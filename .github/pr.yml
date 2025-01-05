@@ -1,0 +1,27 @@
+name: CI Workflow Checks
+
+on:
+  pull_request:
+    branches: [ main ]
+jobs:
+  run-checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: yarn install --immutable
+        working-directory: .
+
+      # - name: Lint
+      #   run: yarn lint
+      #   working-directory: .
+
+      - name: TypeScript compilation
+        run: yarn tsc
+        working-directory: .
+
+      - name: Run tests
+        run: yarn test
+        working-directory: .
