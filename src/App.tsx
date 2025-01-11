@@ -1,18 +1,18 @@
-import './App.css';
-import Footer from './Footer';
+import React from 'react';
+import { CssBaseline, ThemeProvider } from '@mui/material';
+import { BrowserRouter } from 'react-router-dom';
+import { theme } from './theme/theme';
+import AppRoutes from './routes/AppRoutes';
 
-function App() {
+const App: React.FC = () => {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={require('./assets/images/QuaDevIconAlpha.png')} className="App-logo" alt="logo" />
-        <h2 className="App-tagline">Building Robust Software Solutions</h2>
-      </header>
-      <Footer />
-    </div>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </ThemeProvider>
   );
-}
-
-console.log("You are the best!!!!!");
+};
 
 export default App;

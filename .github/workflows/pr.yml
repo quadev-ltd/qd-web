@@ -20,9 +20,9 @@ jobs:
         run: yarn install --immutable
         working-directory: .
 
-      # - name: Lint
-      #   run: yarn lint
-      #   working-directory: .
+      - name: Lint
+        run: yarn lint
+        working-directory: .
 
       - name: TypeScript compilation
         run: yarn tsc
