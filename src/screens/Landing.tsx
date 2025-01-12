@@ -36,11 +36,31 @@ const Landing: React.FC = () => {
             md: '1.5rem',
           },
           color: 'white',
-          mt: 2,
-          fontWeight: 300,
+          mt: 1,
+          fontWeight: 500,
         }}
       >
         Building Robust Software Solutions
+      </Typography>
+      <Typography
+        component="p"
+        sx={{
+          fontSize: {
+            xs: '0.9rem',
+            sm: '1.1rem',
+            md: '1.2rem',
+          },
+          color: 'white',
+          mt: 3,
+          fontWeight: 300,
+          textAlign: 'center',
+        }}
+      >
+        Users can securely sign in to access a foundational interface, designed
+        to evolve into a gateway for innovative AI-powered features and
+        capabilities. This platform also serves as a research and development
+        project, advancing expertise in microservices, secure authentication,
+        and AI integration.
       </Typography>
     </Box>
   );
