@@ -56,11 +56,9 @@ const Landing: React.FC = () => {
           textAlign: 'center',
         }}
       >
-        Users can securely sign in to access a foundational interface, designed
-        to evolve into a gateway for innovative AI-powered features and
-        capabilities. This platform also serves as a research and development
-        project, advancing expertise in microservices, secure authentication,
-        and AI integration.
+        Users can securely sign in to access a simple and secure interface,
+        providing account management options such as the ability to delte their
+        accounts.
       </Typography>
     </Box>
   );
