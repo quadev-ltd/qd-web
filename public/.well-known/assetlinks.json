@@ -11,13 +11,14 @@
   }
 },
 {
-  "relation": ["delegate_permission/common.handle_all_urls"],
+  "relation": ["delegate_permission/common.handle_all_urls", "delegate_permission/common.get_login_creds"],
   "target": {
     "namespace": "android_app",
     "package_name": "com.qdmobile",
     "sha256_cert_fingerprints":
       [
-        "F8:57:9B:DC:5F:70:F6:6B:AD:F2:72:2F:91:A3:64:62:6B:47:50:57:94:8C:2E:40:4D:0D:86:0D:2A:7A:33:27"
+        "F8:57:9B:DC:5F:70:F6:6B:AD:F2:72:2F:91:A3:64:62:6B:47:50:57:94:8C:2E:40:4D:0D:86:0D:2A:7A:33:27",
+        "DF:31:38:08:E2:39:A6:C0:27:3C:9D:46:D7:D2:0F:50:32:E6:98:65:8C:1A:BF:6B:3A:C8:64:F3:3F:6F:94:F5"
       ]
   }
 }]
