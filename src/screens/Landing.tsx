@@ -56,9 +56,12 @@ const Landing: React.FC = () => {
           textAlign: 'center',
         }}
       >
-        Users can securely sign in to access a simple and secure interface,
-        providing account management options such as the ability to delte their
-        accounts.
+        Our platform empowers users to securely sign in and access an intuitive
+        interface designed for seamless account management. Built with a focus
+        on AI innovation, the project aims to advance research and deliver
+        powerful AI-driven features, offering cutting-edge tools and
+        functionalities tailored for developers and businesses seeking to
+        harness the potential of artificial intelligence.
       </Typography>
     </Box>
   );
