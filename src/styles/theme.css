@@ -1,0 +1,44 @@
+/*
+ * Design tokens, from the option A artboards. Tailwind v4 turns every token into
+ * utilities: --color-primary gives bg-primary / text-primary / border-primary,
+ * --radius-card gives rounded-card, --spacing-control gives h-control, and so on.
+ * Components use these names; raw hex values do not belong in components.
+ */
+@theme {
+  --font-sans: 'DM Sans Variable', system-ui, sans-serif;
+  --font-display: 'Sora Variable', system-ui, sans-serif;
+
+  --color-primary: #5050c3;
+  --color-primary-dark: #2c2e87;
+  --color-background: #f1f1f1;
+  --color-surface: #ffffff;
+  --color-text: #222222;
+  --color-muted: #5c5e70;
+  --color-sky: #6cc6f7;
+  --color-danger: #b3261e;
+
+  --color-border: #cfd0dd;
+  --color-border-strong: #b9bacb;
+  --color-border-subtle: #dcdde8;
+  --color-border-faint: #e4e4ec;
+  --color-tint: #ececfa;
+
+  --color-chip: #e3f3fd;
+  --color-chip-text: #0f5682;
+
+  --color-link: #4747b8;
+  --color-link-on-dark: #cdebfc;
+
+  --radius-control: 12px;
+  --radius-cta: 14px;
+  --radius-card: 20px;
+
+  /* The font's own line height: what the designs use wherever they set none. */
+  --leading-natural: normal;
+
+  --spacing-control: 48px;
+  --spacing-gutter: clamp(16px, 4vw, 40px);
+
+  --shadow-card: 0 10px 30px rgb(22 23 80 / 0.12);
+  --shadow-floating: 0 24px 60px rgb(22 23 80 / 0.32);
+}

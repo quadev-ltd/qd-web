@@ -1,0 +1,75 @@
+@import 'tailwindcss';
+@import './theme.css';
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: var(--color-text);
+    background: var(--color-background);
+  }
+
+  a {
+    color: var(--color-link);
+  }
+
+  a:hover {
+    color: var(--color-primary-dark);
+  }
+
+  /* One focus ring for every interactive element. */
+  :focus-visible {
+    outline: 3px solid var(--color-sky);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Long-form legal text: the markup stays plain (h1, h2, p, ul) and is styled here. */
+  .legal-document {
+    font-size: 16px;
+    line-height: 1.7;
+    overflow-wrap: break-word;
+  }
+
+  .legal-document h1 {
+    margin: 0 0 16px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(30px, 5vw, 40px);
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  .legal-document h2 {
+    margin: 40px 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 22px;
+    line-height: 1.25;
+  }
+
+  .legal-document p {
+    margin: 0 0 14px;
+  }
+
+  .legal-document ul {
+    margin: 0 0 14px;
+    padding-left: 24px;
+    list-style: disc;
+  }
+
+  .legal-document li {
+    margin-bottom: 6px;
+  }
+
+  .legal-document a {
+    font-weight: 700;
+    text-decoration: underline;
+  }
+
+  .legal-document strong {
+    font-weight: 700;
+  }
+}

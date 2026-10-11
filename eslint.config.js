@@ -184,14 +184,11 @@ export default tseslint.config(
     },
   },
   {
-    // TODO(PR 2, design foundation): these screens are rewritten with i18n keys
-    // and this exception is removed. Until then they keep their literal text.
+    // The legal documents keep their text word for word as literal JSX: long legal
+    // copy is not worth moving to the translation file. Only these two files.
     files: [
-      'src/components/Footer.tsx',
-      'src/components/MainLayout.tsx',
-      'src/screens/Landing.tsx',
-      'src/screens/PrivacyPolicy.tsx',
-      'src/screens/TermsAndConditions.tsx',
+      'src/screens/PrivacyPolicy/PrivacyPolicyContent.tsx',
+      'src/screens/TermsAndConditions/TermsAndConditionsContent.tsx',
     ],
     rules: {
       'i18next/no-literal-string': 'off',
