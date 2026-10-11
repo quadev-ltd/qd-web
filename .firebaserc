@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "quadevapp-dev",
+    "dev": "quadevapp-dev",
+    "prod": "quadevapp"
+  }
+}

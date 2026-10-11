@@ -80,3 +80,80 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  # A temporary copy of the pull request on Firebase Hosting: the dev build (.env.dev) on the
+  # preview channel `pr-<number>` of quadevapp-dev (alias `dev` in .firebaserc). The channel
+  # expires 7 days after the last push; its address is written to the job summary.
+  # Authenticates with Workload Identity Federation (no JSON key). The job is skipped until
+  # the owner runs scripts/setup-wif.sh and sets the repository variables WIF_PROVIDER_DEV
+  # and WIF_SERVICE_ACCOUNT_DEV (README, "Deploy"). It never runs for a pull request from a
+  # fork or from Dependabot: those get no identity token, and their code must not be given
+  # deploy rights. It is not a required check.
+  preview:
+    needs: [run-checks, e2e]
+    if: >-
+      vars.WIF_PROVIDER_DEV != '' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Only this job can ask for the identity token that Google Cloud exchanges for deploy rights.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack (Yarn 4 from packageManager)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build (dev configuration)
+        run: yarn build:dev
+
+      - name: App-link files unchanged in the build output
+        run: yarn check:well-known
+
+      # `yarn check:bundle` is not run on this build on purpose. It keeps the preview auth
+      # gateway out of PRODUCTION builds, and run-checks has run it on the production build.
+      # The dev build is configured with that gateway (.env.dev) and contains it by design.
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_DEV }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
+
+      # `yarn firebase` runs the pinned firebase-tools (package.json). With --json the command
+      # prints only its result, which holds the address of the channel.
+      # --no-authorized-domains: the address is not added to the sign-in domains of Firebase
+      # Authentication, so the deploy account needs no rights over users.
+      - name: Deploy to the preview channel
+        env:
+          CHANNEL: pr-${{ github.event.pull_request.number }}
+        run: |
+          result="$RUNNER_TEMP/preview.json"
+          status=0
+          yarn firebase hosting:channel:deploy "$CHANNEL" --project dev --expires 7d \
+            --no-authorized-domains --non-interactive --json > "$result" || status=$?
+          cat "$result"
+          if [ "$status" -ne 0 ]; then
+            exit "$status"
+          fi
+          url="$(grep -oE 'https://[A-Za-z0-9.-]+\.web\.app' "$result" | head -n 1 || true)"
+          if [ -z "$url" ]; then
+            echo "The deploy result has no preview address." >&2
+            exit 1
+          fi
+          {
+            echo "### Preview of this pull request"
+            echo
+            echo "$url"
+            echo
+            echo "Dev build on the Firebase Hosting channel \`$CHANNEL\` (project quadevapp-dev). It expires 7 days after the last push."
+          } >> "$GITHUB_STEP_SUMMARY"

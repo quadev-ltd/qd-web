@@ -40,7 +40,8 @@ export default defineConfig(({ command, mode }) => {
       port: 3000,
     },
     build: {
-      // Deployed by .github/workflows/main.yml (SOURCE_DIR).
+      // Deployed by .github/workflows/main.yml (SOURCE_DIR) and by Firebase Hosting
+      // (firebase.json, `public`).
       outDir: 'dist',
     },
     test: {

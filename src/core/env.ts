@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+// zod speeds up object parsing by generating code with `new Function`, and probes whether
+// the page allows that as soon as an object schema is created. The site's
+// Content-Security-Policy (firebase.json) has no 'unsafe-eval', and a browser reports even
+// the probe as a violation. `jitless` turns both off. It is set here, before the first
+// schema: this module is the first one of the application to create a zod object.
+z.config({ jitless: true });
+
 export const ApplicationEnvironentEnum = z.enum(['test', 'dev', 'prod']);
 
 export const AuthGatewayEnum = z.enum(['unavailable', 'preview']);
