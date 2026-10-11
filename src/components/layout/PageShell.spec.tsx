@@ -43,4 +43,29 @@ describe('PageShell', () => {
 
     expect(screen.queryByTestId('arcs')).not.toBeInTheDocument();
   });
+
+  // The focus ring is sky blue on dark surfaces and a darker blue on light ones.
+  it('declares its surface: dark for the brand tone, with a dark header and footer', () => {
+    const { container, unmount } = renderWithProviders(
+      <PageShell title="Page" tone="brand">
+        Content
+      </PageShell>,
+    );
+    expect(container.firstElementChild).toHaveAttribute('data-surface', 'dark');
+    unmount();
+
+    const light = renderWithProviders(
+      <PageShell title="Page">Content</PageShell>,
+    );
+
+    expect(light.container.firstElementChild).toHaveAttribute(
+      'data-surface',
+      'light',
+    );
+    expect(screen.getByRole('banner')).toHaveAttribute('data-surface', 'dark');
+    expect(screen.getByRole('contentinfo')).toHaveAttribute(
+      'data-surface',
+      'dark',
+    );
+  });
 });

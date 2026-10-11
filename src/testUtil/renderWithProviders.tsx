@@ -1,30 +1,95 @@
 import { render } from '@testing-library/react';
-import { type ReactElement } from 'react';
+import { type ReactElement, type ReactNode } from 'react';
+import { Provider } from 'react-redux';
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router';
 
-import { routes } from '@/app/routes';
+import { createRoutes } from '@/app/routes';
+import { AuthGatewayProvider } from '@/core/auth/AuthGatewayProvider';
+import { type AuthGateway } from '@/core/auth/gateway';
+import { unavailableGateway } from '@/core/auth/unavailableGateway';
+import {
+  initialSessionState,
+  type SessionState,
+} from '@/core/state/slices/sessionSlice';
+import { createStore } from '@/core/state/store';
 
 interface Options {
   /** The URL the component is rendered at. */
   route?: string;
+  /** Router state at that URL (what a <Link state> passes). */
+  routeState?: unknown;
+  /** The session the store starts with, on top of the initial one (Initializing). */
+  session?: Partial<SessionState>;
+  /** The auth gateway the component calls. By default sign-in is unavailable. */
+  gateway?: AuthGateway;
 }
 
-// Translations are mocked in vitest.setup.ts (t returns the key), so no i18n
-// provider is needed here. Later providers (store, session, flags) are added in
-// this one place.
+// Translations are mocked in vitest.setup.ts (t returns the key), so no i18n provider is
+// needed here. There is no SessionProvider either: the session is what `session` says, and
+// a spec that needs the real one renders it itself.
 
-/** Renders a component or a screen inside a router. */
+const createProviders = ({
+  session,
+  gateway = unavailableGateway,
+}: Options) => {
+  const store = createStore({
+    session: { ...initialSessionState, ...session },
+  });
+  const Providers = ({ children }: { children: ReactNode }) => (
+    <Provider store={store}>
+      <AuthGatewayProvider gateway={gateway}>{children}</AuthGatewayProvider>
+    </Provider>
+  );
+  return { store, Providers };
+};
+
+/** Renders a component or a screen inside the store, the auth gateway and a router. */
 export const renderWithProviders = (
   ui: ReactElement,
-  { route = '/' }: Options = {},
-) => render(<MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>);
+  options: Options = {},
+) => {
+  const { route = '/', routeState } = options;
+  const { store, Providers } = createProviders(options);
+  return {
+    store,
+    ...render(
+      <Providers>
+        <MemoryRouter initialEntries={[{ pathname: route, state: routeState }]}>
+          {ui}
+        </MemoryRouter>
+      </Providers>,
+    ),
+  };
+};
 
-/** Renders the application's routes at a URL, to test which screen a path shows. */
-export const renderRoute = (route: string) =>
-  render(
-    <RouterProvider
-      router={createMemoryRouter(routes, { initialEntries: [route] })}
-    />,
-  );
+/**
+ * Renders the application's routes at a URL, to test which screen a path shows. The account
+ * screens are loaded on demand, so this waits until the first screen is ready.
+ */
+export const renderRoute = async (route: string, options: Options = {}) => {
+  const { store, Providers } = createProviders(options);
+  const router = createMemoryRouter(createRoutes(), {
+    initialEntries: [route],
+  });
+  if (!router.state.initialized) {
+    await new Promise<void>(resolve => {
+      const stop = router.subscribe(state => {
+        if (state.initialized) {
+          stop();
+          resolve();
+        }
+      });
+    });
+  }
+  return {
+    store,
+    router,
+    ...render(
+      <Providers>
+        <RouterProvider router={router} />
+      </Providers>,
+    ),
+  };
+};
 
 export default renderWithProviders;

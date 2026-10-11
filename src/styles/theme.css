@@ -16,6 +16,8 @@
   --color-muted: #5c5e70;
   --color-sky: #6cc6f7;
   --color-danger: #b3261e;
+  /* The focus ring on light surfaces; dark (purple, indigo) surfaces use --color-sky. */
+  --color-focus: #1b8fd8;
 
   --color-border: #cfd0dd;
   --color-border-strong: #b9bacb;

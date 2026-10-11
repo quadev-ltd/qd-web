@@ -40,6 +40,25 @@ describe('env', () => {
     ).toBe(false);
   });
 
+  it('uses the unavailable auth gateway unless "preview" is asked for', () => {
+    expect(parseEnv(valid).AUTH_GATEWAY).toBe('unavailable');
+    expect(parseEnv({ ...valid, AUTH_GATEWAY: '' }).AUTH_GATEWAY).toBe(
+      'unavailable',
+    );
+    expect(
+      parseEnv({ ...valid, AUTH_GATEWAY: 'unavailable' }).AUTH_GATEWAY,
+    ).toBe('unavailable');
+    expect(parseEnv({ ...valid, AUTH_GATEWAY: 'preview' }).AUTH_GATEWAY).toBe(
+      'preview',
+    );
+  });
+
+  it('rejects an auth gateway it does not know', () => {
+    expect(
+      envSchema.safeParse({ ...valid, AUTH_GATEWAY: 'firebase' }).success,
+    ).toBe(false);
+  });
+
   it('throws naming the invalid variables', () => {
     expect(() => parseEnv({ APPLICATION_ENVIRONMENT: 'staging' })).toThrow(
       /Invalid config variables:[\s\S]*APPLICATION_NAME[\s\S]*APPLICATION_ENVIRONMENT/,
@@ -53,6 +72,7 @@ describe('env', () => {
       APPLICATION_NAME: 'web',
       APPLICATION_ENVIRONMENT: 'test',
       ACCOUNT_ENABLED: false,
+      AUTH_GATEWAY: 'unavailable',
     });
   });
 });

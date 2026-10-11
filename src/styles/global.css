@@ -16,9 +16,23 @@
     color: var(--color-primary-dark);
   }
 
-  /* One focus ring for every interactive element. */
+  /*
+   * One focus ring for every interactive element. Its colour follows the surface the
+   * element is on: the sky blue has too little contrast on white and light grey, so light
+   * surfaces use a darker blue. A surface declares itself with data-surface="dark" or
+   * "light"; the nearest one wins (a white card on the brand background is light).
+   */
+  :root,
+  [data-surface='light'] {
+    --focus-ring: var(--color-focus);
+  }
+
+  [data-surface='dark'] {
+    --focus-ring: var(--color-sky);
+  }
+
   :focus-visible {
-    outline: 3px solid var(--color-sky);
+    outline: 3px solid var(--focus-ring);
     outline-offset: 2px;
   }
 }

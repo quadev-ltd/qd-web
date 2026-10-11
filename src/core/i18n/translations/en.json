@@ -7,6 +7,61 @@
     "signUpButton": "Sign up",
     "changePathButton": "Sign in"
   },
+  "signIn": {
+    "documentTitle": "Sign in | QuaDev",
+    "title": "Sign in",
+    "subtitle": "Use the same account as in the QuaDev mobile app.",
+    "withGoogle": "Sign in with Google",
+    "withApple": "Sign in with Apple",
+    "withSSO": "or",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "passwordLabel": "Password",
+    "forgotButton": "Forgot password?",
+    "submitButton": "Sign in",
+    "changePathDescription": "Don't have an account?",
+    "changePathButton": "Sign up"
+  },
+  "signUp": {
+    "documentTitle": "Sign up | QuaDev",
+    "title": "Create your account",
+    "subtitle": "One account for the web and the QuaDev mobile app.",
+    "withGoogle": "Sign up with Google",
+    "withApple": "Sign up with Apple",
+    "withSSO": "or",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "firstNameLabel": "First name",
+    "lastNameLabel": "Last name",
+    "dobLabel": "Date of birth (optional, DD/MM/YYYY)",
+    "dobPlaceholder": "DD/MM/YYYY",
+    "passwordLabel": "Password",
+    "passwordHint": "At least 8 characters, with upper and lower case letters, a number and a special character.",
+    "passwordConfirmationLabel": "Confirm password",
+    "termsAgreement": "I agree to the",
+    "termsOfService": "Terms of Service",
+    "termsConjunction": "and the",
+    "privacyPolicy": "Privacy policy",
+    "submitButton": "Sign up",
+    "changePathDescription": "Already have an account?",
+    "changePathButton": "Sign in"
+  },
+  "forgotPassword": {
+    "documentTitle": "Reset password | QuaDev",
+    "title": "Reset password",
+    "subtitle": "Please, enter your email address. We will send you a link to create a new password.",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "submitButton": "Reset Password",
+    "sending": "Sending email...",
+    "success": "If an account exists for that email, we've sent it a link to reset the password.\n\nOpen the link to choose a new password, then sign in.",
+    "repeat": "Send another link",
+    "error": "There was an error sending the password reset email",
+    "tryAgain": "Try again",
+    "backToSignInLink": "Back to sign in",
+    "changePathDescription": "Don't have an account?",
+    "changePathButton": "Sign up"
+  },
   "publicHome": {
     "documentTitle": "QuaDev",
     "title": "Building robust software solutions",
@@ -49,7 +104,8 @@
     "homeLink": "Go to the home page"
   },
   "header": {
-    "accountNavAccessibilityLabel": "Account"
+    "accountNavAccessibilityLabel": "Account",
+    "legalNavAccessibilityLabel": "Legal"
   },
   "footer": {
     "copyright": "© {{year}} QuaDev. All rights reserved.",
@@ -58,9 +114,50 @@
     "termsAndConditions": "Terms and Conditions",
     "deleteAccount": "Delete your account"
   },
+  "fieldError": {
+    "emailRequiredError": "Required",
+    "emailFormatError": "Please enter a valid email address",
+    "emailAlreadyUsedError": "Email is already in use",
+    "firstNameRequiredError": "Required",
+    "firstNameLengthError": "First name must be less than 30 characters",
+    "lastNameRequiredError": "Required",
+    "lastNameLengthError": "Last name must be less than 30 characters",
+    "dobFutureError": "Date cannot be in the future",
+    "dobFormatError": "Date of birth format is invalid",
+    "passwordRequiredError": "Required",
+    "passwordFormatError": "Password format is invalid",
+    "passwordLengthError": "Must be at least 8 characters long",
+    "passwordLowercaseError": "Must contain at least one lowercase letter",
+    "passwordUppercaseError": "Must contain at least one uppercase letter",
+    "passwordNumberError": "Must contain at least one number",
+    "passwordSpecialCharacterError": "Must contain at least one special character",
+    "passwordConfirmationRequiredError": "Required",
+    "passwordConfirmationMatchError": "Passwords do not match",
+    "termsRequiredError": "Please agree to the terms and conditions",
+    "invalidEmailOrPasswordError": "Invalid email or password",
+    "passwordNotComplexError": "Password is not complex enough"
+  },
   "error": {
     "documentTitle": "Something went wrong | QuaDev",
     "unexpectedErrorTitle": "Something went wrong",
-    "unexpectedErrorMessage": "Please try again later."
+    "unexpectedErrorMessage": "Please try again later.",
+    "unexpectedErrorRetry": "Something went wrong. Please try again later.",
+    "serverSideError": "There was an error. If the problem persist please contact support.",
+    "networkError": "Network error. Check your connection.",
+    "tooManyRequestsError": "Too many requests. Wait a minute and try again.",
+    "requiresRecentLogin": "For your security, please sign in again and retry.",
+    "userDisabled": "This account has been disabled. Please contact support.",
+    "accountExistsWithDifferentCredential": "An account already exists with this email. Sign in with the method you used before.",
+    "reauthUserMismatch": "That account doesn't match the one you're signed in with.",
+    "accountUnavailable": "Sign-in on the web is not available yet."
+  },
+  "password": {
+    "hideAccessibilityLabel": "Hide password",
+    "showAccessibilityLabel": "Show password",
+    "showButton": "Show",
+    "hideButton": "Hide"
+  },
+  "spinner": {
+    "accessibilityLabel": "Loading"
   }
 }

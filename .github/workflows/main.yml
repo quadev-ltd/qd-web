@@ -41,6 +41,9 @@ jobs:
       - name: App-link files unchanged in the build output
         run: yarn check:well-known
 
+      - name: No preview auth gateway in the build output
+        run: yarn check:bundle
+
       - name: Deploy to S3
         uses: jakejarvis/s3-sync-action@v0.5.1
         with:
