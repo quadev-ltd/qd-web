@@ -1,5 +1,3 @@
-import React from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Toolbar,
@@ -8,8 +6,11 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
-import Footer from './Footer';
+import { Link, Outlet, useLocation } from 'react-router';
+
 import QuaDevIconAlpha from '../assets/images/QuaDevIconAlphaNoWording.png';
+
+import Footer from './Footer';
 
 const MainLayout: React.FC = () => {
   const theme = useTheme();
@@ -27,16 +28,14 @@ const MainLayout: React.FC = () => {
         color: isLandingPage
           ? theme.palette.primary.contrastText
           : theme.palette.text.primary,
-      }}
-    >
+      }}>
       <AppBar
         position="static"
         sx={{
           zIndex: theme.zIndex.drawer + 1,
           backgroundColor: theme.palette.primary.dark,
           boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        }}
-      >
+        }}>
         <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
           {/* Left Section: Logo */}
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -47,8 +46,7 @@ const MainLayout: React.FC = () => {
                 display: 'flex',
                 flexDirection: 'row',
                 alignItems: 'center',
-              }}
-            >
+              }}>
               <img
                 src={QuaDevIconAlpha}
                 alt="QuaDev Logo"
@@ -60,8 +58,7 @@ const MainLayout: React.FC = () => {
                   color: 'white',
                   fontWeight: 'bold',
                   display: { xs: 'none', sm: 'block' },
-                }}
-              >
+                }}>
                 QuaDev
               </Typography>
             </Link>
@@ -76,8 +73,7 @@ const MainLayout: React.FC = () => {
                 textDecoration: 'none',
                 fontSize: '1rem',
                 fontWeight: 500,
-              }}
-            >
+              }}>
               Privacy Policy
             </Link>
             <Link
@@ -87,8 +83,7 @@ const MainLayout: React.FC = () => {
                 textDecoration: 'none',
                 fontSize: '1rem',
                 fontWeight: 500,
-              }}
-            >
+              }}>
               Terms and Conditions
             </Link>
           </Box>

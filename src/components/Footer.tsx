@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box, Typography, Link } from '@mui/material';
 
 const Footer: React.FC = () => {
@@ -11,8 +10,7 @@ const Footer: React.FC = () => {
         textAlign: 'center',
         py: 2,
         width: '100%',
-      }}
-    >
+      }}>
       <Typography variant="body2" sx={{ fontSize: 14 }}>
         © {new Date().getFullYear()} QuaDev. All rights reserved.
       </Typography>
@@ -21,8 +19,7 @@ const Footer: React.FC = () => {
           mt: 1,
           fontSize: 12,
           lineHeight: 1.5,
-        }}
-      >
+        }}>
         <Typography variant="body2">
           <strong>Address:</strong> Apartment 405, 1 Camberwell Passage, SE5
           0AU, London, UK
@@ -35,8 +32,7 @@ const Footer: React.FC = () => {
               color: '#61dafb',
               textDecoration: 'none',
               '&:hover': { textDecoration: 'underline' },
-            }}
-          >
+            }}>
             support@quadev.net
           </Link>
         </Typography>
@@ -48,8 +44,7 @@ const Footer: React.FC = () => {
               color: '#61dafb',
               textDecoration: 'none',
               '&:hover': { textDecoration: 'underline' },
-            }}
-          >
+            }}>
             +44 7597 300 268
           </Link>
         </Typography>

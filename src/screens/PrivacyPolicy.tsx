@@ -196,8 +196,7 @@ const PrivacyPolicy = () => {
           To exercise these rights, contact us at{' '}
           <Link
             href="mailto:support@quadev.com"
-            sx={{ color: 'primary.main', fontWeight: 'bold' }}
-          >
+            sx={{ color: 'primary.main', fontWeight: 'bold' }}>
             support@quadev.com
           </Link>
           .
@@ -252,8 +251,7 @@ const PrivacyPolicy = () => {
             <Link
               href="https://policies.google.com/privacy"
               target="_blank"
-              rel="noopener"
-            >
+              rel="noopener">
               Google Analytics Privacy Policy
             </Link>
             ).
@@ -263,8 +261,7 @@ const PrivacyPolicy = () => {
             <Link
               href="https://firebase.google.com/support/privacy"
               target="_blank"
-              rel="noopener"
-            >
+              rel="noopener">
               Firebase Privacy Policy
             </Link>
             ).
@@ -274,8 +271,7 @@ const PrivacyPolicy = () => {
             <Link
               href="https://policies.google.com/privacy"
               target="_blank"
-              rel="noopener"
-            >
+              rel="noopener">
               Google Privacy Policy
             </Link>
             ).
@@ -311,8 +307,7 @@ const PrivacyPolicy = () => {
           Email:{' '}
           <Link
             href="mailto:support@quadev.com"
-            sx={{ color: 'primary.main', fontWeight: 'bold' }}
-          >
+            sx={{ color: 'primary.main', fontWeight: 'bold' }}>
             support@quadev.com
           </Link>
         </Typography>

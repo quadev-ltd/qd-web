@@ -1,5 +1,5 @@
-import React from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router';
+
 import MainLayout from '../components/MainLayout';
 import Landing from '../screens/Landing';
 import PrivacyPolicy from '../screens/PrivacyPolicy';

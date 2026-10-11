@@ -100,8 +100,7 @@ const TermsAndConditions = () => {
           Notify us immediately at{' '}
           <Link
             href="mailto:support@quadev.com"
-            sx={{ color: 'primary.main', fontWeight: 'bold' }}
-          >
+            sx={{ color: 'primary.main', fontWeight: 'bold' }}>
             support@quadev.com
           </Link>{' '}
           if you suspect unauthorized access to your account or a security
@@ -135,8 +134,7 @@ const TermsAndConditions = () => {
           described in our{' '}
           <Link
             href="/privacy-policy"
-            sx={{ color: 'primary.main', fontWeight: 'bold' }}
-          >
+            sx={{ color: 'primary.main', fontWeight: 'bold' }}>
             Privacy Policy
           </Link>
           .
@@ -176,8 +174,7 @@ const TermsAndConditions = () => {
           collection, storage, and processing of your data as outlined in our{' '}
           <Link
             href="/privacy-policy"
-            sx={{ color: 'primary.main', fontWeight: 'bold' }}
-          >
+            sx={{ color: 'primary.main', fontWeight: 'bold' }}>
             Privacy Policy
           </Link>
           .
@@ -363,8 +360,7 @@ const TermsAndConditions = () => {
           Email:{' '}
           <Link
             href="mailto:support@quadev.com"
-            sx={{ color: 'primary.main', fontWeight: 'bold' }}
-          >
+            sx={{ color: 'primary.main', fontWeight: 'bold' }}>
             support@quadev.com
           </Link>
         </Typography>

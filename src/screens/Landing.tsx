@@ -1,5 +1,5 @@
-import React from 'react';
 import { Box, Typography, useTheme } from '@mui/material';
+
 import QuaDevIconAlpha from '../assets/images/QuaDevIconAlpha.png';
 
 const Landing: React.FC = () => {
@@ -15,8 +15,7 @@ const Landing: React.FC = () => {
         justifyContent: 'center',
         fontSize: 'calc(10px + 2vmin)',
         color: 'white',
-      }}
-    >
+      }}>
       <Box
         component="img"
         src={QuaDevIconAlpha}
@@ -38,8 +37,7 @@ const Landing: React.FC = () => {
           color: 'white',
           mt: 1,
           fontWeight: 500,
-        }}
-      >
+        }}>
         Building Robust Software Solutions
       </Typography>
       <Typography
@@ -54,8 +52,7 @@ const Landing: React.FC = () => {
           mt: 3,
           fontWeight: 300,
           textAlign: 'center',
-        }}
-      >
+        }}>
         Our platform empowers users to securely sign in and access an intuitive
         interface designed for seamless account management. Built with a focus
         on AI innovation, the project aims to advance research and deliver

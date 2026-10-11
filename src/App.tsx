@@ -1,8 +1,8 @@
-import React from 'react';
 import { CssBaseline, ThemeProvider } from '@mui/material';
-import { BrowserRouter } from 'react-router-dom';
-import { theme } from './theme/theme';
+import { BrowserRouter } from 'react-router';
+
 import AppRoutes from './routes/AppRoutes';
+import { theme } from './theme/theme';
 
 const App: React.FC = () => {
   return (

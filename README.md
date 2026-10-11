@@ -1,46 +1,68 @@
-# Getting Started with Create React App
+QuaDev Website
+=======
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+The public website at [quadev.net](https://quadev.net): a [Vite](https://vite.dev) single-page app
+(React 19, TypeScript, React Router). It follows the same conventions as `qd-mobile` wherever they
+apply to the web: the same lint rules, Prettier options, TypeScript strictness, `@/` alias, script
+names and test layout.
 
-## Available Scripts
+**Merging to `main` deploys to production** (see [Deploy](#deploy)).
 
-In the project directory, you can run:
+# Requirements
 
-### `yarn start`
+- Node 24 (`nvm use` reads `.nvmrc`) and Yarn 4 (`corepack enable`).
+- Optional: [gitleaks](https://github.com/gitleaks/gitleaks) (`brew install gitleaks`). `yarn install`
+  points git at `.githooks/`, whose pre-commit hook scans staged changes for secrets when gitleaks
+  is installed.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+# Quickstart
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+```bash
+yarn install
+yarn start:dev       # dev server on http://localhost:3000 (Vite mode `dev`)
+yarn start:prod      # same, with the production configuration (Vite mode `prod`)
+yarn build           # production build into dist/
+yarn preview         # serve dist/ locally
+```
 
-### `yarn test`
+# Architecture rules
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- `src/` is imported through the `@/` alias (`@/components/...`); relative imports only inside a folder.
+- Static files that must keep their exact URL live in `public/` and are copied as they are into
+  `dist/`. `public/.well-known/` holds the app-link files that tie `quadev.net` to the mobile apps
+  (Android App Links, iOS Universal Links): they must never change by accident. `yarn check:well-known`
+  compares them, and their copies in `dist/`, with pinned SHA-256 hashes
+  (`scripts/check-well-known.mjs`); changing one on purpose means updating its hash in the same commit.
+- Tests sit next to the file they test, as `*.spec.ts` / `*.spec.tsx` (Vitest + Testing Library).
+- Lint rules are ported from `qd-mobile/.eslintrc.cjs`; `eslint.config.js` lists what is the same,
+  what was added for the web (`jsx-a11y`) and what does not apply (`react-native/*`).
 
-### `yarn build`
+# Checks
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+yarn typecheck && yarn lint && yarn test
+yarn build && yarn check:well-known
+yarn format          # Prettier, same options as qd-mobile
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Pull request checks (CI)
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Every pull request into `main` runs:
 
-### `yarn eject`
+| Check        | Workflow          | What it proves                                                                                       |
+| ------------ | ----------------- | ---------------------------------------------------------------------------------------------------- |
+| `run-checks` | `pr.yml`          | TypeScript, lint, Vitest, the production build, and that the app-link files are unchanged in `dist/` |
+| `gitleaks`   | `secret-scan.yml` | No secrets in the new commits                                                                        |
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+# Deploy
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+`main.yml` runs on every push to `main`: the same checks as a pull request, then it syncs `dist/` to
+the S3 bucket (with `--delete`) and invalidates the CloudFront distribution. The site is a
+single-page app: the hosting answers unknown paths with `index.html`, and React Router picks the page.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+After a merge, check that:
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+- `https://quadev.net/` loads;
+- `https://quadev.net/privacy-policy` and `https://quadev.net/terms-and-conditions` open by direct URL;
+- `https://quadev.net/.well-known/assetlinks.json` and
+  `https://quadev.net/.well-known/apple-app-site-association` still return the same content.
