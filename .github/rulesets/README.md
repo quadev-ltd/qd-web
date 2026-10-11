@@ -4,7 +4,7 @@
 It mirrors the ruleset of `qd-mobile`:
 
 - changes reach `main` only through a pull request, with all review threads resolved;
-- the checks `run-checks` and `gitleaks` must pass (add `e2e` once that job exists on `main`);
+- the checks `run-checks`, `gitleaks` and `e2e` must pass;
 - `main` cannot be deleted or force-pushed;
 - organisation admins can bypass the rule in an emergency.
 
