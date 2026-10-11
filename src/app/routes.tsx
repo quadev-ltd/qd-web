@@ -5,7 +5,7 @@ import {
   ScrollRestoration,
 } from 'react-router';
 
-import { SignedOutRoutes } from './guards';
+import { HOME_PATH, SignedInRoutes, SignedOutRoutes } from './guards';
 
 import { env } from '@/core/env';
 import DeleteAccountInfoScreen from '@/screens/DeleteAccountInfo/DeleteAccountInfoScreen';
@@ -45,15 +45,27 @@ const accountRoutes: RouteObject[] = [
             .SignUpScreen,
         }),
       },
+    ],
+  },
+  {
+    element: <SignedInRoutes />,
+    children: [
       {
-        path: '/forgot-password',
+        path: HOME_PATH,
         lazy: async () => ({
-          Component: (
-            await import('@/screens/ForgotPassword/ForgotPasswordScreen')
-          ).ForgotPasswordScreen,
+          Component: (await import('@/screens/Home/HomeScreen')).HomeScreen,
         }),
       },
     ],
+  },
+  // For everyone: a signed-out visitor who forgot the password, and a signed-in user who
+  // wants to change it (the link on the signed-in home).
+  {
+    path: '/forgot-password',
+    lazy: async () => ({
+      Component: (await import('@/screens/ForgotPassword/ForgotPasswordScreen'))
+        .ForgotPasswordScreen,
+    }),
   },
 ];
 

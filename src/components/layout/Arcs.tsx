@@ -1,6 +1,9 @@
 export interface ArcsProps {
-  /** home: the public home. auth: the sign-in and sign-up screens. */
-  variant?: 'home' | 'auth';
+  /**
+   * home: the public home. auth: the sign-in and sign-up screens. welcome: the band at the
+   * top of the signed-in home.
+   */
+  variant?: 'home' | 'auth' | 'welcome';
 }
 
 const ARC = 'pointer-events-none absolute box-border rounded-full';
@@ -13,6 +16,10 @@ const VARIANTS = {
   auth: [
     'size-[920px] border-[96px] border-white/6 -right-[330px] -top-[300px]',
     'size-[640px] border-[64px] border-sky/14 -left-[260px] -bottom-[280px]',
+  ],
+  welcome: [
+    'size-[720px] border-[80px] border-white/6 -right-[200px] -top-[330px]',
+    'size-[360px] border-[40px] border-sky/16 right-[220px] -bottom-[250px]',
   ],
 };
 

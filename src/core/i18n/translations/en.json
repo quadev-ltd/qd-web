@@ -59,8 +59,41 @@
     "error": "There was an error sending the password reset email",
     "tryAgain": "Try again",
     "backToSignInLink": "Back to sign in",
+    "backToHomeLink": "Back to your account",
     "changePathDescription": "Don't have an account?",
     "changePathButton": "Sign up"
+  },
+  "home": {
+    "documentTitle": "Home | QuaDev",
+    "welcomeTitle": "Welcome back, {{firstName}}",
+    "welcomeDescription": "Your account is ready. New tools will show up here as they are released.",
+    "comingSoonChip": "Coming soon",
+    "availableChip": "Available",
+    "mockInterviewTitle": "Mock interview",
+    "mockInterviewDescription": "Practise with an AI interviewer that asks the questions and follows up on your answers.",
+    "liveInterviewTitle": "Live interview",
+    "liveInterviewDescription": "Short bullet points for each question while you are being interviewed, with a review afterwards.",
+    "cvToolTitle": "CV tool",
+    "cvToolDescription": "Improve your CV and create versions tailored to each job.",
+    "accountTitle": "Your account",
+    "accountLink": "Account",
+    "profileTitle": "Profile",
+    "nameLabel": "Name",
+    "emailLabel": "Email",
+    "dobLabel": "Date of birth",
+    "dobNotSet": "Not set (optional)",
+    "securityTitle": "Sign-in and security",
+    "signInMethodsLabel": "Sign-in methods",
+    "passwordMethod": "Email and password",
+    "googleMethod": "Google",
+    "appleMethod": "Apple",
+    "passwordLabel": "Password",
+    "changePasswordLink": "Change password"
+  },
+  "drawerMenu": {
+    "home": "Home",
+    "deleteAccount": "Delete account",
+    "signOut": "Sign out"
   },
   "publicHome": {
     "documentTitle": "QuaDev",
@@ -68,6 +101,7 @@
     "description": "One QuaDev account for the web and the mobile app. New tools will arrive here as they are released.",
     "descriptionWithAccount": "One QuaDev account for the web and the mobile app. Create it today; new tools will arrive here as they are released.",
     "createAccountButton": "Create your account",
+    "goToHomeButton": "Go to your account",
     "signUpCardTitle": "Sign up your way",
     "signUpCardDescription": "Use your email, Google or Apple. The same account works in the mobile app.",
     "dataCardTitle": "Only what is needed",
@@ -105,7 +139,9 @@
   },
   "header": {
     "accountNavAccessibilityLabel": "Account",
-    "legalNavAccessibilityLabel": "Legal"
+    "legalNavAccessibilityLabel": "Legal",
+    "mainNavAccessibilityLabel": "Main",
+    "accountMenuAccessibilityLabel": "Account menu for {{name}}"
   },
   "footer": {
     "copyright": "© {{year}} QuaDev. All rights reserved.",
