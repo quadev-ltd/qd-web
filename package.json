@@ -9,6 +9,7 @@
     "start:prod": "vite --mode prod",
     "dev": "vite --mode dev",
     "build": "vite build --mode prod",
+    "build:dev": "vite build --mode dev",
     "preview": "vite preview",
     "build:e2e": "vite build --mode dev --outDir dist-e2e",
     "preview:e2e": "vite preview --mode dev --outDir dist-e2e",
@@ -20,6 +21,8 @@
     "format": "prettier --write .",
     "check:well-known": "node scripts/check-well-known.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
+    "firebase": "npx --yes firebase-tools@15.32.1",
+    "hosting:serve": "yarn firebase emulators:start --only hosting --project demo-quadev",
     "postinstall": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {

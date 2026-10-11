@@ -64,3 +64,54 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
+
+  # Deploys the dev build (.env.dev) to Firebase Hosting on quadevapp-dev (alias `dev` in
+  # .firebaserc): https://quadevapp-dev.web.app. It is a second job so the production deploy
+  # above stays exactly as it was; it starts once that job has passed.
+  # Authenticates with Workload Identity Federation (no JSON key). The job is skipped until
+  # the owner runs scripts/setup-wif.sh and sets the repository variables WIF_PROVIDER_DEV
+  # and WIF_SERVICE_ACCOUNT_DEV (README, "Deploy").
+  deploy-dev:
+    needs: run-checks
+    if: vars.WIF_PROVIDER_DEV != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # One dev deploy at a time; a newer push waits for the running one instead of cancelling it.
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false
+    # Only this job can ask for the identity token that Google Cloud exchanges for deploy rights.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack (Yarn 4 from packageManager)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build (dev configuration)
+        run: yarn build:dev
+
+      - name: App-link files unchanged in the build output
+        run: yarn check:well-known
+
+      # `yarn check:bundle` is not run on this build on purpose. It keeps the preview auth
+      # gateway out of PRODUCTION builds, and run-checks has run it on the production build.
+      # The dev build is configured with that gateway (.env.dev) and contains it by design.
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_DEV }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
+
+      # `yarn firebase` runs the pinned firebase-tools (package.json).
+      - name: Deploy to Firebase Hosting (dev)
+        run: yarn firebase deploy --only hosting --project dev --non-interactive --message "$GITHUB_SHA"

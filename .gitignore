@@ -24,6 +24,10 @@ yarn-error.log*
 /playwright-report
 /test-results
 
+# Firebase CLI (Hosting emulator log, deploy cache)
+/.firebase
+firebase-debug.log
+
 # local overrides (the shared .env.* files are committed: they hold no secrets)
 .env.local
 .env.*.local

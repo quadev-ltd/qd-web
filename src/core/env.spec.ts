@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import { envSchema, parseEnv } from './env';
 
 const valid = {
@@ -6,6 +8,10 @@ const valid = {
 };
 
 describe('env', () => {
+  it('turns off the code generation of zod, which the Content-Security-Policy forbids', () => {
+    expect(z.config().jitless).toBe(true);
+  });
+
   it('accepts the three application environments', () => {
     for (const environment of ['test', 'dev', 'prod']) {
       expect(
