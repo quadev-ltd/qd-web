@@ -1,3 +1,7 @@
 node_modules/
-build/
+dist/
+coverage/
 public/
+.yarn/
+.idea/
+yarn.lock

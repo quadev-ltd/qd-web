@@ -1,0 +1,66 @@
+{
+  "brand": {
+    "name": "QUADEV",
+    "logoAlt": "QuaDev"
+  },
+  "landing": {
+    "signUpButton": "Sign up",
+    "changePathButton": "Sign in"
+  },
+  "publicHome": {
+    "documentTitle": "QuaDev",
+    "title": "Building robust software solutions",
+    "description": "One QuaDev account for the web and the mobile app. New tools will arrive here as they are released.",
+    "descriptionWithAccount": "One QuaDev account for the web and the mobile app. Create it today; new tools will arrive here as they are released.",
+    "createAccountButton": "Create your account",
+    "signUpCardTitle": "Sign up your way",
+    "signUpCardDescription": "Use your email, Google or Apple. The same account works in the mobile app.",
+    "dataCardTitle": "Only what is needed",
+    "dataCardDescription": "Your name and email are enough. Your date of birth is optional.",
+    "deleteCardTitle": "Leave whenever you want",
+    "deleteCardDescription": "You can delete your account and all its data at any time.",
+    "deleteCardLink": "How to delete your account"
+  },
+  "deleteAccountInfo": {
+    "documentTitle": "Delete your account | QuaDev",
+    "title": "Delete your account",
+    "description": "You can delete your QuaDev account at any time. Deleting it is permanent.",
+    "stepsTitle": "In the mobile app",
+    "stepOpenMenu": "Open the menu.",
+    "stepChooseDelete": "Choose Delete account.",
+    "stepConfirm": "Confirm. You may be asked for your password again.",
+    "erasedTitle": "What is erased",
+    "erasedDescription": "Your account and its profile: your name, your email, your date of birth if you gave it, and the data linked to your account.",
+    "permanentTitle": "It cannot be undone",
+    "permanentDescription": "A deleted account cannot be restored. You can create a new account later.",
+    "emailTitle": "By email",
+    "emailDescription": "If you cannot use the app, send an email from the address of your account to the address below and ask us to delete it."
+  },
+  "privacyPolicy": {
+    "documentTitle": "Privacy Policy | QuaDev"
+  },
+  "termsAndConditions": {
+    "documentTitle": "Terms and Conditions | QuaDev"
+  },
+  "notFound": {
+    "documentTitle": "Page not found | QuaDev",
+    "title": "Page not found",
+    "description": "This page does not exist or has moved.",
+    "homeLink": "Go to the home page"
+  },
+  "header": {
+    "accountNavAccessibilityLabel": "Account"
+  },
+  "footer": {
+    "copyright": "© {{year}} QuaDev. All rights reserved.",
+    "navAccessibilityLabel": "Legal and support",
+    "privacyPolicy": "Privacy Policy",
+    "termsAndConditions": "Terms and Conditions",
+    "deleteAccount": "Delete your account"
+  },
+  "error": {
+    "documentTitle": "Something went wrong | QuaDev",
+    "unexpectedErrorTitle": "Something went wrong",
+    "unexpectedErrorMessage": "Please try again later."
+  }
+}

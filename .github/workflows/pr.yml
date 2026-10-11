@@ -1,36 +1,45 @@
-name: CI Workflow Checks
+name: PR checks
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # Keeps the job name used by the previous workflow and by qd-mobile.
   run-checks:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 20
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack (Yarn 4 from packageManager)
+        run: corepack enable
 
       - name: Install dependencies
         run: yarn install --immutable
-        working-directory: .
+
+      - name: TypeScript
+        run: yarn typecheck
 
       - name: Lint
         run: yarn lint
-        working-directory: .
 
-      - name: TypeScript compilation
-        run: yarn tsc
-        working-directory: .
-
-      - name: Run tests
+      - name: Tests
         run: yarn test
-        working-directory: .
 
-      - name: Build React App
+      - name: Build
         run: yarn build
+
+      - name: App-link files unchanged in the build output
+        run: yarn check:well-known

@@ -1,6 +1,6 @@
 {
   "short_name": "QuaDev",
-  "name": "QuaDev Ltd",
+  "name": "QuaDev",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,6 +20,6 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
+  "theme_color": "#2C2E87",
   "background_color": "#5050C3"
 }
