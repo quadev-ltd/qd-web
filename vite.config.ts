@@ -18,6 +18,15 @@ export default defineConfig(({ command, mode }) => {
         `Missing ${missing.join(', ')} for mode "${mode}". Build with \`yarn build\` (mode prod, .env.prod); see .env.example.`,
       );
     }
+    // The preview auth gateway is an in-memory fake for local preview and tests. It must
+    // never be deployed: a production build that asks for it fails here.
+    const isProduction =
+      mode === 'prod' || fileEnv.VITE_APPLICATION_ENVIRONMENT === 'prod';
+    if (isProduction && fileEnv.VITE_AUTH_GATEWAY === 'preview') {
+      throw new Error(
+        'VITE_AUTH_GATEWAY=preview is not allowed in a production build. Use "unavailable" (see .env.prod).',
+      );
+    }
   }
 
   return {

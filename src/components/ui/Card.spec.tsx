@@ -26,4 +26,32 @@ describe('Card', () => {
     expect(screen.getByText('Surface')).toHaveClass('bg-surface');
     expect(screen.getByText('Glass')).toHaveClass('bg-white/10');
   });
+
+  it('declares the white card as a light surface, for the focus ring colour', () => {
+    render(
+      <>
+        <Card>Surface</Card>
+        <Card tone="glass">Glass</Card>
+      </>,
+    );
+
+    expect(screen.getByText('Surface')).toHaveAttribute(
+      'data-surface',
+      'light',
+    );
+    expect(screen.getByText('Glass')).not.toHaveAttribute('data-surface');
+  });
+
+  it('has more padding when asked', () => {
+    render(
+      <>
+        <Card>Standard</Card>
+        <Card padding="roomy">Roomy</Card>
+      </>,
+    );
+
+    expect(screen.getByText('Standard')).toHaveClass('p-6');
+    expect(screen.getByText('Roomy')).toHaveClass('p-[clamp(22px,6vw,36px)]');
+    expect(screen.getByText('Roomy')).not.toHaveClass('p-6');
+  });
 });

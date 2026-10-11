@@ -43,3 +43,6 @@ jobs:
 
       - name: App-link files unchanged in the build output
         run: yarn check:well-known
+
+      - name: No preview auth gateway in the build output
+        run: yarn check:bundle

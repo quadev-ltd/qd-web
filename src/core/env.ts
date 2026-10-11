@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export const ApplicationEnvironentEnum = z.enum(['test', 'dev', 'prod']);
 
+export const AuthGatewayEnum = z.enum(['unavailable', 'preview']);
+
 export const envSchema = z.object({
   APPLICATION_NAME: z.string(),
   APPLICATION_ENVIRONMENT: ApplicationEnvironentEnum,
@@ -11,6 +13,17 @@ export const envSchema = z.object({
     .enum(['true', 'false', ''])
     .optional()
     .transform(value => value === 'true'),
+  // What answers the account screens (src/core/auth). "unavailable" (the default): every
+  // action fails with "not available yet". "preview": an in-memory fake, for local preview
+  // and tests only; a production build refuses it (vite.config.ts).
+  AUTH_GATEWAY: z
+    .enum([...AuthGatewayEnum.options, ''])
+    .optional()
+    .transform(value =>
+      value === AuthGatewayEnum.enum.preview
+        ? AuthGatewayEnum.enum.preview
+        : AuthGatewayEnum.enum.unavailable,
+    ),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -35,4 +48,5 @@ export const env = parseEnv({
   APPLICATION_NAME: import.meta.env.VITE_APPLICATION_NAME,
   APPLICATION_ENVIRONMENT: import.meta.env.VITE_APPLICATION_ENVIRONMENT,
   ACCOUNT_ENABLED: import.meta.env.VITE_ACCOUNT_ENABLED,
+  AUTH_GATEWAY: import.meta.env.VITE_AUTH_GATEWAY,
 });
