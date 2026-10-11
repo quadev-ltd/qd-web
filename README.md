@@ -43,7 +43,8 @@ fails instead of deploying a blank page.
 off:
 
 - the public home shows no "Sign in", "Sign up" or "Create your account" buttons;
-- `/sign-in`, `/sign-up` and `/forgot-password` are not registered and show the Not found page;
+- `/sign-in`, `/sign-up`, `/forgot-password` and `/home` are not registered and show the Not found
+  page;
 - the browser never downloads the account screens (they are separate files, loaded on demand).
 
 To see the account screens locally:
@@ -52,8 +53,8 @@ To see the account screens locally:
 VITE_ACCOUNT_ENABLED=true yarn start:dev
 ```
 
-The signed-in home (`/home`) is not built yet: after a successful sign-in with the preview gateway
-the site goes to `/home`, which shows the Not found page for now.
+`.env.dev` uses the preview auth gateway (below), so the screens work end to end: sign up or use the
+sample account, land on the signed-in home, sign out.
 
 ## The auth gateway
 
@@ -83,8 +84,9 @@ It is a fake for clicking through the screens: never type a real password into i
 2. A production build with `VITE_AUTH_GATEWAY=preview` fails (`vite.config.ts`).
 3. `yarn check:bundle` (run in CI after the build) fails if the build output contains it.
 
-When the backend is connected, a `firebaseGateway` replaces both without touching a screen
-(see the plan's next steps); `firebase/*` imports will then be limited to that folder by a lint rule.
+When the backend is connected, a `firebaseGateway` replaces both without touching a screen;
+`firebase/*` imports will then be limited to that folder by a lint rule. The reasoning is in
+[ADR 0002](docs/adr/0002-auth-gateway-boundary.md).
 
 # Architecture
 
@@ -92,7 +94,8 @@ When the backend is connected, a `firebaseGateway` replaces both without touchin
 src/
   app/          App.tsx (provider tree), routes.tsx, guards.tsx (route guards)
   components/   ui/ (Button, ButtonLink, Card, Chip, Checkbox)
-                layout/ (PageShell, SiteHeader, SiteFooter, BrandLink, Arcs, LegalPage)
+                layout/ (PageShell, SiteHeader, SiteFooter, BrandLink, Arcs, LegalPage,
+                         MainNav, AccountMenu)
                 FormTextInput, Spinner, AppLoading
                 HookFormInputs/ (HookFormTextInput, HookFormPasswordInput, HookFormDateInput)
                 SignIn/ (Layout, SSOForm, Divider, ErrorMessage, FooterPrompt, SubmitButton)
@@ -104,11 +107,13 @@ src/
                 sso/ (GoogleSSOCTA, AppleSSOCTA, useSSOSignIn)
   hooks/        usePasswordValidation.ts
   schemas/      signInSchema.ts, signUpSchema.ts, forgotPasswordSchema.ts
-  screens/      one folder per screen: PublicHome/, SignIn/, SignUp/, ForgotPassword/,
+  screens/      one folder per screen: PublicHome/, SignIn/, SignUp/, ForgotPassword/, Home/,
                 PrivacyPolicy/, TermsAndConditions/, DeleteAccountInfo/, NotFound/, Error/
   styles/       theme.css (design tokens), global.css
   testUtil/     renderWithProviders.tsx, mockGateway.ts
   util/         index.ts (date helpers)
+e2e/            Playwright tests (the two critical flows, accessibility, keyboard)
+docs/adr/       architecture decisions
 ```
 
 The provider tree in `App.tsx` has the same order as the mobile app:
@@ -116,6 +121,10 @@ The provider tree in `App.tsx` has the same order as the mobile app:
 
 Files that have a mobile original say so in their first comment (`// Mirrors qd-mobile src/...`).
 Change the two together.
+
+Why the stack is what it is, how each choice maps to the mobile app and where the website differs:
+[ADR 0001](docs/adr/0001-web-stack.md). How the screens work without a backend:
+[ADR 0002](docs/adr/0002-auth-gateway-boundary.md).
 
 Rules (the same as in `qd-mobile` where they exist there):
 
@@ -145,10 +154,14 @@ Rules (the same as in `qd-mobile` where they exist there):
 - **Auth:** screens call the auth gateway from `useAuthGateway()`; nothing else knows how users are
   signed in. `src/core/auth/selectAuthGateway.ts` is the only place that chooses the gateway.
 - **Route guards** (`src/app/guards.tsx`) read the session status, like the app's Router: while it is
-  `initializing` they show a loading state; a signed-in (`ready`) user who opens `/sign-in`,
-  `/sign-up` or `/forgot-password` is sent to `/home`.
+  `initializing` they show a loading state; a signed-in (`ready`) user who opens `/sign-in` or
+  `/sign-up` is sent to `/home`; a visitor who is not signed in and opens `/home` is sent to
+  `/sign-in`; a user who signs out on `/home` lands on the public home.
 - **Feature flags:** `useFlag('key')` from `src/core/flags/FlagsProvider.tsx`. The registry mirrors
-  the app's (and the backend's); the website has no remote source yet, so the code defaults apply.
+  the app's (and the backend's): never add a flag here that the backend does not have. The website
+  has no remote source yet, so the code defaults apply (all off). On the signed-in home, "Mock
+  interview" and "Live interview" follow `interviewAssistant`; the "CV tool" has no flag yet and is
+  always "Coming soon".
 - **Focus ring:** one rule for every interactive element (`global.css`). Its colour follows the
   surface: `data-surface="dark"` (brand and indigo backgrounds) uses the sky blue, light surfaces a
   darker blue, so the ring always has enough contrast.
@@ -174,6 +187,7 @@ Rules (the same as in `qd-mobile` where they exist there):
 | `/sign-in`              | Sign in (only with the account flag on)                                  |
 | `/sign-up`              | Sign up (only with the account flag on)                                  |
 | `/forgot-password`      | Reset password (only with the account flag on)                           |
+| `/home`                 | Signed-in home (only with the account flag on; needs a session)          |
 | anything else           | Not found                                                                |
 
 # Quickstart
@@ -191,6 +205,7 @@ yarn preview         # serve dist/ locally
 ```bash
 yarn typecheck && yarn lint && yarn test
 yarn build && yarn check:well-known && yarn check:bundle
+yarn e2e             # end-to-end tests (first time: yarn playwright install chromium)
 yarn format          # Prettier, same options as qd-mobile
 ```
 
@@ -205,6 +220,31 @@ session to start with (`{ session: { status: SessionStatus.Ready } }`) and the g
 (`createMockGateway()` from `src/testUtil/mockGateway.ts`, the web equivalent of mocking the app's
 Firebase modules). `await renderRoute('/path')` renders the application's routes at a URL.
 
+## End-to-end tests (Playwright)
+
+The web equivalent of the app's Maestro flows, in `e2e/`. `yarn e2e` builds the site in the dev mode
+with `VITE_ACCOUNT_ENABLED=true` and `VITE_AUTH_GATEWAY=preview` (into `dist-e2e/`), serves it with
+`vite preview` on port 4173 and runs the tests in Chromium at two sizes: desktop (1280 x 900) and
+phone (390 x 844). No backend is involved: the preview gateway answers.
+
+```bash
+yarn playwright install chromium   # once: downloads the browser
+yarn e2e
+yarn e2e --project=phone           # one size only
+yarn e2e --ui                      # interactive runner
+```
+
+| File                           | What it proves                                                                                                  |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `auth-email-lifecycle.spec.ts` | Sign up → signed-in home with the user's own name → reload keeps the session → sign out → public home → sign in |
+| `auth-sign-in-errors.spec.ts`  | Empty and invalid fields, wrong password, forgot password (neutral message), then a successful sign-in          |
+| `pages.spec.ts`                | Every page: no serious or critical accessibility violation (axe) and no horizontal scroll                       |
+| `keyboard.spec.ts`             | Keyboard-only sign-in, the account menu with the keyboard, the focus ring colour on light and dark surfaces     |
+
+The detailed cases (every validation rule, every error code) are unit tests; the end-to-end tests
+cover the paths that cross screens. They prove the screens, the session and the guards, not the
+backend: email verification and account deletion get their flows when the backend is connected.
+
 ## Lint
 
 `eslint.config.js` ports the rules of `qd-mobile/.eslintrc.cjs` and lists, at the top, what is the
@@ -218,9 +258,11 @@ Every pull request into `main` runs:
 | Check        | Workflow          | What it proves                                                                                                                                        |
 | ------------ | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `run-checks` | `pr.yml`          | TypeScript, lint, Vitest, the production build, that the app-link files are unchanged in `dist/`, and that the preview auth gateway is not in `dist/` |
+| `e2e`        | `pr.yml`          | The Playwright tests above; the report is uploaded as an artifact when they fail                                                                      |
 | `gitleaks`   | `secret-scan.yml` | No secrets in the new commits                                                                                                                         |
 
-`gitleaks` also runs on pull requests into other branches; `run-checks` only on those into `main`.
+`gitleaks` also runs on pull requests into other branches; `run-checks` and `e2e` only on those into
+`main`.
 
 # Deploy
 

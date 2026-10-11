@@ -25,6 +25,9 @@
   --color-border-faint: #e4e4ec;
   --color-tint: #ececfa;
 
+  /* Text on the sky blue (the initials in the account menu button). */
+  --color-on-sky: #1e1f5c;
+
   --color-chip: #e3f3fd;
   --color-chip-text: #0f5682;
 

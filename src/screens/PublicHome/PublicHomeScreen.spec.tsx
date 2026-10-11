@@ -2,6 +2,7 @@ import { screen } from '@testing-library/react';
 
 import { PublicHomeScreen } from './PublicHomeScreen';
 
+import { SessionStatus } from '@/core/state/slices/sessionSlice';
 import { renderWithProviders } from '@/testUtil/renderWithProviders';
 
 const mockEnv = vi.hoisted(() => ({
@@ -109,5 +110,53 @@ describe('PublicHomeScreen', () => {
         screen.queryByText('publicHome.description'),
       ).not.toBeInTheDocument();
     });
+
+    describe('for a signed-in user', () => {
+      const signedIn = { session: { status: SessionStatus.Ready } };
+
+      it('links to their home instead of sign in and sign up', () => {
+        renderWithProviders(<PublicHomeScreen />, signedIn);
+
+        expect(
+          screen.getByRole('link', { name: 'drawerMenu.home' }),
+        ).toHaveAttribute('href', '/home');
+        expect(
+          screen.getByRole('link', { name: 'publicHome.goToHomeButton' }),
+        ).toHaveAttribute('href', '/home');
+        expect(
+          screen.queryByRole('link', { name: 'landing.changePathButton' }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole('link', { name: 'landing.signUpButton' }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole('link', {
+            name: 'publicHome.createAccountButton',
+          }),
+        ).not.toBeInTheDocument();
+      });
+
+      it('does not invite them to create an account', () => {
+        renderWithProviders(<PublicHomeScreen />, signedIn);
+
+        expect(screen.getByText('publicHome.description')).toBeInTheDocument();
+        expect(
+          screen.queryByText('publicHome.descriptionWithAccount'),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  it('shows no way to the signed-in home while the account flag is off, even with a session', () => {
+    renderWithProviders(<PublicHomeScreen />, {
+      session: { status: SessionStatus.Ready },
+    });
+
+    expect(
+      screen.queryByRole('link', { name: 'drawerMenu.home' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'publicHome.goToHomeButton' }),
+    ).not.toBeInTheDocument();
   });
 });

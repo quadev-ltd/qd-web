@@ -10,10 +10,13 @@
     "dev": "vite --mode dev",
     "build": "vite build --mode prod",
     "preview": "vite preview",
+    "build:e2e": "vite build --mode dev --outDir dist-e2e",
+    "preview:e2e": "vite preview --mode dev --outDir dist-e2e",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "playwright test",
     "format": "prettier --write .",
     "check:well-known": "node scripts/check-well-known.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
@@ -34,7 +37,9 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.0",
     "@tailwindcss/vite": "4.3.3",
     "@testing-library/dom": "10.4.2",
     "@testing-library/jest-dom": "7.0.1",

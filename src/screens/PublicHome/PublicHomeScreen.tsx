@@ -8,11 +8,15 @@ import logo from '@/assets/images/QuaDevIconAlpha.png';
 import PageShell from '@/components/layout/PageShell';
 import ButtonLink from '@/components/ui/ButtonLink';
 import { env } from '@/core/env';
+import { useSessionStatus } from '@/core/session/hooks';
+import { SessionStatus } from '@/core/state/slices/sessionSlice';
 
 export const PublicHomeScreen: React.FC = () => {
   const { t } = useTranslation();
   // Off in production until the account backend is connected: no account entry points.
   const accountEnabled = env.ACCOUNT_ENABLED;
+  // A signed-in user gets the way back to their home instead of the sign-in buttons.
+  const isSignedIn = useSessionStatus() === SessionStatus.Ready;
 
   return (
     <PageShell
@@ -23,12 +27,20 @@ export const PublicHomeScreen: React.FC = () => {
           <nav
             aria-label={t('header.accountNavAccessibilityLabel')}
             className="flex items-center gap-2">
-            <ButtonLink to="/sign-in" variant="text" size="small">
-              {t('landing.changePathButton')}
-            </ButtonLink>
-            <ButtonLink to="/sign-up" variant="inverse" size="small">
-              {t('landing.signUpButton')}
-            </ButtonLink>
+            {isSignedIn ? (
+              <ButtonLink to="/home" variant="inverse" size="small">
+                {t('drawerMenu.home')}
+              </ButtonLink>
+            ) : (
+              <>
+                <ButtonLink to="/sign-in" variant="text" size="small">
+                  {t('landing.changePathButton')}
+                </ButtonLink>
+                <ButtonLink to="/sign-up" variant="inverse" size="small">
+                  {t('landing.signUpButton')}
+                </ButtonLink>
+              </>
+            )}
           </nav>
         )
       }
@@ -45,18 +57,26 @@ export const PublicHomeScreen: React.FC = () => {
           {t('publicHome.title')}
         </h1>
         <p className="max-w-[600px] text-[18px] leading-[1.55]">
-          {accountEnabled
+          {accountEnabled && !isSignedIn
             ? t('publicHome.descriptionWithAccount')
             : t('publicHome.description')}
         </p>
         {accountEnabled && (
           <div className="mt-2 flex flex-wrap justify-center gap-3">
-            <ButtonLink to="/sign-up" variant="inverse" size="large">
-              {t('publicHome.createAccountButton')}
-            </ButtonLink>
-            <ButtonLink to="/sign-in" variant="outline" size="large">
-              {t('landing.changePathButton')}
-            </ButtonLink>
+            {isSignedIn ? (
+              <ButtonLink to="/home" variant="inverse" size="large">
+                {t('publicHome.goToHomeButton')}
+              </ButtonLink>
+            ) : (
+              <>
+                <ButtonLink to="/sign-up" variant="inverse" size="large">
+                  {t('publicHome.createAccountButton')}
+                </ButtonLink>
+                <ButtonLink to="/sign-in" variant="outline" size="large">
+                  {t('landing.changePathButton')}
+                </ButtonLink>
+              </>
+            )}
           </div>
         )}
       </div>

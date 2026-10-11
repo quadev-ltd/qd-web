@@ -17,9 +17,12 @@ yarn-error.log*
 
 # build output
 /dist
+/dist-e2e
 
 # testing
 /coverage
+/playwright-report
+/test-results
 
 # local overrides (the shared .env.* files are committed: they hold no secrets)
 .env.local
