@@ -41,7 +41,10 @@ export default tseslint.config(
     // Like mobile (`ignorePatterns: ['*.js']`): only TypeScript is linted.
     ignores: [
       'dist/',
+      'dist-e2e/',
       'coverage/',
+      'playwright-report/',
+      'test-results/',
       'node_modules/',
       '.yarn/',
       'public/',

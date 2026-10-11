@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Navigate, Outlet } from 'react-router';
 
 import AppLoading from '@/components/AppLoading';
@@ -25,6 +26,28 @@ export const SignedOutRoutes: React.FC = () => {
   }
   if (status === SessionStatus.Ready) {
     return <Navigate to={HOME_PATH} replace />;
+  }
+  return <Outlet />;
+};
+
+/**
+ * The signed-in routes. A visitor who is not signed in is sent to the sign-in screen. A
+ * user who signs out while on one of these pages is sent to the public home instead, as
+ * the app goes back to its landing screen.
+ */
+export const SignedInRoutes: React.FC = () => {
+  const status = useSessionStatus();
+  const [wasReady, setWasReady] = useState(status === SessionStatus.Ready);
+
+  if (status === SessionStatus.Ready && !wasReady) {
+    setWasReady(true);
+  }
+
+  if (status === SessionStatus.Initializing) {
+    return <AppLoading />;
+  }
+  if (status !== SessionStatus.Ready) {
+    return <Navigate to={wasReady ? '/' : '/sign-in'} replace />;
   }
   return <Outlet />;
 };

@@ -11,6 +11,8 @@ export interface PageShellProps {
   arcs?: ArcsProps['variant'];
   /** The browser tab title. */
   title: string;
+  /** Shown next to the brand in the header: the main navigation of the signed-in pages. */
+  headerNav?: ReactNode;
   /** Shown on the right of the header. */
   headerActions?: ReactNode;
   /** Layout classes for the main area. */
@@ -23,6 +25,7 @@ export const PageShell: React.FC<PageShellProps> = ({
   tone = 'light',
   arcs = 'home',
   title,
+  headerNav,
   headerActions,
   mainClassName,
   children,
@@ -34,7 +37,7 @@ export const PageShell: React.FC<PageShellProps> = ({
     }`}>
     <title>{title}</title>
     {tone === 'brand' && <Arcs variant={arcs} />}
-    <SiteHeader tone={tone === 'brand' ? 'brand' : 'solid'}>
+    <SiteHeader tone={tone === 'brand' ? 'brand' : 'solid'} nav={headerNav}>
       {headerActions}
     </SiteHeader>
     <main className={`relative flex-1 ${mainClassName ?? ''}`}>{children}</main>

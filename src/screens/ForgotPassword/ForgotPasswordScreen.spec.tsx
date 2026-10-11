@@ -2,6 +2,7 @@ import { screen } from '@testing-library/react';
 
 import { ForgotPasswordScreen } from './ForgotPasswordScreen';
 
+import { SessionStatus } from '@/core/state/slices/sessionSlice';
 import { renderWithProviders } from '@/testUtil/renderWithProviders';
 
 vi.mock('@/core/logger', () => ({
@@ -56,5 +57,26 @@ describe('ForgotPasswordScreen', () => {
     });
 
     expect(screen.getByLabelText('forgotPassword.emailLabel')).toHaveValue('');
+  });
+
+  it('leads a signed-in user back to their home, without the sign-up prompt', () => {
+    renderWithProviders(<ForgotPasswordScreen />, {
+      route: '/forgot-password',
+      routeState: { email: 'ada@example.com' },
+      session: { status: SessionStatus.Ready },
+    });
+
+    expect(
+      screen.getByRole('link', { name: 'forgotPassword.backToHomeLink' }),
+    ).toHaveAttribute('href', '/home');
+    expect(
+      screen.queryByRole('link', { name: 'forgotPassword.backToSignInLink' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'forgotPassword.changePathButton' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('forgotPassword.emailLabel')).toHaveValue(
+      'ada@example.com',
+    );
   });
 });

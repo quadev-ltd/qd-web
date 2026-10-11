@@ -95,13 +95,13 @@ describe('routes', () => {
       ).toBeInTheDocument();
     });
 
-    // The signed-in home arrives with the next change.
-    it('shows the not found page at /home for now', async () => {
-      await renderRoute('/home', signedOut);
+    it('guards /home: a signed-out visitor is sent to the sign-in screen', async () => {
+      const { router } = await renderRoute('/home', signedOut);
 
       expect(
-        screen.getByRole('heading', { level: 1, name: 'notFound.title' }),
+        await screen.findByRole('heading', { level: 1, name: 'signIn.title' }),
       ).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe('/sign-in');
     });
 
     it('still shows the public pages', async () => {
