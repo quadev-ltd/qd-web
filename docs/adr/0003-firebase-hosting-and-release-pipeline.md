@@ -2,7 +2,7 @@
 
 - **Status:** accepted (October 2026); being implemented in steps (see "Steps")
 - **Scope:** where `qd-web` is hosted, `firebase.json`, `.firebaserc`, `scripts/setup-wif.sh` and
-  the deploy workflows
+  the deploy workflows (`main.yml`, `pr.yml`, `release.yml`)
 
 ## Context
 
@@ -50,13 +50,22 @@ merges go to dev, a version tag goes to production after approval.**
   accepts only `quadev-ltd/qd-web`, and a service account `hosting-deployer` whose only role is
   `roles/firebasehosting.admin`. `scripts/setup-wif.sh` creates them (dry run by default) and the
   owner runs it once per project. Workflows read two repository variables per environment
-  (`WIF_PROVIDER_DEV`, `WIF_SERVICE_ACCOUNT_DEV`; `..._PROD` for production) and skip the deploy job
-  while they are missing.
+  (`WIF_PROVIDER_DEV`, `WIF_SERVICE_ACCOUNT_DEV`; `..._PROD` for production). The dev jobs are
+  skipped while theirs are missing; a release fails before deploying anything.
+- **Production deploy rights belong to the approval step only.** On `quadevapp` the provider accepts
+  a token only when its subject is `repo:quadev-ltd/qd-web:environment:production`, which GitHub
+  issues only to a job that runs in the environment `production`. The environment's rules (a
+  required reviewer, version tags only) therefore decide who can deploy production; a pull request
+  workflow cannot, even if it is edited to try. On dev any workflow of the repository is accepted,
+  because pull request previews need it.
 - **Pull request previews** on Hosting preview channels of the dev project (`pr-<number>`, expiring
   after 7 days), never for pull requests from forks.
-- **Production by version tag with approval.** A tag `vX.Y.Z` that equals the version in
-  `package.json` runs the checks, waits for a reviewer on the GitHub environment `production`, then
-  deploys the production build. This is the rule `qd-mobile` uses for its releases.
+- **Production by version tag with approval** (`release.yml`). A tag `vX.Y.Z` that equals the
+  version in `package.json` runs the checks, waits for a reviewer on the GitHub environment
+  `production`, then deploys the production build. This is the rule `qd-mobile` uses for its
+  releases. One rule is added for the web: the tagged commit must be on `main`, because a tag can
+  be pushed on any commit and only `main` has been through a reviewed pull request and the
+  end-to-end tests.
 - **A Content-Security-Policy from the start,** written for the site as it is (everything from its
   own origin, no inline code, no `eval`), sent in report-only mode first and enforced once the dev
   site shows no violation. The README has the policy and the steps.
@@ -66,11 +75,11 @@ merges go to dev, a version tag goes to production after approval.**
 Each step is safe to merge on its own, and production is not touched before step 4.
 
 1. Hosting configuration, the dev deploy on merge and pull request previews. Production stays on S3
-   and still deploys on merge. **(this change)**
+   and still deploys on merge. **(done)**
 2. `dev.quadev.net` points at the dev site (DNS, by hand, logged in
    `quadev-backend/docs/operations/infrastructure-log.md`).
 3. The release workflow: a version tag deploys production to Firebase Hosting and, during the
-   transition, to S3 as well; `main.yml` stops deploying production.
+   transition, to S3 as well; `main.yml` stops deploying production. **(this change)**
 4. `quadev.net` and `www` point at the production site. CloudFront stays up for two weeks as the
    rollback.
 5. The S3 and CloudFront deploy, its secrets and the AWS resources are removed.
@@ -98,8 +107,17 @@ Each step is safe to merge on its own, and production is not touched before step
 ## Consequences
 
 - **Merged is no longer released** (from step 3): a merge is visible on the dev site, and
-  production changes only when a version is tagged and approved. Until then every merge still
-  releases production.
+  production changes only when a version is tagged and approved.
+- **The approval exists only if the environment does.** GitHub creates a missing environment on
+  first use, without protection. The environment `production` with its required reviewer, the
+  keyless setup on `quadevapp` and the two variables must exist before the first tag (README,
+  "One-time setup for production").
+- **One release, two deploys, during the transition.** The release deploys the same build to
+  Firebase Hosting first and S3 second. If the second fails, the two hosts differ until the failed
+  job is run again; before step 4 nobody visits the Firebase address, and after it S3 is only the
+  rollback.
+- **The release does not repeat the end-to-end tests.** It relies on the pull request that put the
+  commit on `main`, which is why the tagged commit must be on `main`.
 - **During the transition there are two hosts.** The README's "Deploy" section says which is live
   for what; `firebase.json` is not in effect on `quadev.net` until step 4, so the 404 on direct
   links and the missing headers remain there until then.
@@ -114,9 +132,7 @@ Each step is safe to merge on its own, and production is not touched before step
 - **The policy must be kept with the code.** A change that loads something from another origin, or
   adds inline code, has to change the Content-Security-Policy in the same pull request (README,
   "Hosting configuration"). zod's code generation is turned off for it (`src/core/env.ts`).
-- **Open for the production step:** whether `Strict-Transport-Security` gets `includeSubDomains`
-  and `preload` on `quadev.net` (it would cover every subdomain, so each must serve HTTPS first),
-  and narrowing the production provider to tag builds or to the `production` environment rather
-  than the whole repository.
+- **Open for step 4:** whether `Strict-Transport-Security` gets `includeSubDomains` and `preload`
+  on `quadev.net` (it would cover every subdomain, so each must serve HTTPS first).
 - **The app-link files have a new server.** Their bytes are checked in CI (`yarn check:well-known`)
   and must be compared on the live addresses at steps 2 and 4, together with their content types.

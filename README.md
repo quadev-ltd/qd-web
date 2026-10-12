@@ -6,8 +6,8 @@ The public website at [quadev.net](https://quadev.net): a [Vite](https://vite.de
 wherever they apply to the web: the same lint rules, Prettier options, TypeScript strictness, `@/`
 alias, folder layout, script names, translations and test style.
 
-**Merging to `main` deploys to production**, and to the dev site on Firebase Hosting once its
-one-time setup is done (see [Deploy](#deploy)).
+**Merging to `main` deploys to the dev site. Production is released by pushing a version tag**
+(`vX.Y.Z`) and approving the release (see [Deploy](#deploy)).
 
 # Requirements
 
@@ -293,38 +293,112 @@ until the one-time setup is done, and for pull requests from forks.
 
 The site is moving from S3 + CloudFront to Firebase Hosting, in steps
 ([ADR 0003](docs/adr/0003-firebase-hosting-and-release-pipeline.md)). **This is the transition
-state:** production is still served from S3 exactly as before, and Firebase Hosting serves a dev
-site and pull request previews.
+state:** `quadev.net` is still served from S3 + CloudFront, a release deploys the production build
+to both hosts, and Firebase Hosting also serves a dev site and pull request previews.
 
-|            | Production                             | Dev site                                  | Pull request preview                              |
-| ---------- | -------------------------------------- | ----------------------------------------- | ------------------------------------------------- |
-| Address    | `quadev.net`                           | `https://quadevapp-dev.web.app`           | `https://quadevapp-dev--pr-<number>-<id>.web.app` |
-| Hosted on  | S3 + CloudFront                        | Firebase Hosting, project `quadevapp-dev` | Hosting preview channel `pr-<number>`             |
-| Build      | `yarn build` (`.env.prod`)             | `yarn build:dev` (`.env.dev`)             | `yarn build:dev` (`.env.dev`)                     |
-| Updated by | `main.yml`, job `run-checks`, on merge | `main.yml`, job `deploy-dev`, on merge    | `pr.yml`, job `preview`, on every push            |
-| Status     | Live, unchanged                        | Skipped until the one-time setup below    | Skipped until the one-time setup below            |
+|            | Production                                                            | Dev site                                  | Pull request preview                              |
+| ---------- | --------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------- |
+| Address    | `quadev.net` (S3 + CloudFront today), `https://quadevapp.web.app`     | `https://quadevapp-dev.web.app`           | `https://quadevapp-dev--pr-<number>-<id>.web.app` |
+| Hosted on  | S3 + CloudFront **and** Firebase Hosting, project `quadevapp`         | Firebase Hosting, project `quadevapp-dev` | Hosting preview channel `pr-<number>`             |
+| Build      | `yarn build` (`.env.prod`)                                            | `yarn build:dev` (`.env.dev`)             | `yarn build:dev` (`.env.dev`)                     |
+| Updated by | `release.yml`, on a tag `vX.Y.Z`, after approval                      | `main.yml`, job `deploy-dev`, on merge    | `pr.yml`, job `preview`, on every push            |
+| Needs      | [One-time setup for production](#one-time-setup-for-production-owner) | The dev one-time setup below (done)       | The dev one-time setup below (done)               |
 
-`dev.quadev.net` is still another name for the production site on CloudFront. Pointing it at the dev
-site, releasing production to Firebase Hosting from a version tag, and removing the S3 deploy are
-later steps (ADR 0003).
+**A merge to `main` no longer changes `quadev.net`.** It updates the dev site only. Pointing
+`dev.quadev.net` at the dev site, pointing `quadev.net` at Firebase Hosting, and removing the S3
+deploy are the remaining steps (ADR 0003).
 
-## Production (unchanged)
+## Production release
 
-`main.yml` runs on every push to `main`: the same checks as a pull request, then it syncs `dist/` to
-the S3 bucket (with `--delete`) and invalidates the CloudFront distribution. The site is a
-single-page app: the hosting answers unknown paths with `index.html`, and React Router picks the page.
+`release.yml` runs when a tag `vX.Y.Z` is pushed:
 
-After a merge, check that:
+1. **`run-checks`** fails unless the tag equals `v` + the `version` in `package.json` (the rule
+   `qd-mobile` uses), the tagged commit is on `main`, and the production deploy is set up. Then it
+   runs the same checks as a pull request (TypeScript, lint, tests, production build, app-link
+   files, no preview auth gateway). The end-to-end tests are not repeated: the commit passed them in
+   its pull request.
+2. **`deploy-production`** waits for an approval on the GitHub environment `production`. Once
+   approved it builds with `.env.prod`, repeats the two checks on that build, and deploys it to
+   Firebase Hosting (`firebase deploy --only hosting --project prod`, labelled with the tag and the
+   commit) and then to S3 (with `--delete`) with a CloudFront invalidation, as `main.yml` did on
+   every merge before.
 
-- `https://quadev.net/` loads;
-- `https://quadev.net/privacy-policy`, `https://quadev.net/terms-and-conditions` and
-  `https://quadev.net/delete-account` open by direct URL;
-- `https://quadev.net/.well-known/assetlinks.json` and
-  `https://quadev.net/.well-known/apple-app-site-association` still return the same content.
+### Cutting a release
+
+1. Merge a pull request that sets the new `version` in `package.json`.
+2. Tag that commit on `main` and push the tag:
+
+   ```bash
+   git checkout main && git pull
+   git tag v0.2.0        # must equal "v" + the version in package.json
+   git push origin v0.2.0
+   ```
+
+3. Open **Actions → Release**. When `run-checks` has passed, the run shows **Review deployments**:
+   tick `production` and approve.
+4. Check the release:
+   - `https://quadevapp.web.app/` and `https://quadev.net/` load;
+   - `/privacy-policy`, `/terms-and-conditions` and `/delete-account` open by direct URL on both
+     (on `quadev.net` they still answer with status 404 until it is served by Firebase Hosting);
+   - `/.well-known/assetlinks.json` and `/.well-known/apple-app-site-association` still return the
+     same content on both (the commands in [After a deploy](#after-a-deploy) do this for a
+     Firebase Hosting address).
+
+A tag that fails `run-checks` deploys nothing. Fix the cause, delete the tag
+(`git push origin :refs/tags/v0.2.0`, `git tag -d v0.2.0`) and tag again. If the deploy job fails
+part-way, use **Re-run failed jobs** on the same run: both deploys can be repeated safely.
+
+### Rolling back
+
+- **Both hosts:** open the run of the previous tag in **Actions → Release**, choose **Re-run all
+  jobs** and approve it. It rebuilds that tag and deploys it to Firebase Hosting and S3.
+- **Firebase Hosting only (seconds):** Firebase console → project `quadevapp` → Hosting → release
+  history → the previous release → **Rollback**. This does not change what S3 serves, so while
+  `quadev.net` is on CloudFront it is not enough on its own.
+
+### One-time setup for production (owner)
+
+All three are needed **before the first tag is pushed**.
+
+1. **Create the environment `production` with a required reviewer.** Repository **Settings →
+   Environments → New environment**, name `production` (lower case, exactly). Then:
+   - tick **Required reviewers** and add yourself. Leave **Prevent self-review** unticked, or the
+     person who pushes the tag cannot approve it;
+   - under **Deployment branches and tags** choose **Selected branches and tags** and add the tag
+     rule `v*.*.*`, so only a version tag can use the environment.
+
+   If the environment does not exist when the first release runs, GitHub creates it **without any
+   protection** and the release deploys with no approval.
+
+2. **Create the keyless deploy on `quadevapp`**, signed in to `gcloud` as an Owner of the project:
+
+   ```bash
+   scripts/setup-wif.sh --project quadevapp           # dry run: prints the commands
+   scripts/setup-wif.sh --project quadevapp --apply
+   ```
+
+   It is the same as on dev (see [One-time setup for dev](#one-time-setup-for-dev-owner)) with one
+   difference: the provider on `quadevapp` accepts a token only from a job that runs in the
+   environment `production`. No other workflow or job of this repository can deploy production,
+   and the environment's rules above decide who gets there. Record the run in
+   `quadev-backend/docs/operations/infrastructure-log.md`.
+
+3. **Set the two repository variables it prints** (names of resources, not secrets):
+
+   ```bash
+   gh variable set WIF_PROVIDER_PROD -R quadev-ltd/qd-web --body '<printed value>'
+   gh variable set WIF_SERVICE_ACCOUNT_PROD -R quadev-ltd/qd-web --body '<printed value>'
+   ```
+
+   While they are missing, a release stops in `run-checks` with a message that names them.
+
+The S3 half of the release keeps using the repository secrets it always used (`S3_BUCKET_NAME`,
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `CLOUDFRONT_DISTRIBUTION_ID`); nothing
+to do for it. They are removed with the S3 deploy (ADR 0003, step 5).
 
 ## Dev site and pull request previews (Firebase Hosting)
 
-- **Dev site.** After the production job has passed, the job `deploy-dev` builds with `.env.dev` and
+- **Dev site.** After the checks have passed, the job `deploy-dev` builds with `.env.dev` and
   runs `firebase deploy --only hosting --project dev`. The release is labelled with the commit, and
   the Firebase console (Hosting → release history) can roll back to an earlier one.
 - **Previews.** On a pull request into `main`, after `run-checks` and `e2e` pass, the job `preview`
@@ -346,9 +420,9 @@ Deploys are **keyless**: the workflow proves to Google Cloud that it runs in `qu
 The Firebase CLI is not a dependency: `yarn firebase` runs the pinned version with `npx`
 (`package.json`; the same version as `quadev-backend`).
 
-### One-time setup (repository owner)
+### One-time setup for dev (owner)
 
-Per Firebase project; only `quadevapp-dev` is needed for now.
+Done for `quadevapp-dev` in October 2026; kept as the record of what exists and how to repeat it.
 
 1. Read what will be created (prints the commands, runs nothing, needs no login):
 
@@ -381,15 +455,14 @@ Per Firebase project; only `quadevapp-dev` is needed for now.
    ```
 
 4. Open or update a pull request and check that `preview` publishes it; after the next merge, check
-   the dev site as in [After a dev deploy](#after-a-dev-deploy).
+   the dev site as in [After a deploy](#after-a-deploy).
 
-`--project quadevapp` prints the same for production, with the variables `WIF_PROVIDER_PROD` and
-`WIF_SERVICE_ACCOUNT_PROD`. Nothing uses them yet: they belong to the release pipeline (ADR 0003).
+Production has its own setup: [One-time setup for production](#one-time-setup-for-production-owner).
 
-### After a dev deploy
+### After a deploy
 
 ```bash
-site=https://quadevapp-dev.web.app
+site=https://quadevapp-dev.web.app   # production: https://quadevapp.web.app
 curl -sI $site/privacy-policy                 # 200, text/html, cache-control: no-cache, the security headers
 curl -sI $site/assets/<a file from dist/assets>   # cache-control: public, max-age=31536000, immutable
 curl -s $site/.well-known/assetlinks.json | shasum -a 256
@@ -398,10 +471,9 @@ curl -sI $site/.well-known/apple-app-site-association   # content-type: applicat
 curl -sI $site/assets/missing.js              # 404, and not cached for a year
 ```
 
-Until the first real deploy these rules are verified against the Hosting emulator only; the live
-service is the reference. One known difference: the emulator answers a missing file under
-`/assets/` with a 404 that carries the one-year cache header (it does not apply the `404.html`
-rule). If the live service does the same, the rule has to change.
+All of these were checked on the live dev site after its first deploy (12 October 2026). The live
+service is the reference, not the emulator: the emulator answers a missing file under `/assets/`
+with a 404 that carries the one-year cache header, and the live service does not (`no-cache`).
 
 ## Hosting configuration
 
@@ -483,5 +555,6 @@ curl -sI http://127.0.0.1:5002/privacy-policy
 
 The first run downloads the Firebase CLI. The port is 5002 because macOS uses 5000 and the
 `quadev-backend` emulators use 5001. Restart it after changing `firebase.json`. It follows the same
-rules as the live service for everything checked here, but it is an emulation: the checks in
-[After a dev deploy](#after-a-dev-deploy) are the proof.
+rules as the live service for everything checked here except the cache header of a missing file
+under `/assets/`, but it is an emulation: the checks in [After a deploy](#after-a-deploy) are the
+proof.
