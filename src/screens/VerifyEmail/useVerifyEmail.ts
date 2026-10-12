@@ -1,7 +1,8 @@
 // Mirrors qd-mobile src/screens/VerifyEmail/useVerifyEmail.ts: the same states and the same
 // session actions (the app keeps the key of an error; here it is the translated message, as
 // in the other web hooks). The app checks again when it returns to the foreground; the website
-// checks again when its tab becomes visible.
+// checks again when its tab becomes visible. Web only so far: a new account starts with the
+// wait before "resend" already running.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -13,7 +14,8 @@ import {
   logAuthError,
 } from '@/core/auth/errors';
 import { SIGN_IN_PATH } from '@/core/auth/paths';
-import { useAppDispatch } from '@/core/state/hooks';
+import { useAppDispatch, useAppSelector } from '@/core/state/hooks';
+import { selectSessionUser } from '@/core/state/selectors/session';
 import { signedOutPathChosen } from '@/core/state/slices/exitSlice';
 import {
   authStateChanged,
@@ -23,6 +25,25 @@ import {
 export const RESEND_COOLDOWN_SECONDS = 60;
 
 export type ResendStatus = 'idle' | 'sending' | 'sent' | 'error';
+
+/**
+ * Signing up sends the first email, and the backend refuses another one within about a minute.
+ * So a new account starts with the wait running: the seconds left of it, counted from the
+ * creation of the account (0 for an older account, or when the gateway gives no date).
+ */
+export const waitLeftAfterSignUp = (
+  createdAt: number | undefined,
+  now: number,
+): number => {
+  if (createdAt === undefined) {
+    return 0;
+  }
+  const secondsLeft = Math.ceil(
+    (createdAt + RESEND_COOLDOWN_SECONDS * 1000 - now) / 1000,
+  );
+  // Never longer than a full wait, whatever the clock of this device says.
+  return Math.max(0, Math.min(RESEND_COOLDOWN_SECONDS, secondsLeft));
+};
 
 /**
  * VerifyEmail logic. The link in the email opens the page that confirms the address; back
@@ -37,10 +58,16 @@ export const useVerifyEmail = () => {
   const [notVerifiedYet, setNotVerifiedYet] = useState(false);
   const [resendStatus, setResendStatus] = useState<ResendStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
-  const [cooldown, setCooldown] = useState(0);
+  const createdAt = useAppSelector(selectSessionUser)?.createdAt;
+  const [firstWait] = useState(() => {
+    const now = Date.now();
+    const seconds = waitLeftAfterSignUp(createdAt, now);
+    return { seconds, endsAt: now + seconds * 1000 };
+  });
+  const [cooldown, setCooldown] = useState(firstWait.seconds);
   // The wait is measured against the clock, so it stays right while the browser slows the
   // timers of a tab in the background.
-  const cooldownEndsAt = useRef(0);
+  const cooldownEndsAt = useRef(firstWait.endsAt);
 
   const startCooldown = () => {
     cooldownEndsAt.current = Date.now() + RESEND_COOLDOWN_SECONDS * 1000;

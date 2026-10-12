@@ -50,13 +50,17 @@ import {
 
 // ---------- Session ----------
 
-export const toSessionUser = (user: User): SessionUser => ({
-  uid: user.uid,
-  email: user.email,
-  emailVerified: user.emailVerified,
-  displayName: user.displayName,
-  providerIds: (user.providerData ?? []).map(info => info.providerId),
-});
+export const toSessionUser = (user: User): SessionUser => {
+  const createdAt = Date.parse(user.metadata?.creationTime ?? '');
+  return {
+    uid: user.uid,
+    email: user.email,
+    emailVerified: user.emailVerified,
+    displayName: user.displayName,
+    providerIds: (user.providerData ?? []).map(info => info.providerId),
+    ...(Number.isNaN(createdAt) ? {} : { createdAt }),
+  };
+};
 
 /** Calls `listener` now and on every sign-in / sign-out. Returns the unsubscribe function. */
 export const subscribeToAuthState = (

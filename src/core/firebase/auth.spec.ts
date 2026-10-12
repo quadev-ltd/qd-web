@@ -107,6 +107,22 @@ describe('toSessionUser', () => {
       providerIds: ['password'],
     });
   });
+
+  it('keeps when the account was created, as a number', () => {
+    const user = fakeUser(['password'], {
+      metadata: { creationTime: 'Mon, 12 Oct 2026 14:27:00 GMT' },
+    });
+
+    expect(toSessionUser(user as never).createdAt).toBe(
+      Date.UTC(2026, 9, 12, 14, 27, 0),
+    );
+  });
+
+  it('leaves it out when Firebase gives no usable date', () => {
+    const user = fakeUser(['password'], { metadata: { creationTime: '' } });
+
+    expect(toSessionUser(user as never)).not.toHaveProperty('createdAt');
+  });
 });
 
 describe('the session', () => {
