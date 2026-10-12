@@ -7,11 +7,12 @@ import { Link } from 'react-router';
 import { DocumentIcon, MicrophoneIcon, SoundWaveIcon } from './icons';
 import ToolCard from './ToolCard';
 
-import AccountMenu from '@/components/layout/AccountMenu';
 import Arcs from '@/components/layout/Arcs';
-import MainNav from '@/components/layout/MainNav';
-import PageShell from '@/components/layout/PageShell';
+import SignedInShell, {
+  ACCOUNT_SECTION_ID,
+} from '@/components/layout/SignedInShell';
 import Card from '@/components/ui/Card';
+import { DELETE_ACCOUNT_PATH } from '@/core/auth/paths';
 import { isoDateToDisplay } from '@/core/auth/profile';
 import {
   APPLE_PROVIDER_ID,
@@ -20,10 +21,6 @@ import {
 } from '@/core/auth/types';
 import { useFlag } from '@/core/flags/FlagsProvider';
 import { useProfile, useSessionUser, useSignOut } from '@/core/session/hooks';
-
-const HOME_PATH = '/home';
-const ACCOUNT_SECTION_ID = 'account';
-const ACCOUNT_PATH = `${HOME_PATH}#${ACCOUNT_SECTION_ID}`;
 
 const CARD_TITLE = 'text-[17px] leading-natural font-bold';
 const DETAILS =
@@ -55,7 +52,6 @@ export const HomeScreen: React.FC = () => {
   const firstName = profile?.firstName ?? '';
   const lastName = profile?.lastName ?? '';
   const fullName = `${firstName} ${lastName}`.trim();
-  const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   const dateOfBirth = displayDate(profile?.dateOfBirth);
 
   const providerIds = user?.providerIds ?? [];
@@ -67,20 +63,7 @@ export const HomeScreen: React.FC = () => {
   ].filter(Boolean);
 
   return (
-    <PageShell
-      tone="light"
-      title={t('home.documentTitle')}
-      headerNav={<MainNav homePath={HOME_PATH} accountPath={ACCOUNT_PATH} />}
-      headerActions={
-        <AccountMenu
-          firstName={firstName}
-          fullName={fullName}
-          initials={initials}
-          homePath={HOME_PATH}
-          accountPath={ACCOUNT_PATH}
-          onSignOut={signOut}
-        />
-      }>
+    <SignedInShell title={t('home.documentTitle')}>
       <div
         data-surface="dark"
         className="relative overflow-hidden bg-primary px-gutter pt-[clamp(36px,7vw,56px)] pb-28 text-white">
@@ -171,7 +154,7 @@ export const HomeScreen: React.FC = () => {
                     {t('drawerMenu.signOut')}
                   </button>
                   <Link
-                    to="/delete-account"
+                    to={DELETE_ACCOUNT_PATH}
                     className={`${ACTION} text-danger hover:text-danger`}>
                     {t('drawerMenu.deleteAccount')}
                   </Link>
@@ -181,7 +164,7 @@ export const HomeScreen: React.FC = () => {
           </section>
         </div>
       </div>
-    </PageShell>
+    </SignedInShell>
   );
 };
 

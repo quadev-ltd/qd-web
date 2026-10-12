@@ -1,8 +1,10 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { ForgotPasswordScreen } from './ForgotPasswordScreen';
 
 import { SessionStatus } from '@/core/state/slices/sessionSlice';
+import { createMockGateway } from '@/testUtil/mockGateway';
 import { renderWithProviders } from '@/testUtil/renderWithProviders';
 
 vi.mock('@/core/logger', () => ({
@@ -26,17 +28,38 @@ describe('ForgotPasswordScreen', () => {
     expect(document.title).toBe('forgotPassword.documentTitle');
   });
 
-  it('links back to sign in, and to sign up', () => {
+  it('links back to sign in from the header, and to sign up', () => {
     renderWithProviders(<ForgotPasswordScreen />, {
       route: '/forgot-password',
     });
 
     expect(
-      screen.getByRole('link', { name: 'forgotPassword.backToSignInLink' }),
+      screen.getByText('forgotPassword.rememberedPrompt'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'landing.changePathButton' }),
     ).toHaveAttribute('href', '/sign-in');
     expect(
       screen.getByRole('link', { name: 'forgotPassword.changePathButton' }),
     ).toHaveAttribute('href', '/sign-up');
+  });
+
+  it('offers the way back to sign in under the success message', async () => {
+    renderWithProviders(<ForgotPasswordScreen />, {
+      route: '/forgot-password',
+      routeState: { email: 'ada@example.com' },
+      gateway: createMockGateway(),
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'forgotPassword.submitButton' }),
+    );
+
+    expect(
+      await screen.findByRole('link', {
+        name: 'forgotPassword.backToSignInLink',
+      }),
+    ).toHaveAttribute('href', '/sign-in');
   });
 
   it('starts with the email carried over from the sign-in screen', () => {
@@ -70,7 +93,10 @@ describe('ForgotPasswordScreen', () => {
       screen.getByRole('link', { name: 'forgotPassword.backToHomeLink' }),
     ).toHaveAttribute('href', '/home');
     expect(
-      screen.queryByRole('link', { name: 'forgotPassword.backToSignInLink' }),
+      screen.queryByText('forgotPassword.rememberedPrompt'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'landing.changePathButton' }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'forgotPassword.changePathButton' }),

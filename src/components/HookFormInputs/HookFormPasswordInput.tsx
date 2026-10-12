@@ -20,6 +20,8 @@ import {
 
 import { HookFormTextInput } from './HookFormTextInput';
 
+import { PasswordVisibilityToggle } from '@/components/PasswordVisibilityToggle';
+
 interface PasswordConfirmationProps<TFormSchema extends FieldValues> {
   label: string;
   name: Path<TFormSchema>;
@@ -86,17 +88,10 @@ export const HookFormPasswordInput = <TFormSchema extends FieldValues>({
   };
 
   const visibilityToggle = (
-    <button
-      type="button"
-      onClick={togglePasswordVisibility}
-      aria-label={
-        isPasswordVisible
-          ? t('password.hideAccessibilityLabel')
-          : t('password.showAccessibilityLabel')
-      }
-      className="absolute top-0.5 right-1 h-11 min-w-[60px] cursor-pointer rounded-[10px] px-3 text-sm leading-natural font-medium text-link hover:bg-tint">
-      {isPasswordVisible ? t('password.hideButton') : t('password.showButton')}
-    </button>
+    <PasswordVisibilityToggle
+      isPasswordVisible={isPasswordVisible}
+      onToggle={togglePasswordVisibility}
+    />
   );
 
   const liveHints = !isValid && (

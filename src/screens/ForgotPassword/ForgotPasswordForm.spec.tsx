@@ -22,6 +22,8 @@ const renderForm = (defaultEmail = '') => {
       emailLabel="email"
       defaultEmail={defaultEmail}
       submitLabel="submit"
+      backPath="/sign-in"
+      backLabel="back"
     />,
     { gateway },
   );
@@ -54,6 +56,11 @@ describe('ForgotPasswordForm', () => {
     expect(await screen.findByText('forgotPassword.success')).toBeVisible();
     expect(gateway.sendPasswordReset).toHaveBeenCalledWith('ada@example.com');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByTestId('status-icon-check')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'back' })).toHaveAttribute(
+      'href',
+      '/sign-in',
+    );
   });
 
   it('shows the same neutral message when no account exists', async () => {
@@ -83,6 +90,14 @@ describe('ForgotPasswordForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'error.networkError',
     );
+    expect(screen.getByTestId('status-icon-error')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'back' }),
+    ).not.toBeInTheDocument();
+    const tryAgain = screen.getByRole('button', {
+      name: 'forgotPassword.tryAgain',
+    });
+    await waitFor(() => expect(tryAgain).toHaveFocus());
     await userEvent.click(
       screen.getByRole('button', { name: 'forgotPassword.tryAgain' }),
     );
@@ -103,17 +118,24 @@ describe('ForgotPasswordForm', () => {
     );
   });
 
-  it('shows that the email is being sent', async () => {
+  // The app replaces the form with a spinner; here the form stays, disabled.
+  it('keeps the form in place, disabled, while the email is being sent', async () => {
     const { gateway } = renderForm();
     gateway.sendPasswordReset.mockReturnValue(new Promise(() => undefined));
 
     await submit('ada@example.com');
 
+    const button = screen.getByRole('button', { name: 'submit' });
+    await waitFor(() => expect(button).toBeDisabled());
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('spinner')).toBeInTheDocument();
+    expect(screen.getByLabelText('email')).toBeDisabled();
+    expect(screen.getByLabelText('email')).toHaveValue('ada@example.com');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'forgotPassword.sending',
+    );
     expect(
-      await screen.findByText('forgotPassword.sending'),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'submit' }),
+      screen.queryByText('forgotPassword.success'),
     ).not.toBeInTheDocument();
   });
 

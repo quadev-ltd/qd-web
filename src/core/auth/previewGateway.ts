@@ -23,6 +23,11 @@ import {
  * It knows one sample account (PREVIEW_USER) and the accounts created with the sign-up form.
  * They live in memory and in sessionStorage, so reloading the page keeps the session and
  * closing the tab forgets everything. Nothing is sent anywhere. Never type a real password.
+ *
+ * An account created with the sign-up form starts with an unverified email, as on the real
+ * backend, but no email exists here. `window.qdPreview` (PreviewControls) stands for what
+ * happens outside the site: `qdPreview.verifyEmail()` is "the user opened the link in the
+ * email". The end-to-end tests use it, and so can anyone in the browser console.
  */
 export const PREVIEW_GATEWAY_MARKER = 'qd-preview-gateway';
 
@@ -38,7 +43,26 @@ interface PreviewAccount {
   email: string;
   password: string;
   providerIds: string[];
-  profile: UserProfile;
+  emailVerified: boolean;
+  /** `null`: the account has no profile document (see PreviewControls.removeProfile). */
+  profile: UserProfile | null;
+}
+
+/** What happens outside the site, for the signed-in preview account. Test and preview only. */
+export interface PreviewControls {
+  /** The user opened the link in the verification email. */
+  verifyEmail(): void;
+  /** The profile document is gone (a failed write at sign-up): the site asks for the names. */
+  removeProfile(): void;
+}
+
+/** The gateway, and the controls that `window.qdPreview` exposes. */
+export type PreviewGateway = AuthGateway & { controls: PreviewControls };
+
+declare global {
+  interface Window {
+    qdPreview?: PreviewControls;
+  }
 }
 
 interface PreviewState {
@@ -54,6 +78,7 @@ const SEEDED_ACCOUNT: PreviewAccount = {
   email: PREVIEW_USER.email,
   password: PREVIEW_USER.password,
   providerIds: [PASSWORD_PROVIDER_ID, GOOGLE_PROVIDER_ID, APPLE_PROVIDER_ID],
+  emailVerified: true,
   profile: { ...PREVIEW_USER.profile },
 };
 
@@ -87,8 +112,7 @@ const readState = (storage: PreviewStorage | null): PreviewState => {
 const toSessionUser = (account: PreviewAccount): SessionUser => ({
   uid: account.uid,
   email: account.email,
-  // There is no verification step in the preview: every account counts as verified.
-  emailVerified: true,
+  emailVerified: Boolean(account.emailVerified),
   displayName: null,
   providerIds: account.providerIds,
 });
@@ -96,7 +120,7 @@ const toSessionUser = (account: PreviewAccount): SessionUser => ({
 /** `storage: null` keeps everything in memory only. */
 export const createPreviewGateway = (
   storage: PreviewStorage | null = browserStorage(),
-): AuthGateway => {
+): PreviewGateway => {
   const state = readState(storage);
   const listeners = new Set<(user: SessionUser | null) => void>();
   const profileListeners = new Map<
@@ -106,7 +130,7 @@ export const createPreviewGateway = (
   // The sample account is the same for every tab; a changed profile lives in this tab only.
   const sampleAccount: PreviewAccount = {
     ...SEEDED_ACCOUNT,
-    profile: { ...SEEDED_ACCOUNT.profile },
+    profile: { ...PREVIEW_USER.profile },
   };
 
   const accounts = () => [sampleAccount, ...state.accounts];
@@ -138,8 +162,14 @@ export const createPreviewGateway = (
     setCurrent(sampleAccount);
     return {
       user: toSessionUser(sampleAccount),
-      names: { ...sampleAccount.profile },
+      names: { ...PREVIEW_USER.profile },
     };
+  };
+
+  const notifyProfile = (account: PreviewAccount) => {
+    profileListeners
+      .get(account.uid)
+      ?.forEach(listener => listener(account.profile));
   };
 
   const requireCurrentAccount = () => {
@@ -150,7 +180,21 @@ export const createPreviewGateway = (
     return account;
   };
 
+  const controls: PreviewControls = {
+    verifyEmail: () => {
+      requireCurrentAccount().emailVerified = true;
+      save();
+    },
+    removeProfile: () => {
+      const account = requireCurrentAccount();
+      account.profile = null;
+      save();
+      notifyProfile(account);
+    },
+  };
+
   return {
+    controls,
     subscribeToAuthState: listener => {
       listeners.add(listener);
       listener(currentUser());
@@ -169,8 +213,23 @@ export const createPreviewGateway = (
         watchers.delete(onNext);
       };
     },
-    createProfileIfMissing: async uid =>
-      hasCompleteNames(findByUid(uid)?.profile),
+    // Like the backend: an existing profile is left alone; a missing one is created from
+    // the provider's names when both are there.
+    createProfileIfMissing: async (uid, names) => {
+      const account = findByUid(uid);
+      if (!account) {
+        return false;
+      }
+      if (!account.profile && names.firstName && names.lastName) {
+        account.profile = {
+          firstName: names.firstName,
+          lastName: names.lastName,
+        };
+        save();
+        notifyProfile(account);
+      }
+      return hasCompleteNames(account.profile);
+    },
     saveProfile: async (uid, profile) => {
       const account = findByUid(uid);
       if (!account) {
@@ -178,7 +237,7 @@ export const createPreviewGateway = (
       }
       account.profile = { ...profile };
       save();
-      profileListeners.get(uid)?.forEach(listener => listener(account.profile));
+      notifyProfile(account);
     },
     getClaims: async () => NO_CLAIMS,
 
@@ -191,6 +250,8 @@ export const createPreviewGateway = (
         email: email.trim().toLowerCase(),
         password,
         providerIds: [PASSWORD_PROVIDER_ID],
+        // As on the backend: the email of a new account is not verified yet.
+        emailVerified: false,
         profile,
       };
       state.accounts.push(account);
@@ -206,7 +267,8 @@ export const createPreviewGateway = (
       setCurrent(account);
       return toSessionUser(account);
     },
-    // No email exists here: every account counts as verified, and nothing is sent.
+    // No email exists here and nothing is sent: `qdPreview.verifyEmail()` stands for opening
+    // the link, and `refreshUser` then reports the verified user.
     sendVerificationEmail: async () => {
       requireCurrentAccount();
     },
@@ -221,20 +283,32 @@ export const createPreviewGateway = (
       setCurrent(null);
     },
     getReauthMethod,
-    // Like the backend, without the Google window: a wrong password is refused, and the
-    // account is gone afterwards. The sample account is only signed out (it is built in).
+    // Like the backend, without the Google window: a password account must give its
+    // password (the backend asks for it only when the sign-in is old; the preview always
+    // does, so the step can be seen), a wrong one is refused, and the account is gone
+    // afterwards. The sample account is only signed out (it is built in).
     deleteAccount: async ({ password } = {}) => {
       const account = requireCurrentAccount();
-      if (
-        getReauthMethod(toSessionUser(account)) === 'password' &&
-        password !== undefined &&
-        password !== account.password
-      ) {
-        throw new AppAuthError(AuthErrorCode.InvalidCredential);
+      if (getReauthMethod(toSessionUser(account)) === 'password') {
+        if (password === undefined) {
+          throw new AppAuthError(AuthErrorCode.RequiresRecentLogin);
+        }
+        if (password !== account.password) {
+          throw new AppAuthError(AuthErrorCode.InvalidCredential);
+        }
       }
       state.accounts = state.accounts.filter(({ uid }) => uid !== account.uid);
       profileListeners.delete(account.uid);
       setCurrent(null);
     },
   };
+};
+
+/**
+ * Puts the preview controls on `window.qdPreview`, for the browser console and the
+ * end-to-end tests. Only the preview gateway has them, so they are never in a production build.
+ */
+export const exposePreviewControls = (gateway: PreviewGateway): AuthGateway => {
+  window.qdPreview = gateway.controls;
+  return gateway;
 };

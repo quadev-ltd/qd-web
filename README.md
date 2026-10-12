@@ -52,8 +52,8 @@ page if it is started that way (`src/core/env.ts`).
 off:
 
 - the public home shows no "Sign in", "Sign up" or "Create your account" buttons;
-- `/sign-in`, `/sign-up`, `/forgot-password` and `/home` are not registered and show the Not found
-  page;
+- `/sign-in`, `/sign-up`, `/forgot-password`, `/verify-email`, `/complete-profile`, `/home` and
+  `/account/delete` are not registered and show the Not found page;
 - the browser never downloads the account screens (they are separate files, loaded on demand).
 
 To see the account screens locally:
@@ -62,8 +62,8 @@ To see the account screens locally:
 VITE_ACCOUNT_ENABLED=true yarn start:dev
 ```
 
-`.env.dev` uses the preview auth gateway (below), so the screens work end to end: sign up or use the
-sample account, land on the signed-in home, sign out.
+`.env.dev` uses the preview auth gateway (below), so the screens work end to end: sign up, verify
+the email, land on the signed-in home, sign out, delete the account; or use the sample account.
 
 ## The auth gateway
 
@@ -81,6 +81,20 @@ layer. `VITE_AUTH_GATEWAY` chooses the implementation, in one place
 
 The preview gateway has one sample account, and sign-up creates more (they disappear when the tab
 closes). "Sign in with Google" and "Sign in with Apple" sign in as the sample account.
+
+An account created with the sign-up form starts with an **unverified email**, as on the real
+backend, and lands on the verify-email screen. No email exists in the preview, so
+`window.qdPreview` stands for what happens outside the site. Type these in the browser console (the
+end-to-end tests call the same functions):
+
+| Console                     | Stands for                                                                                           |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `qdPreview.verifyEmail()`   | The user opened the link in the email. Then press "I've verified my email", or come back to the tab. |
+| `qdPreview.removeProfile()` | The profile was not written at sign-up. The site then asks for the names (complete-profile screen).  |
+
+Deleting an account always asks a preview account for its password (the real backend asks only when
+the sign-in is old), so that step can be seen. The sample account also has Google, so it confirms
+"with Google" (no window opens) and, being built in, is only signed out.
 
 | Sample account | Value                 |
 | -------------- | --------------------- |
@@ -160,23 +174,26 @@ src/
   app/          App.tsx (provider tree), routes.tsx, guards.tsx (route guards)
   components/   ui/ (Button, ButtonLink, Card, Chip, Checkbox)
                 layout/ (PageShell, SiteHeader, SiteFooter, BrandLink, Arcs, LegalPage,
-                         MainNav, AccountMenu)
-                FormTextInput, Spinner, AppLoading
+                         MainNav, AccountMenu, SignedInShell)
+                FormTextInput, PasswordVisibilityToggle, Spinner, StatusIcon, AppLoading
                 HookFormInputs/ (HookFormTextInput, HookFormPasswordInput, HookFormDateInput)
-                SignIn/ (Layout, SSOForm, Divider, ErrorMessage, FooterPrompt, SubmitButton)
+                SignIn/ (Layout, SSOForm, Divider, ErrorMessage, FooterPrompt, SubmitButton,
+                         SignedInActions)
   core/         env.ts, logger.ts, contact.ts, i18n/ (i18n.ts, translations/en.json)
                 auth/ (types, gateway, errors, profile, reauth, paths, the unavailable and
                        preview gateways, selectAuthGateway, AuthGatewayProvider)
                 firebase/ (app, auth, profile, claims, gateway: the Firebase gateway, the only
                            folder that imports the Firebase SDK)
-                state/ (store, hooks, slices/sessionSlice, selectors/session)
+                state/ (store, hooks, slices/sessionSlice and exitSlice, selectors/)
                 session/ (SessionProvider, hooks)
                 flags/ (registry, evaluate, FlagsProvider)
                 sso/ (GoogleSSOCTA, AppleSSOCTA, useSSOSignIn, providers)
   hooks/        usePasswordValidation.ts
-  schemas/      signInSchema.ts, signUpSchema.ts, forgotPasswordSchema.ts
-  screens/      one folder per screen: PublicHome/, SignIn/, SignUp/, ForgotPassword/, Home/,
-                PrivacyPolicy/, TermsAndConditions/, DeleteAccountInfo/, NotFound/, Error/
+  schemas/      signInSchema.ts, signUpSchema.ts, forgotPasswordSchema.ts,
+                completeProfileSchema.ts
+  screens/      one folder per screen: PublicHome/, SignIn/, SignUp/, ForgotPassword/,
+                VerifyEmail/, CompleteProfile/, Home/, DeleteAccount/, PrivacyPolicy/,
+                TermsAndConditions/, DeleteAccountInfo/, NotFound/, Error/
   styles/       theme.css (design tokens), global.css
   testUtil/     renderWithProviders.tsx, mockGateway.ts
   util/         index.ts (date helpers)
@@ -196,7 +213,9 @@ Change the two together.
 Why the stack is what it is, how each choice maps to the mobile app and where the website differs:
 [ADR 0001](docs/adr/0001-web-stack.md). How the screens work without a backend:
 [ADR 0002](docs/adr/0002-auth-gateway-boundary.md). Where the site is hosted and how it is released:
-[ADR 0003](docs/adr/0003-firebase-hosting-and-release-pipeline.md).
+[ADR 0003](docs/adr/0003-firebase-hosting-and-release-pipeline.md). The Firebase gateway:
+[ADR 0004](docs/adr/0004-firebase-gateway.md). The account screens after sign-in and the route
+guards: [ADR 0005](docs/adr/0005-account-screens-and-route-guards.md).
 
 Rules (the same as in `qd-mobile` where they exist there):
 
@@ -227,10 +246,19 @@ Rules (the same as in `qd-mobile` where they exist there):
   signed in. `src/core/auth/selectAuthGateway.ts` is the only place that chooses the gateway.
 - **Firebase:** only `src/core/firebase/` imports the Firebase SDK (`firebase/*`), and only
   `selectAuthGateway.ts` loads that folder. Both are lint errors anywhere else.
-- **Route guards** (`src/app/guards.tsx`) read the session status, like the app's Router: while it is
-  `initializing` they show a loading state; a signed-in (`ready`) user who opens `/sign-in` or
-  `/sign-up` is sent to `/home`; a visitor who is not signed in and opens `/home` is sent to
-  `/sign-in`; a user who signs out on `/home` lands on the public home.
+- **Route guards** (`src/app/guards.tsx`) read the session status, like the app's Router. Each
+  status has its page: `needsEmailVerification` → `/verify-email`, `needsProfile` →
+  `/complete-profile`, `ready` → `/home` and `/account/delete`. While the session is `initializing`
+  they show the loading screen; a user who opens the page of another status (or `/sign-in`,
+  `/sign-up`) is sent to the page of theirs; a visitor who is not signed in is sent to `/sign-in`; a
+  user who signs out, or deletes the account, on one of these pages lands on the public home. That is
+  also how the sign-up form ends: the new account is signed in and unverified, so the guard leads to
+  `/verify-email`.
+- **While a form is being sent** it stays in place, disabled, and its button shows a spinner (the app
+  replaces the form with a spinner). When an error message appears, the focus moves to it.
+- **Leaving** (`src/core/state/slices/exitSlice.ts`, web only): "Use another account" on the
+  verify-email screen chooses `/sign-in` as the place to land after signing out, and a deleted
+  account is confirmed on the public home until the user opens another page (the app shows a toast).
 - **Feature flags:** `useFlag('key')` from `src/core/flags/FlagsProvider.tsx`. The registry mirrors
   the app's (and the backend's): never add a flag here that the backend does not have. The website
   has no remote source yet, so the code defaults apply (all off). On the signed-in home, "Mock
@@ -257,17 +285,20 @@ Rules (the same as in `qd-mobile` where they exist there):
 
 ## Pages
 
-| Path                    | Screen                                                                   |
-| ----------------------- | ------------------------------------------------------------------------ |
-| `/`                     | Public home                                                              |
-| `/privacy-policy`       | Privacy Policy                                                           |
-| `/terms-and-conditions` | Terms and Conditions                                                     |
-| `/delete-account`       | How to delete an account (the deletion itself happens in the mobile app) |
-| `/sign-in`              | Sign in (only with the account flag on)                                  |
-| `/sign-up`              | Sign up (only with the account flag on)                                  |
-| `/forgot-password`      | Reset password (only with the account flag on)                           |
-| `/home`                 | Signed-in home (only with the account flag on; needs a session)          |
-| anything else           | Not found                                                                |
+| Path                    | Screen                                                                  |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `/`                     | Public home                                                             |
+| `/privacy-policy`       | Privacy Policy                                                          |
+| `/terms-and-conditions` | Terms and Conditions                                                    |
+| `/delete-account`       | How to delete an account (public; the stores link to it)                |
+| `/sign-in`              | Sign in (only with the account flag on)                                 |
+| `/sign-up`              | Sign up (only with the account flag on)                                 |
+| `/forgot-password`      | Reset password (only with the account flag on)                          |
+| `/verify-email`         | Verify your email (flag on; signed in, email not verified yet)          |
+| `/complete-profile`     | Complete your profile (flag on; signed in, no names in the profile yet) |
+| `/home`                 | Signed-in home (only with the account flag on; needs a session)         |
+| `/account/delete`       | Delete the signed-in account (flag on; needs a session)                 |
+| anything else           | Not found                                                               |
 
 # Quickstart
 
@@ -320,16 +351,16 @@ yarn e2e --project=phone           # one size only
 yarn e2e --ui                      # interactive runner
 ```
 
-| File                           | What it proves                                                                                                  |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `auth-email-lifecycle.spec.ts` | Sign up → signed-in home with the user's own name → reload keeps the session → sign out → public home → sign in |
-| `auth-sign-in-errors.spec.ts`  | Empty and invalid fields, wrong password, forgot password (neutral message), then a successful sign-in          |
-| `pages.spec.ts`                | Every page: no serious or critical accessibility violation (axe) and no horizontal scroll                       |
-| `keyboard.spec.ts`             | Keyboard-only sign-in, the account menu with the keyboard, the focus ring colour on light and dark surfaces     |
+| File                           | What it proves                                                                                                                                                                                                                                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth-email-lifecycle.spec.ts` | Sign up → verify email (too early, resend, verified) → complete profile → home → reload → sign out → sign in → delete account (wrong password, then the right one) → confirmation on the public home; the tab that checks by itself; the ways out of the two onboarding screens; deleting with Google |
+| `auth-sign-in-errors.spec.ts`  | Empty and invalid fields, wrong password, forgot password (neutral message), then a successful sign-in                                                                                                                                                                                                |
+| `pages.spec.ts`                | Every page, and every state of the account screens: no serious or critical accessibility violation (axe) and no horizontal scroll                                                                                                                                                                     |
+| `keyboard.spec.ts`             | Keyboard-only sign-in, the account menu with the keyboard, the focus ring colour on light and dark surfaces                                                                                                                                                                                           |
 
 The detailed cases (every validation rule, every error code) are unit tests; the end-to-end tests
 cover the paths that cross screens. They prove the screens, the session and the guards, not the
-backend: email verification and account deletion get their flows when the backend is connected.
+backend: running the same flows against the Firebase emulators is a separate suite, still to come.
 
 ## Lint
 

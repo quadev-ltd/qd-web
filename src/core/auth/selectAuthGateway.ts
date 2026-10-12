@@ -22,8 +22,9 @@ import { unavailableGateway } from './unavailableGateway';
 export const selectAuthGateway = (): AuthGateway | Promise<AuthGateway> => {
   // eslint-disable-next-line no-restricted-syntax -- see the comment above
   if (import.meta.env.VITE_AUTH_GATEWAY === 'preview') {
-    return import('./previewGateway').then(({ createPreviewGateway }) =>
-      createPreviewGateway(),
+    return import('./previewGateway').then(
+      ({ createPreviewGateway, exposePreviewControls }) =>
+        exposePreviewControls(createPreviewGateway()),
     );
   }
   if (

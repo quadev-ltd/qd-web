@@ -26,7 +26,8 @@ const PASSWORD_ERRORS: string[] = [
 
 /**
  * Creates the account and its profile. On success there is nothing to do here: the session
- * moves on by itself.
+ * moves on by itself, and the route guard leads to the verify-email screen as soon as the
+ * account exists (so `isLoading` stays on until the form is gone).
  */
 export const useSignUp = (setError: UseFormSetError<SignUpSchemaType>) => {
   const { t } = useTranslation();

@@ -1,10 +1,12 @@
-export type ButtonVariant = 'primary' | 'inverse' | 'outline' | 'text';
+export type ButtonVariant =
+  'primary' | 'secondary' | 'danger' | 'inverse' | 'outline' | 'text';
 export type ButtonSize = 'small' | 'medium' | 'large';
 
 export interface ButtonStyleProps {
   /**
-   * primary: filled, for light surfaces. inverse: white, for the brand background.
-   * outline and text: white on the brand background.
+   * primary: filled, for light surfaces. secondary: outlined, next to a primary button on a
+   * light surface. danger: filled red, for an action that cannot be undone.
+   * inverse: white, for the brand background. outline and text: white on the brand background.
    */
   variant?: ButtonVariant;
   /** small 44px, medium 48px (form controls), large 52px (hero). */
@@ -17,6 +19,8 @@ const BASE =
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-primary text-white hover:bg-primary-dark',
+  secondary: 'border border-primary bg-surface text-link hover:bg-tint',
+  danger: 'bg-danger text-white hover:bg-danger-dark',
   inverse: 'bg-white text-primary-dark hover:bg-tint',
   outline: 'border-2 border-white text-white hover:bg-white/10',
   text: 'text-white hover:bg-white/10',

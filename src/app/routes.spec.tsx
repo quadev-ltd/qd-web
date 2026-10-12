@@ -66,16 +66,21 @@ describe('routes', () => {
   });
 
   describe('when the account flag is off (production)', () => {
-    it.each(['/sign-in', '/sign-up', '/forgot-password', '/home'])(
-      'shows the not found page at %s',
-      async path => {
-        await renderRoute(path, signedOut);
+    it.each([
+      '/sign-in',
+      '/sign-up',
+      '/forgot-password',
+      '/home',
+      '/verify-email',
+      '/complete-profile',
+      '/account/delete',
+    ])('shows the not found page at %s', async path => {
+      await renderRoute(path, signedOut);
 
-        expect(
-          screen.getByRole('heading', { level: 1, name: 'notFound.title' }),
-        ).toBeInTheDocument();
-      },
-    );
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'notFound.title' }),
+      ).toBeInTheDocument();
+    });
   });
 
   describe('when the account flag is on', () => {
@@ -95,14 +100,20 @@ describe('routes', () => {
       ).toBeInTheDocument();
     });
 
-    it('guards /home: a signed-out visitor is sent to the sign-in screen', async () => {
-      const { router } = await renderRoute('/home', signedOut);
+    it.each(['/home', '/verify-email', '/complete-profile', '/account/delete'])(
+      'guards %s: a signed-out visitor is sent to the sign-in screen',
+      async path => {
+        const { router } = await renderRoute(path, signedOut);
 
-      expect(
-        await screen.findByRole('heading', { level: 1, name: 'signIn.title' }),
-      ).toBeInTheDocument();
-      expect(router.state.location.pathname).toBe('/sign-in');
-    });
+        expect(
+          await screen.findByRole('heading', {
+            level: 1,
+            name: 'signIn.title',
+          }),
+        ).toBeInTheDocument();
+        expect(router.state.location.pathname).toBe('/sign-in');
+      },
+    );
 
     it('still shows the public pages', async () => {
       await renderRoute('/privacy-policy', signedOut);

@@ -1,12 +1,16 @@
 // Every page: no serious or critical accessibility violation (axe), and no horizontal
 // scroll, at both screen sizes (the two Playwright projects).
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import {
   expectInsideViewport,
   expectNoHorizontalScroll,
   expectNoSeriousAccessibilityViolations,
+  loseProfile,
+  openVerificationLink,
+  PASSWORD,
   signIn,
+  signUp,
 } from './support';
 
 const PUBLIC_PAGES = [
@@ -110,4 +114,86 @@ test('forgot password after sending: accessible and no horizontal scroll', async
 
   await expectNoSeriousAccessibilityViolations(page);
   await expectNoHorizontalScroll(page);
+});
+
+const expectAccessibleAndNotTooWide = async (page: Page) => {
+  await expectNoSeriousAccessibilityViolations(page);
+  await expectNoHorizontalScroll(page);
+};
+
+test('verify email, in each of its states: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await signUp(page);
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Welcome to QuaDev Grace!' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // Not verified yet
+  await page.getByRole('button', { name: "I've verified my email" }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // Link resent, with the wait on the button
+  await page.getByRole('button', { name: 'Resend verification link' }).click();
+  await expect(
+    page.getByRole('button', { name: /^Resend link in \d+s$/ }),
+  ).toBeDisabled();
+  await expectAccessibleAndNotTooWide(page);
+});
+
+test('complete profile, empty and with validation errors: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await signUp(page);
+  await loseProfile(page);
+  await openVerificationLink(page);
+  await page.getByRole('button', { name: "I've verified my email" }).click();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Complete your profile' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  await page.getByLabel(/Date of birth/).fill('31022020');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByText('Date of birth format is invalid')).toBeVisible();
+  await expect(page.getByText('Required')).toHaveCount(2);
+  await expectAccessibleAndNotTooWide(page);
+});
+
+test('delete account, in each of its states: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await signUp(page);
+  await openVerificationLink(page);
+  await page.getByRole('button', { name: "I've verified my email" }).click();
+  await expect(page).toHaveURL('/home');
+
+  // Are you sure?
+  await page.goto('/account/delete');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Are you sure?' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // The password step, empty (the button is disabled)
+  const deleteButton = page.getByRole('button', { name: 'Delete account' });
+  await deleteButton.click();
+  const password = page.getByLabel('Password', { exact: true });
+  await expect(password).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // A wrong password
+  await password.fill('Wr0ngPassword!');
+  await deleteButton.click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // Deleted: the public home with the confirmation
+  await password.fill(PASSWORD);
+  await deleteButton.click();
+  await expect(page).toHaveURL('/');
+  await expect(page.getByText('Account successfully deleted')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
 });

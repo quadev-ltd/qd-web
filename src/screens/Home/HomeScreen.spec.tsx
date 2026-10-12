@@ -244,12 +244,12 @@ describe('HomeScreen', () => {
       expect(screen.queryByText('home.passwordLabel')).not.toBeInTheDocument();
     });
 
-    it('links to the delete-account page', () => {
+    it('links to the page where the account is deleted', () => {
       renderHome();
 
       expect(
         screen.getByRole('link', { name: 'drawerMenu.deleteAccount' }),
-      ).toHaveAttribute('href', '/delete-account');
+      ).toHaveAttribute('href', '/account/delete');
     });
 
     it('signs out from the card', async () => {
