@@ -52,4 +52,15 @@ describe('Button', () => {
       'bg-primary',
     );
   });
+
+  it.each([
+    ['secondary', ['border-primary', 'bg-surface', 'text-link']],
+    ['danger', ['bg-danger', 'text-white']],
+  ] as const)('can be a %s button', (variant, classNames) => {
+    render(<Button variant={variant}>Save</Button>);
+
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveClass(
+      ...classNames,
+    );
+  });
 });

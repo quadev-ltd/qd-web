@@ -1,5 +1,6 @@
 // The web version of qd-mobile src/components/SignIn/Layout.tsx: the frame of the sign-in,
-// sign-up and forgot-password screens (brand background, white card with the title).
+// sign-up, forgot-password, verify-email and complete-profile screens (brand background,
+// white card with the title).
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,20 +13,36 @@ export interface LayoutProps {
   documentTitle: string;
   /** The card's heading. */
   title: string;
-  subtitle?: string;
+  /** A text, or the paragraphs under the title (they bring their own styles). */
+  subtitle?: ReactNode;
+  /** A picture above the title (the status of the verify-email screen). */
+  icon?: ReactNode;
+  /** The picture, the title and the subtitle in the middle of the card. */
+  centered?: boolean;
   /** Shown on the right of the header. */
   headerActions?: ReactNode;
   /** The QuaDev logo above the card (sign in). */
   showLogo?: boolean;
-  /** narrow: 440px (sign in). wide: 520px (sign up, two fields side by side). */
-  width?: 'narrow' | 'wide';
+  /**
+   * narrow: 440px (sign in). medium: 480px (verify email, complete profile). wide: 520px
+   * (sign up, two fields side by side).
+   */
+  width?: 'narrow' | 'medium' | 'wide';
   children: ReactNode;
 }
+
+const WIDTHS = {
+  narrow: 'max-w-[440px]',
+  medium: 'max-w-[480px]',
+  wide: 'max-w-[520px]',
+};
 
 export const Layout: React.FC<LayoutProps> = ({
   documentTitle,
   title,
   subtitle,
+  icon,
+  centered = false,
   headerActions,
   showLogo = false,
   width = 'narrow',
@@ -53,15 +70,19 @@ export const Layout: React.FC<LayoutProps> = ({
       <Card
         elevation="floating"
         padding="roomy"
-        className={`w-full gap-5 ${
-          width === 'wide' ? 'max-w-[520px]' : 'max-w-[440px]'
-        }`}>
-        <div className="flex flex-col gap-1.5">
+        className={`w-full gap-5 ${WIDTHS[width]}`}>
+        <div
+          className={`flex flex-col ${icon ? 'gap-3.5' : 'gap-1.5'} ${
+            centered ? 'items-center text-center' : ''
+          }`}>
+          {icon}
           <h1 className="font-display text-[28px] leading-[1.2] font-semibold">
             {title}
           </h1>
-          {subtitle && (
+          {typeof subtitle === 'string' ? (
             <p className="text-[15px] leading-normal text-muted">{subtitle}</p>
+          ) : (
+            subtitle
           )}
         </div>
         {children}

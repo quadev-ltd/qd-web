@@ -8,6 +8,10 @@ import { AuthGatewayProvider } from '@/core/auth/AuthGatewayProvider';
 import { type AuthGateway } from '@/core/auth/gateway';
 import { unavailableGateway } from '@/core/auth/unavailableGateway';
 import {
+  type ExitState,
+  initialExitState,
+} from '@/core/state/slices/exitSlice';
+import {
   initialSessionState,
   type SessionState,
 } from '@/core/state/slices/sessionSlice';
@@ -20,6 +24,8 @@ interface Options {
   routeState?: unknown;
   /** The session the store starts with, on top of the initial one (Initializing). */
   session?: Partial<SessionState>;
+  /** How the user left the signed-in pages, on top of the initial state (nothing). */
+  exit?: Partial<ExitState>;
   /** The auth gateway the component calls. By default sign-in is unavailable. */
   gateway?: AuthGateway;
 }
@@ -30,10 +36,12 @@ interface Options {
 
 const createProviders = ({
   session,
+  exit,
   gateway = unavailableGateway,
 }: Options) => {
   const store = createStore({
     session: { ...initialSessionState, ...session },
+    exit: { ...initialExitState, ...exit },
   });
   const Providers = ({ children }: { children: ReactNode }) => (
     <Provider store={store}>

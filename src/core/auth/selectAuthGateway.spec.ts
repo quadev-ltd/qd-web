@@ -40,6 +40,12 @@ describe('selectAuthGateway', () => {
       gateway.signInWithEmail('preview@example.com', 'Preview123!'),
     ).resolves.toMatchObject({ email: 'preview@example.com' });
     await gateway.signOut();
+    // The preview controls (the stand-in for the verification email) come with it.
+    expect(window.qdPreview).toEqual({
+      verifyEmail: expect.any(Function),
+      removeProfile: expect.any(Function),
+    });
+    delete window.qdPreview;
     expect(createFirebaseGateway).not.toHaveBeenCalled();
   });
 

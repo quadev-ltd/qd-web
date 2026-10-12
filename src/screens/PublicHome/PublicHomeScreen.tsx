@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
+import AccountDeletedNotice from './AccountDeletedNotice';
 import FeatureCard from './FeatureCard';
 import { AccountAddIcon, DeleteIcon, ProfileCardIcon } from './icons';
 
@@ -9,6 +10,8 @@ import PageShell from '@/components/layout/PageShell';
 import ButtonLink from '@/components/ui/ButtonLink';
 import { env } from '@/core/env';
 import { useSessionStatus } from '@/core/session/hooks';
+import { useAppSelector } from '@/core/state/hooks';
+import { selectAccountDeleted } from '@/core/state/selectors/exit';
 import { SessionStatus } from '@/core/state/slices/sessionSlice';
 
 export const PublicHomeScreen: React.FC = () => {
@@ -17,6 +20,8 @@ export const PublicHomeScreen: React.FC = () => {
   const accountEnabled = env.ACCOUNT_ENABLED;
   // A signed-in user gets the way back to their home instead of the sign-in buttons.
   const isSignedIn = useSessionStatus() === SessionStatus.Ready;
+  // Arriving from the delete-account page: say that the account is gone.
+  const accountDeleted = useAppSelector(selectAccountDeleted);
 
   return (
     <PageShell
@@ -45,6 +50,7 @@ export const PublicHomeScreen: React.FC = () => {
         )
       }
       mainClassName="flex flex-col items-center gap-14 px-gutter pt-[clamp(24px,5vw,48px)] pb-16">
+      {accountDeleted && <AccountDeletedNotice />}
       <div className="flex max-w-[760px] flex-col items-center gap-5 text-center">
         <img
           src={logo}

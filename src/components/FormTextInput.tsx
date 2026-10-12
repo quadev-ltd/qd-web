@@ -52,7 +52,7 @@ export const FormTextInput: React.FC<FormTextInputProps> = ({
           type={type}
           aria-invalid={message ? true : undefined}
           aria-describedby={describedBy}
-          className={`h-control min-w-0 flex-1 rounded-control border bg-surface text-base text-text placeholder:text-muted ${
+          className={`h-control min-w-0 flex-1 rounded-control border bg-surface text-base text-text placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-60 ${
             trailing ? 'pr-[72px] pl-3.5' : 'px-3.5'
           } ${message ? 'border-danger' : 'border-border-strong'}`}
           {...inputProps}

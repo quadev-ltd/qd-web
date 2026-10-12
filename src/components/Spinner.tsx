@@ -2,8 +2,8 @@
 import { useTranslation } from 'react-i18next';
 
 interface SpinnerProps {
-  /** small: inside a button. large: a page or a card that is loading. */
-  size?: 'small' | 'large';
+  /** small: inside a button. medium: inside a status tile. large: a page that is loading. */
+  size?: 'small' | 'medium' | 'large';
   /**
    * Inside a control that already says it is busy (a button with aria-busy): the ring is
    * hidden from assistive technology, so it does not change the control's name.
@@ -14,6 +14,7 @@ interface SpinnerProps {
 
 const SIZES = {
   small: 'size-5 border-2',
+  medium: 'size-[30px] border-[3px]',
   large: 'size-10 border-4',
 };
 

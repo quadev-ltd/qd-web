@@ -1,7 +1,8 @@
 {
   "brand": {
     "name": "QUADEV",
-    "logoAlt": "QuaDev"
+    "logoAlt": "QuaDev",
+    "applicationName": "QuaDev"
   },
   "landing": {
     "signUpButton": "Sign up",
@@ -60,8 +61,43 @@
     "tryAgain": "Try again",
     "backToSignInLink": "Back to sign in",
     "backToHomeLink": "Back to your account",
+    "rememberedPrompt": "Remembered it?",
     "changePathDescription": "Don't have an account?",
     "changePathButton": "Sign up"
+  },
+  "emailVerification": {
+    "documentTitle": "Verify your email | QuaDev",
+    "title": "Welcome to",
+    "emailSent": "We've sent a verification email to {{email}}.",
+    "emailVerificationInstructions": "Open the link in the email, then come back and press \"I've verified my email\".",
+    "verifiedCTA": "I've verified my email",
+    "notVerifiedYet": "Your email isn't verified yet. Open the link in the email, then try again.",
+    "resendCTA": "Resend verification link",
+    "resendCooldown": "Resend link in {{seconds}}s",
+    "changePathDescription": "Wrong account?",
+    "changePathButton": "Use another account"
+  },
+  "completeProfile": {
+    "documentTitle": "Complete your profile | QuaDev",
+    "title": "Complete your profile",
+    "subtitle": "Tell us your name to finish setting up your account. Your date of birth is optional.",
+    "submitButton": "Continue",
+    "changePathDescription": "Not you?",
+    "changePathButton": "Sign out"
+  },
+  "deleteAccount": {
+    "documentTitle": "Delete account | QuaDev",
+    "title": "Are you sure?",
+    "description": "We’re sorry to see you go. Deleting your account will permanently erase all your data, and you will lose access to the app. However, you’re always welcome to create a new account if you decide to return.",
+    "reauthDescription": "For your security, enter your password to confirm that you want to delete your account.",
+    "passwordLabel": "Password",
+    "deleteButton": "Delete account",
+    "cancelButton": "Cancel",
+    "deleting": "Deleting account...",
+    "googleWindowNotice": "Continue in the Google window that opened.",
+    "successTitle": "Account successfully deleted",
+    "successMessage": "Your account has been successfully deleted.",
+    "unavailableOnWeb": "This account signs in with Apple, which the website does not support yet. To delete it, use the QuaDev mobile app, or write to us from the account's email address."
   },
   "home": {
     "documentTitle": "Home | QuaDev",

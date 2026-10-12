@@ -1,4 +1,5 @@
-// Mirrors qd-mobile src/screens/ForgotPassword/useForgotPassword.ts.
+// Mirrors qd-mobile src/screens/ForgotPassword/useForgotPassword.ts. Different on the web: the
+// status replaces the form once the answer is there, not while the email is being sent.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -28,7 +29,6 @@ export const useForgotPassword = () => {
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
 
   const requestPasswordReset = async (formData: ForgotPasswordSchemaType) => {
-    setShowStatus(true);
     setIsLoading(true);
     setIsSuccess(false);
     setErrorMessage(undefined);
@@ -47,6 +47,7 @@ export const useForgotPassword = () => {
       }
     } finally {
       setIsLoading(false);
+      setShowStatus(true);
     }
   };
 

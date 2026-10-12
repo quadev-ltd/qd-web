@@ -1,6 +1,7 @@
 import { AuthErrorCode, NO_CURRENT_USER } from './errors';
 import {
   createPreviewGateway,
+  exposePreviewControls,
   PREVIEW_GATEWAY_MARKER,
   PREVIEW_USER,
   type PreviewStorage,
@@ -99,9 +100,10 @@ describe('previewGateway', () => {
       { ...newProfile, dateOfBirth: '1906-12-09' },
     );
 
+    // As on the backend: the email of a new account is not verified yet.
     expect(user).toMatchObject({
       email: 'grace@example.com',
-      emailVerified: true,
+      emailVerified: false,
       providerIds: ['password'],
     });
     expect(listener).toHaveBeenLastCalledWith(user);
@@ -231,12 +233,82 @@ describe('previewGateway', () => {
     const signUp = async (gateway: ReturnType<typeof createPreviewGateway>) =>
       gateway.signUpWithEmail('grace@example.com', 'Passw0rd!e2e', newProfile);
 
-    it('has nothing to verify: resending resolves and the user stays verified', async () => {
-      const gateway = createPreviewGateway(memoryStorage());
+    it('sends no email: a new account stays unverified until the link is "opened"', async () => {
+      const storage = memoryStorage();
+      const gateway = createPreviewGateway(storage);
       const user = await signUp(gateway);
 
       await expect(gateway.sendVerificationEmail()).resolves.toBeUndefined();
       await expect(gateway.refreshUser()).resolves.toEqual(user);
+      expect(user.emailVerified).toBe(false);
+
+      gateway.controls.verifyEmail();
+
+      await expect(gateway.refreshUser()).resolves.toEqual({
+        ...user,
+        emailVerified: true,
+      });
+      // It survives a reload of the page.
+      expect(createPreviewGateway(storage).getCurrentSessionUser()).toEqual({
+        ...user,
+        emailVerified: true,
+      });
+    });
+
+    it('cannot verify when nobody is signed in', () => {
+      const gateway = createPreviewGateway(memoryStorage());
+
+      expect(() => gateway.controls.verifyEmail()).toThrow(NO_CURRENT_USER);
+      expect(() => gateway.controls.removeProfile()).toThrow(NO_CURRENT_USER);
+    });
+
+    it('can lose the profile, and gets it back from the provider names or the form', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+      const user = await signUp(gateway);
+      const onProfile = vi.fn();
+      gateway.watchProfile(user.uid, onProfile, vi.fn());
+
+      gateway.controls.removeProfile();
+
+      expect(onProfile).toHaveBeenLastCalledWith(null);
+      // Incomplete names are not enough to create it.
+      await expect(
+        gateway.createProfileIfMissing(user.uid, { firstName: 'Grace' }),
+      ).resolves.toBe(false);
+      expect(onProfile).toHaveBeenLastCalledWith(null);
+
+      await expect(
+        gateway.createProfileIfMissing(user.uid, newProfile),
+      ).resolves.toBe(true);
+      expect(onProfile).toHaveBeenLastCalledWith(newProfile);
+    });
+
+    it('leaves an existing profile alone when the provider sends other names', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+      const user = await signUp(gateway);
+
+      await expect(
+        gateway.createProfileIfMissing(user.uid, {
+          firstName: 'Other',
+          lastName: 'Name',
+        }),
+      ).resolves.toBe(true);
+
+      const onProfile = vi.fn();
+      gateway.watchProfile(user.uid, onProfile, vi.fn());
+      expect(onProfile).toHaveBeenCalledWith(newProfile);
+      await expect(
+        gateway.createProfileIfMissing('nobody', newProfile),
+      ).resolves.toBe(false);
+    });
+
+    it('puts the controls on window.qdPreview', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+
+      expect(exposePreviewControls(gateway)).toBe(gateway);
+      expect(window.qdPreview).toBe(gateway.controls);
+
+      delete window.qdPreview;
     });
 
     it('cannot resend the verification email when nobody is signed in', async () => {
@@ -306,6 +378,16 @@ describe('previewGateway', () => {
 
       expect(gateway.getReauthMethod(sample)).toBe('google');
       expect(gateway.getReauthMethod(user)).toBe('password');
+    });
+
+    it('asks a password account for its password before deleting', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+      await signUp(gateway);
+
+      expect(await codeOf(gateway.deleteAccount())).toBe(
+        AuthErrorCode.RequiresRecentLogin,
+      );
+      expect(gateway.getCurrentSessionUser()?.email).toBe('grace@example.com');
     });
 
     it('refuses a wrong password and keeps the account', async () => {

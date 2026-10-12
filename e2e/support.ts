@@ -27,6 +27,34 @@ export const signIn = async (
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 };
 
+/** Fills and sends the sign-up form. The new account lands on the verify-email screen. */
+export const signUp = async (
+  page: Page,
+  { firstName = 'Grace', lastName = 'Hopper', email = newEmail() } = {},
+) => {
+  await page.goto('/sign-up');
+  await page.getByLabel('First name').fill(firstName);
+  await page.getByLabel('Last name').fill(lastName);
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await page.getByLabel('Confirm password').fill(PASSWORD);
+  await page.getByRole('checkbox', { name: /I agree to the/ }).check();
+  await page.getByRole('button', { name: 'Sign up', exact: true }).click();
+  await expect(page).toHaveURL('/verify-email');
+  return email;
+};
+
+// What happens outside the site. The preview gateway has no email and no backend, so it
+// offers these on `window.qdPreview` (src/core/auth/previewGateway.ts).
+
+/** The user opens the link in the verification email (in another tab, or on the phone). */
+export const openVerificationLink = (page: Page) =>
+  page.evaluate(() => window.qdPreview?.verifyEmail());
+
+/** The account has no profile document (the write at sign-up failed). */
+export const loseProfile = (page: Page) =>
+  page.evaluate(() => window.qdPreview?.removeProfile());
+
 /** No serious or critical accessibility violation on the page as it is now. */
 export const expectNoSeriousAccessibilityViolations = async (page: Page) => {
   const { violations } = await new AxeBuilder({ page }).analyze();

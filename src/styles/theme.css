@@ -16,6 +16,9 @@
   --color-muted: #5c5e70;
   --color-sky: #6cc6f7;
   --color-danger: #b3261e;
+  --color-danger-dark: #8c1d18;
+  /* The round tile behind a destructive or failed status icon. */
+  --color-danger-tint: #fbedec;
   /* The focus ring on light surfaces; dark (purple, indigo) surfaces use --color-sky. */
   --color-focus: #1b8fd8;
 

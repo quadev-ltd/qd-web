@@ -1,15 +1,16 @@
-// The web version of qd-mobile src/screens/ForgotPassword/ForgotPasswordScreen.tsx. There is
-// no artboard for it: it uses the sign-in card. On the web a signed-in user can open it too
-// ("Change password" on the signed-in home).
+// The web version of qd-mobile src/screens/ForgotPassword/ForgotPasswordScreen.tsx. On the
+// web a signed-in user can open it too ("Change password" on the signed-in home): the way
+// back then leads to their home, and there is no sign-up prompt.
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation } from 'react-router';
+import { useLocation } from 'react-router';
 
 import ForgotPasswordForm from './ForgotPasswordForm';
 
 import { FooterPrompt } from '@/components/SignIn/FooterPrompt';
 import { Layout } from '@/components/SignIn/Layout';
-import LegalNav from '@/components/SignIn/LegalNav';
 import { ScreenType } from '@/components/SignIn/types';
+import ButtonLink from '@/components/ui/ButtonLink';
+import { HOME_PATH, SIGN_IN_PATH } from '@/core/auth/paths';
 import { useSessionStatus } from '@/core/session/hooks';
 import { SessionStatus } from '@/core/state/slices/sessionSlice';
 
@@ -24,26 +25,38 @@ export const ForgotPasswordScreen: React.FC = () => {
   const location = useLocation();
   // A signed-in user comes here from "Change password" on their home.
   const isSignedIn = useSessionStatus() === SessionStatus.Ready;
+  const backPath = isSignedIn ? HOME_PATH : SIGN_IN_PATH;
 
   return (
     <Layout
-      showLogo
       documentTitle={t('forgotPassword.documentTitle')}
       title={t('forgotPassword.title')}
-      headerActions={<LegalNav />}>
+      headerActions={
+        <div className="flex items-center gap-3 text-[15px] leading-natural">
+          {!isSignedIn && (
+            <span className="max-[720px]:hidden">
+              {t('forgotPassword.rememberedPrompt')}
+            </span>
+          )}
+          <ButtonLink to={backPath} variant="outline" size="small">
+            {isSignedIn
+              ? t('forgotPassword.backToHomeLink')
+              : t('landing.changePathButton')}
+          </ButtonLink>
+        </div>
+      }>
       <ForgotPasswordForm
         emailLabel={t('forgotPassword.emailLabel')}
         emailPlaceholder={t('forgotPassword.emailPlaceholder')}
         submitLabel={t('forgotPassword.submitButton')}
         defaultEmail={emailFromState(location.state)}
+        backPath={backPath}
+        backLabel={
+          isSignedIn
+            ? t('forgotPassword.backToHomeLink')
+            : t('forgotPassword.backToSignInLink')
+        }
       />
-      <Link
-        to={isSignedIn ? '/home' : '/sign-in'}
-        className="self-center text-[15px] leading-natural font-bold no-underline hover:underline">
-        {isSignedIn
-          ? t('forgotPassword.backToHomeLink')
-          : t('forgotPassword.backToSignInLink')}
-      </Link>
       {!isSignedIn && (
         <FooterPrompt
           changePath="/sign-up"

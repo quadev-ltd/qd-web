@@ -1,13 +1,29 @@
+import { useEffect } from 'react';
 import {
   createBrowserRouter,
   Outlet,
   type RouteObject,
   ScrollRestoration,
+  useLocation,
 } from 'react-router';
 
-import { HOME_PATH, SignedInRoutes, SignedOutRoutes } from './guards';
+import {
+  CompleteProfileRoutes,
+  SignedInRoutes,
+  SignedOutRoutes,
+  VerifyEmailRoutes,
+} from './guards';
 
+import {
+  COMPLETE_PROFILE_PATH,
+  DELETE_ACCOUNT_PATH,
+  HOME_PATH,
+  SIGN_IN_PATH,
+  VERIFY_EMAIL_PATH,
+} from '@/core/auth/paths';
 import { env } from '@/core/env';
+import { useAppDispatch } from '@/core/state/hooks';
+import { accountDeletedNoticeCleared } from '@/core/state/slices/exitSlice';
 import DeleteAccountInfoScreen from '@/screens/DeleteAccountInfo/DeleteAccountInfoScreen';
 import ErrorScreen from '@/screens/Error/ErrorScreen';
 import NotFoundScreen from '@/screens/NotFound/NotFoundScreen';
@@ -16,12 +32,26 @@ import PublicHomeScreen from '@/screens/PublicHome/PublicHomeScreen';
 import TermsAndConditionsScreen from '@/screens/TermsAndConditions/TermsAndConditionsScreen';
 
 // Every page starts at the top; going back restores the previous scroll position.
-const RootLayout: React.FC = () => (
-  <>
-    <Outlet />
-    <ScrollRestoration />
-  </>
-);
+const RootLayout: React.FC = () => {
+  const dispatch = useAppDispatch();
+  const { pathname } = useLocation();
+
+  // "Your account was deleted" is said on the public home, once: it is forgotten when the
+  // user opens another page. Only the path decides (not the notice itself), because the
+  // notice can arrive while the delete-account page is still the current one.
+  useEffect(() => {
+    if (pathname !== '/') {
+      dispatch(accountDeletedNoticeCleared());
+    }
+  }, [dispatch, pathname]);
+
+  return (
+    <>
+      <Outlet />
+      <ScrollRestoration />
+    </>
+  );
+};
 
 // Registered only when env.ACCOUNT_ENABLED is on. While it is off (production, until the
 // account backend is connected) these paths show the Not found page.
@@ -32,7 +62,7 @@ const accountRoutes: RouteObject[] = [
     element: <SignedOutRoutes />,
     children: [
       {
-        path: '/sign-in',
+        path: SIGN_IN_PATH,
         lazy: async () => ({
           Component: (await import('@/screens/SignIn/SignInScreen'))
             .SignInScreen,
@@ -54,6 +84,41 @@ const accountRoutes: RouteObject[] = [
         path: HOME_PATH,
         lazy: async () => ({
           Component: (await import('@/screens/Home/HomeScreen')).HomeScreen,
+        }),
+      },
+      {
+        path: DELETE_ACCOUNT_PATH,
+        lazy: async () => ({
+          Component: (
+            await import('@/screens/DeleteAccount/DeleteAccountScreen')
+          ).DeleteAccountScreen,
+        }),
+      },
+    ],
+  },
+  // The two steps between signing in and the signed-in pages, as in the app's onboarding
+  // stack: each is open only to a user whose session is at that step.
+  {
+    element: <VerifyEmailRoutes />,
+    children: [
+      {
+        path: VERIFY_EMAIL_PATH,
+        lazy: async () => ({
+          Component: (await import('@/screens/VerifyEmail/VerifyEmailScreen'))
+            .VerifyEmailScreen,
+        }),
+      },
+    ],
+  },
+  {
+    element: <CompleteProfileRoutes />,
+    children: [
+      {
+        path: COMPLETE_PROFILE_PATH,
+        lazy: async () => ({
+          Component: (
+            await import('@/screens/CompleteProfile/CompleteProfileScreen')
+          ).CompleteProfileScreen,
         }),
       },
     ],

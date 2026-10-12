@@ -4,6 +4,8 @@ export enum ScreenType {
   SignIn = 'signIn',
   SignUp = 'signUp',
   ForgotPassword = 'forgotPassword',
+  EmailVerification = 'emailVerification',
+  CompleteProfile = 'completeProfile',
 }
 
 /** The screens with the Google and Apple buttons. */
