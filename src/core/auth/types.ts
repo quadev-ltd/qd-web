@@ -12,6 +12,8 @@ export interface SessionUser {
   emailVerified: boolean;
   displayName: string | null;
   providerIds: string[];
+  /** When the account was created (milliseconds since the epoch), if the gateway knows. */
+  createdAt?: number;
 }
 
 /** `users/{uid}` as the app sees it. `dateOfBirth` is `YYYY-MM-DD` and optional (decision D16). */

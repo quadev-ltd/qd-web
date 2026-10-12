@@ -3,7 +3,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { RESEND_COOLDOWN_SECONDS } from './useVerifyEmail';
+import { RESEND_COOLDOWN_SECONDS, waitLeftAfterSignUp } from './useVerifyEmail';
 import { VerifyEmailScreen } from './VerifyEmailScreen';
 
 import { type SessionUser } from '@/core/auth/types';
@@ -300,6 +300,46 @@ describe('VerifyEmailScreen', () => {
       expect(resendButton()).toBeEnabled();
     });
 
+    it('starts with the wait running for an account that was just created', async () => {
+      vi.useFakeTimers();
+      const { gateway } = renderScreen({
+        user: { ...unverifiedUser, createdAt: Date.now() - 10_000 },
+      });
+
+      // Signing up sent the first email 10 seconds ago: no second one yet, and no message.
+      expect(resendButton()).toBeDisabled();
+      expect(resendButton()).toHaveTextContent(
+        'emailVerification.resendCooldown',
+      );
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      expect(verifiedButton()).toBeEnabled();
+      fireEvent.click(resendButton());
+      expect(gateway.sendVerificationEmail).not.toHaveBeenCalled();
+
+      await act(() =>
+        vi.advanceTimersByTimeAsync((RESEND_COOLDOWN_SECONDS - 11) * 1000),
+      );
+      expect(resendButton()).toBeDisabled();
+
+      await act(() => vi.advanceTimersByTimeAsync(1000));
+      expect(resendButton()).toBeEnabled();
+      expect(resendButton()).toHaveTextContent('emailVerification.resendCTA');
+
+      fireEvent.click(resendButton());
+      expect(gateway.sendVerificationEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not make the user of an older account wait', () => {
+      renderScreen({
+        user: {
+          ...unverifiedUser,
+          createdAt: Date.now() - RESEND_COOLDOWN_SECONDS * 1000,
+        },
+      });
+
+      expect(resendButton()).toBeEnabled();
+    });
+
     it('shows the throttling error from the backend and makes the user wait', async () => {
       const { gateway } = renderScreen();
       gateway.sendVerificationEmail.mockRejectedValue(
@@ -392,5 +432,27 @@ describe('VerifyEmailScreen', () => {
       expect(gateway.signOut).toHaveBeenCalledTimes(1);
       expect(store.getState().exit.signedOutPath).toBeNull();
     });
+  });
+});
+
+describe('waitLeftAfterSignUp', () => {
+  const now = Date.UTC(2026, 9, 12, 14, 30, 0);
+
+  it('counts the seconds left of the first minute of the account', () => {
+    expect(waitLeftAfterSignUp(now, now)).toBe(RESEND_COOLDOWN_SECONDS);
+    expect(waitLeftAfterSignUp(now - 10_000, now)).toBe(50);
+    expect(waitLeftAfterSignUp(now - 59_400, now)).toBe(1);
+    expect(waitLeftAfterSignUp(now - 60_000, now)).toBe(0);
+    expect(waitLeftAfterSignUp(now - 86_400_000, now)).toBe(0);
+  });
+
+  it('is no wait when the creation date is unknown', () => {
+    expect(waitLeftAfterSignUp(undefined, now)).toBe(0);
+  });
+
+  it('is never longer than a full wait when the clock of the device is behind', () => {
+    expect(waitLeftAfterSignUp(now + 300_000, now)).toBe(
+      RESEND_COOLDOWN_SECONDS,
+    );
   });
 });
