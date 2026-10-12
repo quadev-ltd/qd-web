@@ -124,6 +124,46 @@ describe('env', () => {
     });
   });
 
+  describe('App Check', () => {
+    it('has no site key and no debug token by default', () => {
+      const unset = parseEnv(valid);
+      expect(unset.RECAPTCHA_SITE_KEY).toBeUndefined();
+      expect(unset.APPCHECK_DEBUG_TOKEN).toBeUndefined();
+
+      const empty = parseEnv({
+        ...valid,
+        RECAPTCHA_SITE_KEY: ' ',
+        APPCHECK_DEBUG_TOKEN: '',
+      });
+      expect(empty.RECAPTCHA_SITE_KEY).toBeUndefined();
+      expect(empty.APPCHECK_DEBUG_TOKEN).toBeUndefined();
+    });
+
+    it('reads the site key and, outside production, the debug token', () => {
+      expect(
+        parseEnv({
+          ...valid,
+          APPLICATION_ENVIRONMENT: 'dev',
+          RECAPTCHA_SITE_KEY: 'site-key',
+          APPCHECK_DEBUG_TOKEN: 'debug-token',
+        }),
+      ).toMatchObject({
+        RECAPTCHA_SITE_KEY: 'site-key',
+        APPCHECK_DEBUG_TOKEN: 'debug-token',
+      });
+    });
+
+    it('refuses a debug token in production', () => {
+      expect(() =>
+        parseEnv({
+          ...valid,
+          APPLICATION_ENVIRONMENT: 'prod',
+          APPCHECK_DEBUG_TOKEN: 'debug-token',
+        }),
+      ).toThrow(/APPCHECK_DEBUG_TOKEN/);
+    });
+  });
+
   it('throws naming the invalid variables', () => {
     expect(() => parseEnv({ APPLICATION_ENVIRONMENT: 'staging' })).toThrow(
       /Invalid config variables:[\s\S]*APPLICATION_NAME[\s\S]*APPLICATION_ENVIRONMENT/,
@@ -143,6 +183,8 @@ describe('env', () => {
       FIREBASE_PROJECT_ID: undefined,
       FIREBASE_APP_ID: undefined,
       USE_FIREBASE_EMULATORS: false,
+      RECAPTCHA_SITE_KEY: undefined,
+      APPCHECK_DEBUG_TOKEN: undefined,
     });
   });
 });

@@ -54,6 +54,14 @@ export const envSchema = z
     // "true" sends the Firebase gateway to the local emulators of quadev-backend instead of
     // a real project. Never in production.
     USE_FIREBASE_EMULATORS: switchSchema,
+    // App Check (src/core/firebase/appCheck.ts): the backend's functions refuse a call that
+    // does not prove it comes from this site. The site key of the project's reCAPTCHA
+    // Enterprise key is a public identifier. Without it App Check is not started.
+    RECAPTCHA_SITE_KEY: optionalText,
+    // A SECRET, for `yarn start:dev` on a developer's machine only (.env.dev.local): it stands
+    // in for reCAPTCHA, which only answers on the site's own domain. vite.config.ts removes
+    // it from every build, and it is refused in production.
+    APPCHECK_DEBUG_TOKEN: optionalText,
   })
   .superRefine((value, context) => {
     if (value.AUTH_GATEWAY === AuthGatewayEnum.enum.firebase) {
@@ -75,6 +83,16 @@ export const envSchema = z
         code: 'custom',
         path: ['USE_FIREBASE_EMULATORS'],
         message: 'The emulators are not allowed in production',
+      });
+    }
+    if (
+      value.APPCHECK_DEBUG_TOKEN &&
+      value.APPLICATION_ENVIRONMENT === ApplicationEnvironentEnum.enum.prod
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['APPCHECK_DEBUG_TOKEN'],
+        message: 'An App Check debug token is not allowed in production',
       });
     }
   });
@@ -107,4 +125,6 @@ export const env = parseEnv({
   FIREBASE_PROJECT_ID: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   FIREBASE_APP_ID: import.meta.env.VITE_FIREBASE_APP_ID,
   USE_FIREBASE_EMULATORS: import.meta.env.VITE_USE_FIREBASE_EMULATORS,
+  RECAPTCHA_SITE_KEY: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
+  APPCHECK_DEBUG_TOKEN: import.meta.env.VITE_APPCHECK_DEBUG_TOKEN,
 });

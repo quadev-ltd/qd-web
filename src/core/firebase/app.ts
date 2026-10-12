@@ -15,7 +15,7 @@ import logger from '@/core/logger';
 
 // Ports from quadev-backend/firebase.json. The address is the one the emulators listen on
 // (a browser may resolve "localhost" to IPv6 first, where nothing answers).
-const EMULATOR_HOST = '127.0.0.1';
+export const EMULATOR_HOST = '127.0.0.1';
 const AUTH_EMULATOR_PORT = 9099;
 const FIRESTORE_EMULATOR_PORT = 8080;
 
@@ -36,7 +36,8 @@ const createApp = (): FirebaseApp => {
   return initializeApp({ apiKey, authDomain, projectId, appId });
 };
 
-const app = (): FirebaseApp => {
+/** The one Firebase app of the page. For this folder only (functions.ts). */
+export const app = (): FirebaseApp => {
   firebaseApp ??= createApp();
   return firebaseApp;
 };

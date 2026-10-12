@@ -1,4 +1,4 @@
-# gitleaks configuration: default rules, plus one allowlist entry (below).
+# gitleaks configuration: default rules, plus two allowlist entries (below).
 # Run locally: gitleaks git --redact   (full history)
 #              gitleaks git --pre-commit --staged --redact   (what the pre-commit hook runs)
 
@@ -17,3 +17,14 @@ condition = "AND"
 paths = ['''^\.env\.(dev|prod)$''']
 regexTarget = "line"
 regexes = ['''VITE_FIREBASE_API_KEY=AIza[0-9A-Za-z_-]{35}''']
+
+# A reCAPTCHA site key is the public half of a key pair: the page sends it to Google with every
+# check, and it only works on the domains listed for the key. Allowed only on the
+# VITE_RECAPTCHA_SITE_KEY line of the same two files. The App Check debug token is a real secret and
+# is not allowed anywhere: it belongs in .env.dev.local, which git ignores.
+[[allowlists]]
+description = "reCAPTCHA site key in the committed env files"
+condition = "AND"
+paths = ['''^\.env\.(dev|prod)$''']
+regexTarget = "line"
+regexes = ['''VITE_RECAPTCHA_SITE_KEY=6L[0-9A-Za-z_-]{38}''']
