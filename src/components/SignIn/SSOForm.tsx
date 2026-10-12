@@ -1,6 +1,7 @@
 // The web version of qd-mobile src/components/SignIn/SSOAnimatedForm.tsx, without the
 // animation: the Google and Apple buttons, the "or" divider, the email form (children) and
-// the prompt that leads to the other screen.
+// the prompt that leads to the other screen. The Apple button is shown only when Apple
+// sign-in is set up for the web (src/core/sso/providers.ts).
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type To } from 'react-router';
@@ -13,6 +14,7 @@ import { ScreenType, type SSOScreenType } from './types';
 
 import AppleSSOCTA from '@/core/sso/AppleSSOCTA';
 import GoogleSSOCTA from '@/core/sso/GoogleSSOCTA';
+import { APPLE_SIGN_IN_ENABLED } from '@/core/sso/providers';
 
 export interface SSOFormProps extends Pick<
   LayoutProps,
@@ -54,12 +56,14 @@ export const SSOForm: React.FC<SSOFormProps> = ({
           setIsLoading={setIsLoading}
           setErrorMessage={setErrorMessage}
         />
-        <AppleSSOCTA
-          screen={screen}
-          disabled={isLoading}
-          setIsLoading={setIsLoading}
-          setErrorMessage={setErrorMessage}
-        />
+        {APPLE_SIGN_IN_ENABLED && (
+          <AppleSSOCTA
+            screen={screen}
+            disabled={isLoading}
+            setIsLoading={setIsLoading}
+            setErrorMessage={setErrorMessage}
+          />
+        )}
       </div>
       {errorMessage && <ErrorMessage text={errorMessage} />}
       <Divider label={t(`${screen}.withSSO`)} />

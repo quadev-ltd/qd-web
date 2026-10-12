@@ -13,6 +13,14 @@ vi.mock('@/core/logger', () => ({
   default: vi.fn(() => ({ logError: vi.fn(), logMessage: vi.fn() })),
 }));
 
+// Apple sign-in is off on the web for now; these specs cover both settings.
+const providers = vi.hoisted(() => ({ appleEnabled: true }));
+vi.mock('@/core/sso/providers', () => ({
+  get APPLE_SIGN_IN_ENABLED() {
+    return providers.appleEnabled;
+  },
+}));
+
 const result: SSOSignInResult = {
   user: {
     uid: 'uid-1',
@@ -43,6 +51,23 @@ const renderForm = (
 };
 
 describe('SSOForm', () => {
+  beforeEach(() => {
+    providers.appleEnabled = true;
+  });
+
+  it('hides the Apple button while Apple sign-in is not set up for the web', () => {
+    providers.appleEnabled = false;
+
+    renderForm();
+
+    expect(
+      screen.getByRole('button', { name: 'signIn.withGoogle' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'signIn.withApple' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('shows the title, the two providers, the divider, the form and the prompt', () => {
     renderForm();
 

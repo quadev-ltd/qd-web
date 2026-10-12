@@ -7,8 +7,10 @@
 // "ported from qd-mobile" block below with the same severity and options.
 // Not ported (no meaning on the web): the `@react-native` shared config and the
 // `react-native/*`, `ft-flow/*` and `eslint-comments/*` rules.
-// Added for the web: `jsx-a11y` recommended, and `import.meta.env` in the
-// configuration restriction (mobile restricts `process.env`).
+// Added for the web: `jsx-a11y` recommended, `import.meta.env` in the
+// configuration restriction (mobile restricts `process.env`), and the two import
+// restrictions that keep Firebase behind the auth gateway (the mobile README states
+// the first one as a convention for its `core/firebase` folder).
 // Adapted: `plugin:jest/recommended` becomes the Vitest plugin's recommended set;
 // the `import/*` rules come from eslint-plugin-import-x (the maintained fork:
 // eslint-plugin-import does not run on ESLint 10), registered under the same
@@ -25,6 +27,33 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 const ENV_MESSAGE = 'Read configuration through src/core/env.ts.';
+
+// Ported from qd-mobile: the restricted imports that apply to every file.
+const RESTRICTED_IMPORT_PATHS = [
+  { name: 'react', importNames: ['default'] },
+  { name: 'react-redux', importNames: ['useDispatch', 'useSelector'] },
+];
+const FIREBASE_SDK_IMPORTS = {
+  regex: '^@?firebase(/|$)',
+  message:
+    'Only src/core/firebase may import the Firebase SDK. Everything else uses the auth gateway (useAuthGateway).',
+};
+// `no-restricted-imports` does not see `import()`, so the same two rules again for it.
+const FIREBASE_DYNAMIC_IMPORT = {
+  selector:
+    'ImportExpression[source.value=/^@?firebase(\\/|$)|core\\/firebase(\\/|$)/]',
+  message:
+    'Only src/core/auth/selectAuthGateway.ts loads the Firebase gateway, and only src/core/firebase imports the Firebase SDK.',
+};
+const ENV_ACCESS = {
+  selector: "MemberExpression[object.type='MetaProperty'][property.name='env']",
+  message: ENV_MESSAGE,
+};
+const FIREBASE_FOLDER_IMPORTS = {
+  regex: '(^@/|/)core/firebase(/|$)',
+  message:
+    'Only src/core/auth/selectAuthGateway.ts loads src/core/firebase, on demand. Everything else uses the auth gateway (useAuthGateway).',
+};
 
 // eslint-plugin-import-x under the `import` name: its recommended rules, renamed.
 const importRecommended = {
@@ -128,8 +157,10 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',
       'no-restricted-imports': [
         'error',
-        { name: 'react', importNames: ['default'] },
-        { name: 'react-redux', importNames: ['useDispatch', 'useSelector'] },
+        {
+          paths: RESTRICTED_IMPORT_PATHS,
+          patterns: [FIREBASE_SDK_IMPORTS, FIREBASE_FOLDER_IMPORTS],
+        },
       ],
       'i18next/no-literal-string': [
         'error',
@@ -164,14 +195,33 @@ export default tseslint.config(
           message: ENV_MESSAGE,
         },
       ],
-      'no-restricted-syntax': [
+      'no-restricted-syntax': ['error', ENV_ACCESS, FIREBASE_DYNAMIC_IMPORT],
+    },
+  },
+  {
+    // The Firebase gateway: the only folder that imports the Firebase SDK. Its files import
+    // each other with relative paths.
+    files: ['src/core/firebase/**'],
+    rules: {
+      'no-restricted-imports': [
         'error',
-        {
-          selector:
-            "MemberExpression[object.type='MetaProperty'][property.name='env']",
-          message: ENV_MESSAGE,
-        },
+        { paths: RESTRICTED_IMPORT_PATHS, patterns: [FIREBASE_FOLDER_IMPORTS] },
       ],
+      'no-restricted-syntax': ['error', ENV_ACCESS],
+    },
+  },
+  {
+    // The one place that loads the Firebase gateway, with a dynamic import.
+    files: [
+      'src/core/auth/selectAuthGateway.ts',
+      'src/core/auth/selectAuthGateway.spec.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: RESTRICTED_IMPORT_PATHS, patterns: [FIREBASE_SDK_IMPORTS] },
+      ],
+      'no-restricted-syntax': ['error', ENV_ACCESS],
     },
   },
   {

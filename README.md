@@ -31,12 +31,20 @@ they must not hold secrets. They are validated in `src/core/env.ts`, the only fi
 `import.meta.env` (a lint rule enforces it). A production build with a required variable missing
 fails instead of deploying a blank page.
 
-| Variable                       | Values                             | Meaning                                      |
-| ------------------------------ | ---------------------------------- | -------------------------------------------- |
-| `VITE_APPLICATION_NAME`        | `web`                              | Name of this application                     |
-| `VITE_APPLICATION_ENVIRONMENT` | `test`, `dev`, `prod`              | Same values as the mobile app                |
-| `VITE_ACCOUNT_ENABLED`         | `true`, `false` (default)          | Shows the account screens (see below)        |
-| `VITE_AUTH_GATEWAY`            | `unavailable` (default), `preview` | What answers the account screens (see below) |
+| Variable                       | Values                                         | Meaning                                                                            |
+| ------------------------------ | ---------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `VITE_APPLICATION_NAME`        | `web`                                          | Name of this application                                                           |
+| `VITE_APPLICATION_ENVIRONMENT` | `test`, `dev`, `prod`                          | Same values as the mobile app                                                      |
+| `VITE_ACCOUNT_ENABLED`         | `true`, `false` (default)                      | Shows the account screens (see below)                                              |
+| `VITE_AUTH_GATEWAY`            | `unavailable` (default), `preview`, `firebase` | What answers the account screens (see below)                                       |
+| `VITE_FIREBASE_API_KEY`        | from the Firebase console                      | Required with the `firebase` gateway: the web app's settings (public, not secrets) |
+| `VITE_FIREBASE_AUTH_DOMAIN`    | `<project>.firebaseapp.com`                    | Required with the `firebase` gateway: where the Google sign-in window is served    |
+| `VITE_FIREBASE_PROJECT_ID`     | `quadevapp-dev`, `quadevapp`                   | Required with the `firebase` gateway                                               |
+| `VITE_FIREBASE_APP_ID`         | from the Firebase console                      | Required with the `firebase` gateway                                               |
+| `VITE_USE_FIREBASE_EMULATORS`  | `true`, `false` (default)                      | Sends the `firebase` gateway to the local emulators. A production build refuses it |
+
+A build with `VITE_AUTH_GATEWAY=firebase` and one of the four settings missing fails, and so does the
+page if it is started that way (`src/core/env.ts`).
 
 ## The account flag
 
@@ -59,15 +67,17 @@ sample account, land on the signed-in home, sign out.
 
 ## The auth gateway
 
-The account screens do not talk to a backend yet. Everything they need (the session, sign in, sign
-up, password reset, sign out) goes through one interface, `AuthGateway` (`src/core/auth/gateway.ts`),
-with the same function names as the mobile app's Firebase service layer. `VITE_AUTH_GATEWAY` chooses
-the implementation, in one place (`src/core/auth/selectAuthGateway.ts`):
+Everything the account screens need (the session, sign in, sign up, email verification, the
+profile, password reset, sign out, deleting the account) goes through one interface, `AuthGateway`
+(`src/core/auth/gateway.ts`), with the same function names as the mobile app's Firebase service
+layer. `VITE_AUTH_GATEWAY` chooses the implementation, in one place
+(`src/core/auth/selectAuthGateway.ts`):
 
-| Value         | Used by                    | Behaviour                                                                                                      |
-| ------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `unavailable` | production, tests, default | Nobody is signed in. The forms validate, then show "Sign-in on the web is not available yet." No network call. |
-| `preview`     | `.env.dev`                 | An in-memory fake: the forms work end to end. Accounts live in the tab (`sessionStorage`) and nothing is sent. |
+| Value         | Used by                    | Behaviour                                                                                                                  |
+| ------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `unavailable` | production, tests, default | Nobody is signed in. The forms validate, then show "Sign-in on the web is not available yet." No network call.             |
+| `preview`     | `.env.dev`                 | An in-memory fake: the forms work end to end. Accounts live in the tab (`sessionStorage`) and nothing is sent.             |
+| `firebase`    | nothing yet                | Firebase Authentication and the profile in Firestore (`src/core/firebase`), the same account as the mobile app. See below. |
 
 The preview gateway has one sample account, and sign-up creates more (they disappear when the tab
 closes). "Sign in with Google" and "Sign in with Apple" sign in as the sample account.
@@ -90,9 +100,58 @@ The dev build (`yarn build:dev`, what the dev site and the pull request previews
 configured with the preview gateway and contains it on purpose, so `yarn check:bundle` is only run
 on production builds.
 
-When the backend is connected, a `firebaseGateway` replaces both without touching a screen;
-`firebase/*` imports will then be limited to that folder by a lint rule. The reasoning is in
-[ADR 0002](docs/adr/0002-auth-gateway-boundary.md).
+The reasoning is in [ADR 0002](docs/adr/0002-auth-gateway-boundary.md).
+
+### The Firebase gateway
+
+`src/core/firebase/` (`app.ts`, `auth.ts`, `profile.ts`, `claims.ts`, put together in `gateway.ts`)
+is the web version of the app's `src/core/firebase`: the same function names, the same order of
+operations (account, then the profile document `users/{uid}`, then the verification email) and the
+same document, so the backend's rules treat both clients alike. No environment uses it yet:
+`.env.dev` and `.env.prod` are unchanged. The decisions are in
+[ADR 0004](docs/adr/0004-firebase-gateway.md).
+
+- **It is loaded only when it can be used.** `VITE_AUTH_GATEWAY=firebase` **and**
+  `VITE_ACCOUNT_ENABLED=true`. With the account screens off, the unavailable gateway answers and
+  the Firebase code is not in the build at all; `yarn check:bundle` proves it on every production
+  build. That makes `VITE_ACCOUNT_ENABLED` the one switch: production can carry
+  `VITE_AUTH_GATEWAY=firebase` and its settings, and turning accounts on is that one line.
+- **Only this folder imports the Firebase SDK,** and only `selectAuthGateway.ts` loads the folder
+  (lint rules, for `import` and `import()`). Screens use `useAuthGateway()`.
+- **What differs from the app:**
+  - Google signs in through a browser window. The address of that window is
+    `VITE_FIREBASE_AUTH_DOMAIN`.
+  - Apple sign-in is not offered: it needs a Services ID in the Apple Developer account. The button
+    is hidden by one constant (`src/core/sso/providers.ts`).
+  - The verification email sends the user back to `/verify-email` on the site they signed up on.
+    Firebase refuses a site whose domain is not in the project's authorised domains.
+  - Deleting a Google account always asks for confirmation in a Google window first (a browser
+    blocks a window that does not open straight after a click).
+  - The profile is read once when the user is known and again after each change made on the site
+    (Firestore Lite: a third of the size of the full SDK). A change made in the app shows the next
+    time the site is opened.
+- **Sizes** (production build, gzip): the main file is unchanged (73.9 kB); the Firebase code is
+  one separate file of 63 kB, which exists only in a build with the account screens on. In such a
+  build every page requests it at start, because the session is needed everywhere.
+
+**Running it against the emulators** (no real project, no real email):
+
+```bash
+# 1. In quadev-backend (Node 24, JDK 21): Auth, Firestore and Functions emulators
+npm run emulators            # project demo-quadev
+
+# 2. Here
+VITE_ACCOUNT_ENABLED=true VITE_AUTH_GATEWAY=firebase VITE_USE_FIREBASE_EMULATORS=true \
+VITE_FIREBASE_PROJECT_ID=demo-quadev VITE_FIREBASE_API_KEY=demo \
+VITE_FIREBASE_AUTH_DOMAIN=demo-quadev.firebaseapp.com VITE_FIREBASE_APP_ID=demo yarn start:dev
+```
+
+`VITE_FIREBASE_PROJECT_ID` must be the project the emulators were started with; the other three
+values only have to be present. Verification and reset emails are not sent: the Auth emulator lists
+them at `http://localhost:9099/emulator/v1/projects/demo-quadev/oobCodes`, and opening an `oobLink`
+applies it. "Sign in with Google" opens the emulator's own account page. The emulator UI is at
+`http://localhost:4000`. The verify-email, complete-profile and delete-account pages are not built
+yet, so a new email account stops at the sign-in screen until they are.
 
 # Architecture
 
@@ -106,11 +165,14 @@ src/
                 HookFormInputs/ (HookFormTextInput, HookFormPasswordInput, HookFormDateInput)
                 SignIn/ (Layout, SSOForm, Divider, ErrorMessage, FooterPrompt, SubmitButton)
   core/         env.ts, logger.ts, contact.ts, i18n/ (i18n.ts, translations/en.json)
-                auth/ (types, gateway, errors, profile, the gateways, AuthGatewayProvider)
+                auth/ (types, gateway, errors, profile, reauth, paths, the unavailable and
+                       preview gateways, selectAuthGateway, AuthGatewayProvider)
+                firebase/ (app, auth, profile, claims, gateway: the Firebase gateway, the only
+                           folder that imports the Firebase SDK)
                 state/ (store, hooks, slices/sessionSlice, selectors/session)
                 session/ (SessionProvider, hooks)
                 flags/ (registry, evaluate, FlagsProvider)
-                sso/ (GoogleSSOCTA, AppleSSOCTA, useSSOSignIn)
+                sso/ (GoogleSSOCTA, AppleSSOCTA, useSSOSignIn, providers)
   hooks/        usePasswordValidation.ts
   schemas/      signInSchema.ts, signUpSchema.ts, forgotPasswordSchema.ts
   screens/      one folder per screen: PublicHome/, SignIn/, SignUp/, ForgotPassword/, Home/,
@@ -144,7 +206,7 @@ Rules (the same as in `qd-mobile` where they exist there):
   export. A screen lives in its own folder as `XScreen.tsx`, with its spec next to it.
 - **Configuration:** only `src/core/env.ts` reads environment variables. The one exception is the
   build-time check in `src/core/auth/selectAuthGateway.ts`, which has to be written there for the
-  bundler to drop the preview gateway (the file explains why).
+  bundler to drop the gateways a build does not use (the file explains why).
 - **Logging:** `logger().logError(error)` / `logger().logMessage(text)` from `src/core/logger.ts`
   (set up once in `App.tsx`); `console.log` is a lint error.
 - **Text:** every user-facing string is a key in `src/core/i18n/translations/en.json`, named
@@ -163,6 +225,8 @@ Rules (the same as in `qd-mobile` where they exist there):
   lives in `src/schemas/` (zod), with the app's rules and error keys.
 - **Auth:** screens call the auth gateway from `useAuthGateway()`; nothing else knows how users are
   signed in. `src/core/auth/selectAuthGateway.ts` is the only place that chooses the gateway.
+- **Firebase:** only `src/core/firebase/` imports the Firebase SDK (`firebase/*`), and only
+  `selectAuthGateway.ts` loads that folder. Both are lint errors anywhere else.
 - **Route guards** (`src/app/guards.tsx`) read the session status, like the app's Router: while it is
   `initializing` they show a loading state; a signed-in (`ready`) user who opens `/sign-in` or
   `/sign-up` is sent to `/home`; a visitor who is not signed in and opens `/home` is sent to
@@ -228,7 +292,8 @@ yarn format          # Prettier, same options as qd-mobile
 
 `check:well-known` and `check:bundle` check `dist/`; both take another folder as an argument
 (`yarn check:well-known dist-e2e`). `check:bundle` is for production builds only: a dev build
-contains the preview auth gateway by design and fails it.
+contains the preview auth gateway by design and fails it. It also fails when Firebase code is in
+the output while `VITE_ACCOUNT_ENABLED` is off in the production configuration.
 
 ## Tests
 
@@ -276,11 +341,11 @@ same, what was adapted, the one addition for the web (`jsx-a11y`) and what does 
 
 Every pull request into `main` runs:
 
-| Check        | Workflow          | What it proves                                                                                                                                        |
-| ------------ | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `run-checks` | `pr.yml`          | TypeScript, lint, Vitest, the production build, that the app-link files are unchanged in `dist/`, and that the preview auth gateway is not in `dist/` |
-| `e2e`        | `pr.yml`          | The Playwright tests above; the report is uploaded as an artifact when they fail                                                                      |
-| `gitleaks`   | `secret-scan.yml` | No secrets in the new commits                                                                                                                         |
+| Check        | Workflow          | What it proves                                                                                                                                                                                                          |
+| ------------ | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run-checks` | `pr.yml`          | TypeScript, lint, Vitest, the production build, that the app-link files are unchanged in `dist/`, that the preview auth gateway is not in `dist/`, and that no Firebase code is in it while the account screens are off |
+| `e2e`        | `pr.yml`          | The Playwright tests above; the report is uploaded as an artifact when they fail                                                                                                                                        |
+| `gitleaks`   | `secret-scan.yml` | No secrets in the new commits                                                                                                                                                                                           |
 
 `gitleaks` also runs on pull requests into other branches; `run-checks` and `e2e` only on those into
 `main`.
@@ -516,13 +581,29 @@ skipped the files under the dot-folder `/.well-known/`, and a regular expression
 ### Content-Security-Policy
 
 ```
-default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self';
-connect-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+default-src 'none'; script-src 'self' https://apis.google.com; style-src 'self'; img-src 'self';
+font-src 'self'; connect-src 'self' https://identitytoolkit.googleapis.com
+https://securetoken.googleapis.com https://firestore.googleapis.com;
+frame-src https://quadevapp-dev.firebaseapp.com https://quadevapp.firebaseapp.com;
+manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 ```
 
-Nothing is allowed unless listed, and everything listed comes from the site itself: its own script
-and style files (no inline code, no `style` attributes, no `eval`), its own images and fonts.
-Neither React nor Tailwind needs `'unsafe-inline'` here.
+Nothing is allowed unless listed. The site's own script and style files (no inline code, no `style`
+attributes, no `eval`), its own images and fonts; neither React nor Tailwind needs `'unsafe-inline'`
+here. The other origins are what Firebase sign-in needs, and nothing uses them while the account
+screens are off:
+
+| Directive     | Origin                                                       | Used for                                                                                                    |
+| ------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `connect-src` | `identitytoolkit.googleapis.com`                             | Firebase Authentication: sign in, sign up, emails, deleting the account                                     |
+| `connect-src` | `securetoken.googleapis.com`                                 | Renewing the session token                                                                                  |
+| `connect-src` | `firestore.googleapis.com`                                   | The profile document                                                                                        |
+| `script-src`  | `apis.google.com`                                            | Google's loader for the helper frame below; the Firebase SDK adds it when the Google sign-in window is used |
+| `frame-src`   | `quadevapp-dev.firebaseapp.com`, `quadevapp.firebaseapp.com` | A hidden helper frame through which the Google sign-in window hands back its result                         |
+
+One file serves both sites, so each lists both projects' sign-in domains. The Google sign-in window
+itself is a separate window and is not governed by this policy. Nothing was added for the local
+emulators: the policy is sent by Firebase Hosting only, not by `yarn start:dev`.
 
 It starts in **report-only** mode: the browser applies nothing and writes each violation to its
 console (there is no reporting endpoint, so nothing is collected). The only part enforced today is
@@ -537,10 +618,8 @@ To enforce it:
    `Content-Security-Policy-Report-Only` entry.
 3. Check the pull request preview the same way before merging.
 
-The policy describes the site as it is today. Connecting Firebase sign-in will add the origins that
-work needs (the Firebase and Google endpoints in `connect-src`, the sign-in helper page in
-`frame-src`, Google's script for the sign-in pop-up in `script-src`), in the same pull request as
-the code that uses them.
+Before enforcing it with the account screens on, repeat step 1 while signing in with email and with
+Google on the dev site: the token renewal and the profile read only happen with a real account.
 
 ## The Hosting emulator
 

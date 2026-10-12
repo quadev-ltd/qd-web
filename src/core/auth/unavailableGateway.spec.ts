@@ -2,6 +2,18 @@ import { ACCOUNT_UNAVAILABLE, AppAuthError } from './errors';
 import { unavailableGateway } from './unavailableGateway';
 
 describe('unavailableGateway', () => {
+  it('has no way to confirm who the user is', () => {
+    expect(
+      unavailableGateway.getReauthMethod({
+        uid: 'uid-1',
+        email: 'ada@example.com',
+        emailVerified: true,
+        displayName: null,
+        providerIds: ['password'],
+      }),
+    ).toBeNull();
+  });
+
   it('reports at once that nobody is signed in', () => {
     const listener = vi.fn();
 
@@ -46,6 +58,17 @@ describe('unavailableGateway', () => {
       () => unavailableGateway.createProfileIfMissing('uid-1', {}),
     ],
     ['signOut', () => unavailableGateway.signOut()],
+    ['sendVerificationEmail', () => unavailableGateway.sendVerificationEmail()],
+    ['refreshUser', () => unavailableGateway.refreshUser()],
+    [
+      'saveProfile',
+      () =>
+        unavailableGateway.saveProfile('uid-1', {
+          firstName: 'Ada',
+          lastName: 'L',
+        }),
+    ],
+    ['deleteAccount', () => unavailableGateway.deleteAccount()],
   ])('rejects %s with the "not available yet" error', async (_name, action) => {
     const error = await action().then(
       () => undefined,

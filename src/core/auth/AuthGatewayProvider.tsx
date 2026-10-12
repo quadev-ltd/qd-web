@@ -21,8 +21,9 @@ export interface AuthGatewayProviderProps {
 
 /**
  * Gives the account screens and the session their auth gateway. Mount it once, above
- * SessionProvider. The preview gateway is a separate file loaded on demand, so nothing
- * below is rendered until it has arrived; the default gateway is available at once.
+ * SessionProvider. The preview and the Firebase gateways are separate files loaded on
+ * demand, so nothing below is rendered until the chosen one has arrived; the default
+ * gateway is available at once.
  */
 export const AuthGatewayProvider: React.FC<AuthGatewayProviderProps> = ({
   gateway,

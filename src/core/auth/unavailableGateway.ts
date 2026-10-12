@@ -19,13 +19,18 @@ export const unavailableGateway: AuthGateway = {
   getCurrentSessionUser: () => null,
   watchProfile: () => nothingToStop,
   createProfileIfMissing: unavailable,
+  saveProfile: unavailable,
   getClaims: () => Promise.resolve(NO_CLAIMS),
   signUpWithEmail: unavailable,
   signInWithEmail: unavailable,
+  sendVerificationEmail: unavailable,
+  refreshUser: unavailable,
   sendPasswordReset: unavailable,
   signInWithGoogle: unavailable,
   signInWithApple: unavailable,
   signOut: unavailable,
+  getReauthMethod: () => null,
+  deleteAccount: unavailable,
 };
 
 export default unavailableGateway;

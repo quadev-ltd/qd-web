@@ -34,6 +34,9 @@ export interface Claims {
 
 export const NO_CLAIMS: Claims = { paid: false, admin: false };
 
+/** How a user proves who they are before deleting the account (`getReauthMethod`). */
+export type ReauthMethod = 'password' | 'google' | 'apple';
+
 /** What a Google or Apple sign-in returns (qd-mobile src/core/firebase/auth.ts). */
 export interface SSOSignInResult {
   user: SessionUser;
