@@ -1,5 +1,6 @@
-import { AppAuthError, AuthErrorCode } from './errors';
+import { AppAuthError, AuthErrorCode, NO_CURRENT_USER } from './errors';
 import { type AuthGateway } from './gateway';
+import { getReauthMethod } from './reauth';
 import {
   APPLE_PROVIDER_ID,
   GOOGLE_PROVIDER_ID,
@@ -98,8 +99,17 @@ export const createPreviewGateway = (
 ): AuthGateway => {
   const state = readState(storage);
   const listeners = new Set<(user: SessionUser | null) => void>();
+  const profileListeners = new Map<
+    string,
+    Set<(profile: UserProfile | null) => void>
+  >();
+  // The sample account is the same for every tab; a changed profile lives in this tab only.
+  const sampleAccount: PreviewAccount = {
+    ...SEEDED_ACCOUNT,
+    profile: { ...SEEDED_ACCOUNT.profile },
+  };
 
-  const accounts = () => [SEEDED_ACCOUNT, ...state.accounts];
+  const accounts = () => [sampleAccount, ...state.accounts];
   const findByEmail = (email: string) =>
     accounts().find(account => account.email === email.trim().toLowerCase());
   const findByUid = (uid: string | null) =>
@@ -125,11 +135,19 @@ export const createPreviewGateway = (
   };
 
   const signInAsSampleUser = async (): Promise<SSOSignInResult> => {
-    setCurrent(SEEDED_ACCOUNT);
+    setCurrent(sampleAccount);
     return {
-      user: toSessionUser(SEEDED_ACCOUNT),
-      names: { ...SEEDED_ACCOUNT.profile },
+      user: toSessionUser(sampleAccount),
+      names: { ...sampleAccount.profile },
     };
+  };
+
+  const requireCurrentAccount = () => {
+    const account = findByUid(state.currentUid);
+    if (!account) {
+      throw new AppAuthError(NO_CURRENT_USER);
+    }
+    return account;
   };
 
   return {
@@ -143,11 +161,25 @@ export const createPreviewGateway = (
     getCurrentSessionUser: currentUser,
 
     watchProfile: (uid, onNext) => {
+      const watchers = profileListeners.get(uid) ?? new Set();
+      profileListeners.set(uid, watchers);
+      watchers.add(onNext);
       onNext(findByUid(uid)?.profile ?? null);
-      return () => undefined;
+      return () => {
+        watchers.delete(onNext);
+      };
     },
     createProfileIfMissing: async uid =>
       hasCompleteNames(findByUid(uid)?.profile),
+    saveProfile: async (uid, profile) => {
+      const account = findByUid(uid);
+      if (!account) {
+        throw new AppAuthError(NO_CURRENT_USER);
+      }
+      account.profile = { ...profile };
+      save();
+      profileListeners.get(uid)?.forEach(listener => listener(account.profile));
+    },
     getClaims: async () => NO_CLAIMS,
 
     signUpWithEmail: async (email, password, profile) => {
@@ -174,13 +206,34 @@ export const createPreviewGateway = (
       setCurrent(account);
       return toSessionUser(account);
     },
-    // No email exists here; the answer is the same whether the account exists or not.
+    // No email exists here: every account counts as verified, and nothing is sent.
+    sendVerificationEmail: async () => {
+      requireCurrentAccount();
+    },
+    refreshUser: async () => currentUser(),
+    // The answer is the same whether the account exists or not.
     sendPasswordReset: async () => undefined,
 
     signInWithGoogle: signInAsSampleUser,
     signInWithApple: signInAsSampleUser,
 
     signOut: async () => {
+      setCurrent(null);
+    },
+    getReauthMethod,
+    // Like the backend, without the Google window: a wrong password is refused, and the
+    // account is gone afterwards. The sample account is only signed out (it is built in).
+    deleteAccount: async ({ password } = {}) => {
+      const account = requireCurrentAccount();
+      if (
+        getReauthMethod(toSessionUser(account)) === 'password' &&
+        password !== undefined &&
+        password !== account.password
+      ) {
+        throw new AppAuthError(AuthErrorCode.InvalidCredential);
+      }
+      state.accounts = state.accounts.filter(({ uid }) => uid !== account.uid);
+      profileListeners.delete(account.uid);
       setCurrent(null);
     },
   };

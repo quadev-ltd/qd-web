@@ -1,6 +1,7 @@
 // Mirrors qd-mobile src/core/firebase/errors.ts: the same error codes, the same mapping
 // to translation keys and the same logging rule. Added for the web: ACCOUNT_UNAVAILABLE
-// (the account backend is not connected yet). `logFirebaseError` is `logAuthError` here.
+// (the account backend is not connected yet) and the codes of the sign-in window and of a
+// domain that is not authorised. `logFirebaseError` is `logAuthError` here.
 import logger from '@/core/logger';
 
 /** Auth error codes the app reacts to (Firebase prefixes them with "auth/"). */
@@ -19,6 +20,15 @@ export const AuthErrorCode = {
   AccountExistsWithDifferentCredential:
     'auth/account-exists-with-different-credential',
   UserMismatch: 'auth/user-mismatch',
+  // Web only: the Google sign-in window.
+  PopupBlocked: 'auth/popup-blocked',
+  PopupClosedByUser: 'auth/popup-closed-by-user',
+  CancelledPopupRequest: 'auth/cancelled-popup-request',
+  // Web only: the site's domain, or the address a link returns to, is not in the
+  // project's authorised domains; or the sign-in method is switched off in the project.
+  UnauthorizedDomain: 'auth/unauthorized-domain',
+  UnauthorizedContinueUri: 'auth/unauthorized-continue-uri',
+  OperationNotAllowed: 'auth/operation-not-allowed',
 } as const;
 
 /** Thrown by a gateway when a precondition fails before the backend is called. */
@@ -41,6 +51,15 @@ export const getErrorCode = (error: unknown): string | undefined => {
     return typeof code === 'string' ? code : undefined;
   }
   return undefined;
+};
+
+/** Web only: the user closed the sign-in window, or opened a second one. Not a failure. */
+export const isPopupCancellation = (error: unknown): boolean => {
+  const code = getErrorCode(error);
+  return (
+    code === AuthErrorCode.PopupClosedByUser ||
+    code === AuthErrorCode.CancelledPopupRequest
+  );
 };
 
 /** Firestore and Functions codes arrive as "firestore/x", "functions/x" or a bare "x". */
@@ -83,6 +102,12 @@ export const getErrorMessageKey = (error: unknown) => {
       return 'error.reauthUserMismatch';
     case ACCOUNT_UNAVAILABLE:
       return 'error.accountUnavailable';
+    case AuthErrorCode.PopupBlocked:
+      return 'error.popupBlocked';
+    case AuthErrorCode.UnauthorizedDomain:
+    case AuthErrorCode.UnauthorizedContinueUri:
+    case AuthErrorCode.OperationNotAllowed:
+      return 'error.serverSideError';
     default:
       break;
   }
@@ -110,6 +135,9 @@ const EXPECTED_CODES: ReadonlySet<string> = new Set([
   AuthErrorCode.PasswordDoesNotMeetRequirements,
   AuthErrorCode.WeakPassword,
   AuthErrorCode.RequiresRecentLogin,
+  AuthErrorCode.PopupBlocked,
+  AuthErrorCode.PopupClosedByUser,
+  AuthErrorCode.CancelledPopupRequest,
   SIGN_IN_CANCELLED,
   ACCOUNT_UNAVAILABLE,
 ]);

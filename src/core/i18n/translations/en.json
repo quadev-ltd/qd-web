@@ -185,7 +185,8 @@
     "userDisabled": "This account has been disabled. Please contact support.",
     "accountExistsWithDifferentCredential": "An account already exists with this email. Sign in with the method you used before.",
     "reauthUserMismatch": "That account doesn't match the one you're signed in with.",
-    "accountUnavailable": "Sign-in on the web is not available yet."
+    "accountUnavailable": "Sign-in on the web is not available yet.",
+    "popupBlocked": "Your browser blocked the sign-in window. Allow pop-ups for this site and try again."
   },
   "password": {
     "hideAccessibilityLabel": "Hide password",

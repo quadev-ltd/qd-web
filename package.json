@@ -30,6 +30,7 @@
     "@fontsource-variable/sora": "5.3.0",
     "@hookform/resolvers": "5.9.1",
     "@reduxjs/toolkit": "2.13.0",
+    "firebase": "13.0.0",
     "i18next": "26.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",

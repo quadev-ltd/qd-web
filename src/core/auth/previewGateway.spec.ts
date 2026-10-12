@@ -1,4 +1,4 @@
-import { AuthErrorCode } from './errors';
+import { AuthErrorCode, NO_CURRENT_USER } from './errors';
 import {
   createPreviewGateway,
   PREVIEW_GATEWAY_MARKER,
@@ -225,5 +225,134 @@ describe('previewGateway', () => {
         gateway.signInWithEmail(PREVIEW_USER.email, PREVIEW_USER.password),
       ).resolves.toMatchObject({ email: PREVIEW_USER.email });
     }
+  });
+
+  describe('verification, profile and deletion', () => {
+    const signUp = async (gateway: ReturnType<typeof createPreviewGateway>) =>
+      gateway.signUpWithEmail('grace@example.com', 'Passw0rd!e2e', newProfile);
+
+    it('has nothing to verify: resending resolves and the user stays verified', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+      const user = await signUp(gateway);
+
+      await expect(gateway.sendVerificationEmail()).resolves.toBeUndefined();
+      await expect(gateway.refreshUser()).resolves.toEqual(user);
+    });
+
+    it('cannot resend the verification email when nobody is signed in', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+
+      expect(await codeOf(gateway.sendVerificationEmail())).toBe(
+        NO_CURRENT_USER,
+      );
+      await expect(gateway.refreshUser()).resolves.toBeNull();
+    });
+
+    it('saves a profile, tells the watchers and keeps it across a reload', async () => {
+      const storage = memoryStorage();
+      const gateway = createPreviewGateway(storage);
+      const user = await signUp(gateway);
+      const onProfile = vi.fn();
+      const stop = gateway.watchProfile(user.uid, onProfile, vi.fn());
+      const changed = { firstName: 'Grace', lastName: 'Murray Hopper' };
+
+      await gateway.saveProfile(user.uid, changed);
+
+      expect(onProfile).toHaveBeenLastCalledWith(changed);
+      const afterReload = vi.fn();
+      createPreviewGateway(storage).watchProfile(
+        user.uid,
+        afterReload,
+        vi.fn(),
+      );
+      expect(afterReload).toHaveBeenCalledWith(changed);
+
+      stop();
+      onProfile.mockClear();
+      await gateway.saveProfile(user.uid, newProfile);
+      expect(onProfile).not.toHaveBeenCalled();
+    });
+
+    it('changes the sample user for this gateway only', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+      const { user } = (await gateway.signInWithGoogle())!;
+
+      await gateway.saveProfile(user.uid, { firstName: 'A', lastName: 'B' });
+
+      const other = vi.fn();
+      createPreviewGateway(memoryStorage()).watchProfile(
+        user.uid,
+        other,
+        vi.fn(),
+      );
+      expect(other).toHaveBeenCalledWith({
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+      });
+    });
+
+    it('cannot save the profile of an unknown user', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+
+      expect(await codeOf(gateway.saveProfile('nobody', newProfile))).toBe(
+        NO_CURRENT_USER,
+      );
+    });
+
+    it('confirms a deletion like the backend: Google for the sample user, the password otherwise', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+      const { user: sample } = (await gateway.signInWithGoogle())!;
+      const user = await signUp(gateway);
+
+      expect(gateway.getReauthMethod(sample)).toBe('google');
+      expect(gateway.getReauthMethod(user)).toBe('password');
+    });
+
+    it('refuses a wrong password and keeps the account', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+      await signUp(gateway);
+
+      expect(await codeOf(gateway.deleteAccount({ password: 'wrong' }))).toBe(
+        AuthErrorCode.InvalidCredential,
+      );
+      expect(gateway.getCurrentSessionUser()?.email).toBe('grace@example.com');
+    });
+
+    it('deletes the account: signed out, and the email can sign up again', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+      const listener = vi.fn();
+      gateway.subscribeToAuthState(listener);
+      await signUp(gateway);
+
+      await gateway.deleteAccount({ password: 'Passw0rd!e2e' });
+
+      expect(listener).toHaveBeenLastCalledWith(null);
+      expect(
+        await codeOf(
+          gateway.signInWithEmail('grace@example.com', 'Passw0rd!e2e'),
+        ),
+      ).toBe(AuthErrorCode.InvalidCredential);
+      await expect(signUp(gateway)).resolves.toMatchObject({
+        email: 'grace@example.com',
+      });
+    });
+
+    it('only signs the built-in sample user out', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+      await gateway.signInWithGoogle();
+
+      await gateway.deleteAccount();
+
+      expect(gateway.getCurrentSessionUser()).toBeNull();
+      await expect(
+        gateway.signInWithEmail(PREVIEW_USER.email, PREVIEW_USER.password),
+      ).resolves.toMatchObject({ email: PREVIEW_USER.email });
+    });
+
+    it('cannot delete when nobody is signed in', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+
+      expect(await codeOf(gateway.deleteAccount())).toBe(NO_CURRENT_USER);
+    });
   });
 });

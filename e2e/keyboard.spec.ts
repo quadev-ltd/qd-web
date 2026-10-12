@@ -40,7 +40,6 @@ test('the focus ring is dark blue on light surfaces and sky blue on dark ones', 
   const google = page.getByRole('button', { name: 'Sign in with Google' });
   await expect(google).toBeFocused();
   await expectFocusRing(google, FOCUS_ON_LIGHT);
-  await page.keyboard.press('Tab'); // Sign in with Apple
   await page.keyboard.press('Tab'); // Email
   await expect(email).toBeFocused();
   await expectFocusRing(email, FOCUS_ON_LIGHT);

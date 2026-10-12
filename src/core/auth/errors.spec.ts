@@ -1,10 +1,13 @@
-// Mirrors qd-mobile src/core/firebase/errors.spec.ts, plus the web's "not available yet" code.
+// Mirrors qd-mobile src/core/firebase/errors.spec.ts, plus the web's own codes: "not
+// available yet", the sign-in window and a domain that is not authorised.
 import {
   ACCOUNT_UNAVAILABLE,
   AppAuthError,
   getErrorCode,
   getErrorMessageKey,
+  isPopupCancellation,
   logAuthError,
+  SIGN_IN_CANCELLED,
 } from './errors';
 
 const mockLogger = vi.hoisted(() => ({
@@ -44,6 +47,10 @@ describe('getErrorMessageKey', () => {
     ['deadline-exceeded', 'error.networkError'],
     ['auth/internal-error', 'error.unexpectedErrorRetry'],
     [ACCOUNT_UNAVAILABLE, 'error.accountUnavailable'],
+    ['auth/popup-blocked', 'error.popupBlocked'],
+    ['auth/unauthorized-domain', 'error.serverSideError'],
+    ['auth/unauthorized-continue-uri', 'error.serverSideError'],
+    ['auth/operation-not-allowed', 'error.serverSideError'],
   ])('maps %s to %s', (code, key) => {
     expect(getErrorMessageKey(withCode(code))).toBe(key);
   });
@@ -72,6 +79,26 @@ describe('getErrorCode', () => {
   });
 });
 
+describe('isPopupCancellation', () => {
+  it.each(['auth/popup-closed-by-user', 'auth/cancelled-popup-request'])(
+    'takes %s as the user changing their mind',
+    code => {
+      expect(isPopupCancellation(withCode(code))).toBe(true);
+    },
+  );
+
+  it.each(['auth/popup-blocked', SIGN_IN_CANCELLED, 'auth/user-mismatch'])(
+    'does not take %s as a closed window',
+    code => {
+      expect(isPopupCancellation(withCode(code))).toBe(false);
+    },
+  );
+
+  it('is false without a code', () => {
+    expect(isPopupCancellation(new Error('boom'))).toBe(false);
+  });
+});
+
 describe('logAuthError', () => {
   beforeEach(() => {
     mockLogger.logError.mockReset();
@@ -93,6 +120,19 @@ describe('logAuthError', () => {
     expect(mockLogger.logError).not.toHaveBeenCalled();
     expect(mockLogger.logMessage).toHaveBeenCalledWith(
       'signIn failed: code=auth/invalid-credential',
+    );
+  });
+
+  it('logs a blocked sign-in window as a message, and a domain that is not authorised as an error', () => {
+    logAuthError('googleSignIn', withCode('auth/popup-blocked'));
+    expect(mockLogger.logError).not.toHaveBeenCalled();
+    expect(mockLogger.logMessage).toHaveBeenCalledWith(
+      'googleSignIn failed: code=auth/popup-blocked',
+    );
+
+    logAuthError('googleSignIn', withCode('auth/unauthorized-domain'));
+    expect(mockLogger.logError).toHaveBeenCalledWith(
+      new Error('googleSignIn failed: code=auth/unauthorized-domain'),
     );
   });
 

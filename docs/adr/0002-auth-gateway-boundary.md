@@ -1,6 +1,7 @@
 # ADR 0002: The auth gateway, the boundary between the screens and the account backend
 
-- **Status:** accepted (October 2026)
+- **Status:** accepted (October 2026). The Firebase gateway it announces is
+  [ADR 0004](0004-firebase-gateway.md), which also extends the interface
 - **Scope:** `src/core/auth/` and everything that signs users in or reads the session
 
 ## Context
@@ -66,6 +67,7 @@ code is never requested.
 - **Connecting the backend is one new file set.** A `firebaseGateway` implementing `AuthGateway`
   replaces both gateways; screens, schemas, session and guards do not change. A lint rule will then
   limit `firebase/*` imports to that folder, as the app's README requires for `core/firebase`.
+  (Done in ADR 0004: `src/core/firebase/`.)
 - **Screens are tested like the app's**, with `createMockGateway()` in place of mocking the Firebase
   modules; the preview gateway has its own spec and drives the end-to-end tests.
 - **The preview gateway is not Firebase.** It has no email verification (every account counts as

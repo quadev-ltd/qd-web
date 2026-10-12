@@ -46,7 +46,7 @@ describe('env', () => {
     ).toBe(false);
   });
 
-  it('uses the unavailable auth gateway unless "preview" is asked for', () => {
+  it('uses the unavailable auth gateway unless another one is asked for', () => {
     expect(parseEnv(valid).AUTH_GATEWAY).toBe('unavailable');
     expect(parseEnv({ ...valid, AUTH_GATEWAY: '' }).AUTH_GATEWAY).toBe(
       'unavailable',
@@ -61,8 +61,67 @@ describe('env', () => {
 
   it('rejects an auth gateway it does not know', () => {
     expect(
-      envSchema.safeParse({ ...valid, AUTH_GATEWAY: 'firebase' }).success,
+      envSchema.safeParse({ ...valid, AUTH_GATEWAY: 'supabase' }).success,
     ).toBe(false);
+  });
+
+  describe('the Firebase gateway', () => {
+    const firebase = {
+      FIREBASE_API_KEY: 'key',
+      FIREBASE_AUTH_DOMAIN: 'demo.firebaseapp.com',
+      FIREBASE_PROJECT_ID: 'demo',
+      FIREBASE_APP_ID: '1:1:web:1',
+    };
+
+    it('is accepted with its four settings', () => {
+      expect(
+        parseEnv({ ...valid, AUTH_GATEWAY: 'firebase', ...firebase }),
+      ).toMatchObject({ AUTH_GATEWAY: 'firebase', ...firebase });
+    });
+
+    it('names every setting that is missing or empty', () => {
+      expect(() =>
+        parseEnv({
+          ...valid,
+          AUTH_GATEWAY: 'firebase',
+          FIREBASE_API_KEY: 'key',
+          FIREBASE_PROJECT_ID: ' ',
+        }),
+      ).toThrow(
+        /FIREBASE_AUTH_DOMAIN[\s\S]*FIREBASE_PROJECT_ID[\s\S]*FIREBASE_APP_ID/,
+      );
+    });
+
+    it('does not ask for the settings with another gateway', () => {
+      const env = parseEnv({ ...valid, AUTH_GATEWAY: 'preview' });
+
+      expect(env.FIREBASE_API_KEY).toBeUndefined();
+      expect(env.USE_FIREBASE_EMULATORS).toBe(false);
+    });
+
+    it('uses the emulators only when asked to', () => {
+      expect(
+        parseEnv({ ...valid, USE_FIREBASE_EMULATORS: 'true' })
+          .USE_FIREBASE_EMULATORS,
+      ).toBe(true);
+      expect(
+        parseEnv({ ...valid, USE_FIREBASE_EMULATORS: 'false' })
+          .USE_FIREBASE_EMULATORS,
+      ).toBe(false);
+      expect(
+        envSchema.safeParse({ ...valid, USE_FIREBASE_EMULATORS: '1' }).success,
+      ).toBe(false);
+    });
+
+    it('refuses the emulators in production', () => {
+      expect(() =>
+        parseEnv({
+          ...valid,
+          APPLICATION_ENVIRONMENT: 'prod',
+          USE_FIREBASE_EMULATORS: 'true',
+        }),
+      ).toThrow(/USE_FIREBASE_EMULATORS/);
+    });
   });
 
   it('throws naming the invalid variables', () => {
@@ -79,6 +138,11 @@ describe('env', () => {
       APPLICATION_ENVIRONMENT: 'test',
       ACCOUNT_ENABLED: false,
       AUTH_GATEWAY: 'unavailable',
+      FIREBASE_API_KEY: undefined,
+      FIREBASE_AUTH_DOMAIN: undefined,
+      FIREBASE_PROJECT_ID: undefined,
+      FIREBASE_APP_ID: undefined,
+      USE_FIREBASE_EMULATORS: false,
     });
   });
 });

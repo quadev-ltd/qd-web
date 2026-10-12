@@ -31,9 +31,10 @@ describe('SignUpScreen', () => {
     expect(
       screen.getByRole('button', { name: 'signUp.withGoogle' }),
     ).toBeInTheDocument();
+    // Apple sign-in is not set up for the web yet (src/core/sso/providers.ts).
     expect(
-      screen.getByRole('button', { name: 'signUp.withApple' }),
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'signUp.withApple' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText('signUp.firstNameLabel')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'signUp.submitButton' }),
