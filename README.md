@@ -48,22 +48,52 @@ page if it is started that way (`src/core/env.ts`).
 
 ## The account flag
 
-`VITE_ACCOUNT_ENABLED` is **off in production** until the account backend is connected. While it is
-off:
+`VITE_ACCOUNT_ENABLED` is **on in development** (`.env.dev`: the dev site
+[dev.quadev.net](https://dev.quadev.net) and `yarn start:dev`) and **off in production**
+(`.env.prod`) until the checklist in [Enabling accounts in production](#enabling-accounts-in-production)
+is done. It is the one production switch. While it is off:
 
 - the public home shows no "Sign in", "Sign up" or "Create your account" buttons;
 - `/sign-in`, `/sign-up`, `/forgot-password`, `/verify-email`, `/complete-profile`, `/home` and
   `/account/delete` are not registered and show the Not found page;
 - the browser never downloads the account screens (they are separate files, loaded on demand).
 
-To see the account screens locally:
+Locally, `yarn start:dev` shows the account screens connected to the **dev Firebase project**
+(`quadevapp-dev`): accounts created there are real dev accounts, and verification emails are really
+sent. To click through the screens without any backend, use the preview gateway (below):
 
 ```bash
-VITE_ACCOUNT_ENABLED=true yarn start:dev
+VITE_AUTH_GATEWAY=preview yarn start:dev     # or put the line in .env.dev.local
 ```
 
-`.env.dev` uses the preview auth gateway (below), so the screens work end to end: sign up, verify
-the email, land on the signed-in home, sign out, delete the account; or use the sample account.
+## Enabling accounts in production
+
+Everything is in place for one change: in `.env.prod`, set `VITE_ACCOUNT_ENABLED=true`, merge, and
+release a version tag (see [Production release](#production-release)). `.env.prod` already carries
+`VITE_AUTH_GATEWAY=firebase` and the settings of the production web app; they are not used, and no
+Firebase code is built, while the switch is off.
+
+Before flipping it, all of this must be true (the backend items are tracked in `quadev-backend`'s
+docs and infrastructure log):
+
+- [ ] The full flow works on dev.quadev.net with a real mailbox: sign up, verification email,
+      verify, sign in, complete profile, sign out, reset password, delete account.
+- [ ] `quadev.net` is served by Firebase Hosting (hosting step H4) and is in the authorised domains
+      of `quadevapp` (done on 12 Oct 2026).
+- [ ] Production backend deployed: Firestore rules, indexes, functions (`onUserDeleted`) and the
+      Remote Config templates on `quadevapp`. Without `onUserDeleted`, deleting an account leaves
+      its profile behind.
+- [ ] The backend refuses unverified accounts (not only the screens).
+- [ ] The production browser API key is restricted to the site's addresses, and App Check is
+      decided.
+- [ ] The Content-Security-Policy has been checked with accounts on and is enforced (it is
+      report-only today).
+- [ ] The legal pages and the support address are right for accounts created on the web
+      (`support@quadev.net` must reach a person).
+- [ ] The public "Delete your account" page links to `/account/delete`.
+
+To switch accounts off again: set the value back to `false` and release a tag, or roll back to the
+previous release in the Firebase console.
 
 ## The auth gateway
 
@@ -73,11 +103,11 @@ profile, password reset, sign out, deleting the account) goes through one interf
 layer. `VITE_AUTH_GATEWAY` chooses the implementation, in one place
 (`src/core/auth/selectAuthGateway.ts`):
 
-| Value         | Used by                    | Behaviour                                                                                                                  |
-| ------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `unavailable` | production, tests, default | Nobody is signed in. The forms validate, then show "Sign-in on the web is not available yet." No network call.             |
-| `preview`     | `.env.dev`                 | An in-memory fake: the forms work end to end. Accounts live in the tab (`sessionStorage`) and nothing is sent.             |
-| `firebase`    | nothing yet                | Firebase Authentication and the profile in Firestore (`src/core/firebase`), the same account as the mobile app. See below. |
+| Value         | Used by                      | Behaviour                                                                                                                  |
+| ------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `unavailable` | unit tests, default          | Nobody is signed in. The forms validate, then show "Sign-in on the web is not available yet." No network call.             |
+| `preview`     | end-to-end tests, on request | An in-memory fake: the forms work end to end. Accounts live in the tab (`sessionStorage`) and nothing is sent.             |
+| `firebase`    | `.env.dev`, `.env.prod`      | Firebase Authentication and the profile in Firestore (`src/core/firebase`), the same account as the mobile app. See below. |
 
 The preview gateway has one sample account, and sign-up creates more (they disappear when the tab
 closes). "Sign in with Google" and "Sign in with Apple" sign in as the sample account.
@@ -110,9 +140,10 @@ It is a fake for clicking through the screens: never type a real password into i
 3. `yarn check:bundle` (run in CI after the production build) fails if the build output contains
    it.
 
-The dev build (`yarn build:dev`, what the dev site and the pull request previews serve) is
-configured with the preview gateway and contains it on purpose, so `yarn check:bundle` is only run
-on production builds.
+The end-to-end build (`yarn build:e2e`, a dev-mode build that Playwright starts with
+`VITE_AUTH_GATEWAY=preview`) contains the preview gateway on purpose, so `yarn check:bundle` is only
+run on production builds. The dev build (`yarn build:dev`, what the dev site and the pull request
+previews serve) uses the Firebase gateway and does not contain it.
 
 The reasoning is in [ADR 0002](docs/adr/0002-auth-gateway-boundary.md).
 
@@ -121,9 +152,13 @@ The reasoning is in [ADR 0002](docs/adr/0002-auth-gateway-boundary.md).
 `src/core/firebase/` (`app.ts`, `auth.ts`, `profile.ts`, `claims.ts`, put together in `gateway.ts`)
 is the web version of the app's `src/core/firebase`: the same function names, the same order of
 operations (account, then the profile document `users/{uid}`, then the verification email) and the
-same document, so the backend's rules treat both clients alike. No environment uses it yet:
-`.env.dev` and `.env.prod` are unchanged. The decisions are in
-[ADR 0004](docs/adr/0004-firebase-gateway.md).
+same document, so the backend's rules treat both clients alike. The dev site uses it with the
+project `quadevapp-dev`; production has it configured for `quadevapp` behind the switch. The
+decisions are in [ADR 0004](docs/adr/0004-firebase-gateway.md).
+
+Pull request previews are served from addresses that are not in the project's authorised domains
+(`quadevapp-dev--pr<n>-<hash>.web.app`), so Google sign-in and the verification email are refused
+there. Test sign-in on dev.quadev.net or locally.
 
 - **It is loaded only when it can be used.** `VITE_AUTH_GATEWAY=firebase` **and**
   `VITE_ACCOUNT_ENABLED=true`. With the account screens off, the unavailable gateway answers and
@@ -164,8 +199,7 @@ VITE_FIREBASE_AUTH_DOMAIN=demo-quadev.firebaseapp.com VITE_FIREBASE_APP_ID=demo 
 values only have to be present. Verification and reset emails are not sent: the Auth emulator lists
 them at `http://localhost:9099/emulator/v1/projects/demo-quadev/oobCodes`, and opening an `oobLink`
 applies it. "Sign in with Google" opens the emulator's own account page. The emulator UI is at
-`http://localhost:4000`. The verify-email, complete-profile and delete-account pages are not built
-yet, so a new email account stops at the sign-in screen until they are.
+`http://localhost:4000`.
 
 # Architecture
 

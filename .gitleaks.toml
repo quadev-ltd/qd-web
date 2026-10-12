@@ -1,6 +1,19 @@
-# gitleaks configuration: default rules, no project-specific allowlist yet.
+# gitleaks configuration: default rules, plus one allowlist entry (below).
 # Run locally: gitleaks git --redact   (full history)
 #              gitleaks git --pre-commit --staged --redact   (what the pre-commit hook runs)
 
 [extend]
 useDefault = true
+
+# Firebase web API keys are public identifiers, not secrets: they ship in the site's JavaScript and
+# only say which Firebase project to talk to (access is decided by the Firestore rules and the
+# authorised domains). Allowed only on the VITE_FIREBASE_API_KEY line of these two files; an API
+# key in any other file, or on any other line of them, is still reported.
+# Notes for gitleaks 8.30.1: the line pattern must not start with "^" (the allowlist is then
+# ignored), and `targetRules` has no effect on rules that come from the default config.
+[[allowlists]]
+description = "Firebase web API key in the committed env files"
+condition = "AND"
+paths = ['''^\.env\.(dev|prod)$''']
+regexTarget = "line"
+regexes = ['''VITE_FIREBASE_API_KEY=AIza[0-9A-Za-z_-]{35}''']
