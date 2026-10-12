@@ -1,6 +1,7 @@
 # ADR 0004: The Firebase gateway
 
-- **Status:** accepted (October 2026). The code is merged; no environment uses it yet.
+- **Status:** accepted (October 2026). In use on the dev site since 12 Oct 2026 (`.env.dev`, project
+  `quadevapp-dev`); configured for production behind `VITE_ACCOUNT_ENABLED=false` (`.env.prod`).
 - **Scope:** `src/core/firebase/`, `src/core/auth/selectAuthGateway.ts`, the `VITE_FIREBASE_*`
   settings, the import restrictions in `eslint.config.js`, the Content-Security-Policy in
   `firebase.json`
@@ -118,8 +119,12 @@ in `script-src` (Google's loader, added by the SDK for the sign-in window) and t
 
 ## Consequences
 
-- **Nothing changes for visitors yet.** `.env.dev` and `.env.prod` are untouched; the dev site still
-  uses the preview gateway with the account screens off.
+- **Dev is on, production is one value away** (update of 12 Oct 2026). The website is registered as a
+  web app in both projects and its domains are authorised. `.env.dev` has the account screens on with
+  this gateway; `.env.prod` has the gateway and the production settings with the switch off, which
+  builds no Firebase code. The checklist before flipping it is in the README ("Enabling accounts in
+  production"). The Firebase web API keys in those files are public identifiers; the secret scan
+  allows them on that one line only (`.gitleaks.toml`).
 - **Before the gateway is used on a site,** the project needs a web app (its settings go in the
   environment file), and the site's domain in the authorised domains of Firebase Authentication:
   without it Google sign-in fails with `auth/unauthorized-domain` and the verification email with
