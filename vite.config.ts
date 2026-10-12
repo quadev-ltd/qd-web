@@ -50,6 +50,14 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    // The App Check debug token is a secret that stands in for reCAPTCHA on a developer's
+    // machine (src/core/firebase/appCheck.ts). Vite would copy it into the JavaScript of a
+    // build, where any visitor could read it, so every build gets an empty value instead:
+    // only the development server (`yarn start:dev`) passes it on.
+    define:
+      command === 'build'
+        ? { 'import.meta.env.VITE_APPCHECK_DEBUG_TOKEN': JSON.stringify('') }
+        : {},
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

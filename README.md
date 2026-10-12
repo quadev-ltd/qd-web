@@ -27,21 +27,24 @@ Environment files, one per environment, with the keys from `.env.example`:
   them, and they hold no secrets. For a local override use `.env.dev.local` (ignored by git).
 
 All variables use the `VITE_` prefix: Vite inlines them into the JavaScript bundle at build time, so
-they must not hold secrets. They are validated in `src/core/env.ts`, the only file allowed to read
+they must not hold secrets. The one exception is `VITE_APPCHECK_DEBUG_TOKEN`, which is a secret,
+lives only in `.env.dev.local` and is left out of every build (see "App Check" below). They are validated in `src/core/env.ts`, the only file allowed to read
 `import.meta.env` (a lint rule enforces it). A production build with a required variable missing
 fails instead of deploying a blank page.
 
-| Variable                       | Values                                         | Meaning                                                                            |
-| ------------------------------ | ---------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `VITE_APPLICATION_NAME`        | `web`                                          | Name of this application                                                           |
-| `VITE_APPLICATION_ENVIRONMENT` | `test`, `dev`, `prod`                          | Same values as the mobile app                                                      |
-| `VITE_ACCOUNT_ENABLED`         | `true`, `false` (default)                      | Shows the account screens (see below)                                              |
-| `VITE_AUTH_GATEWAY`            | `unavailable` (default), `preview`, `firebase` | What answers the account screens (see below)                                       |
-| `VITE_FIREBASE_API_KEY`        | from the Firebase console                      | Required with the `firebase` gateway: the web app's settings (public, not secrets) |
-| `VITE_FIREBASE_AUTH_DOMAIN`    | `<project>.firebaseapp.com`                    | Required with the `firebase` gateway: where the Google sign-in window is served    |
-| `VITE_FIREBASE_PROJECT_ID`     | `quadevapp-dev`, `quadevapp`                   | Required with the `firebase` gateway                                               |
-| `VITE_FIREBASE_APP_ID`         | from the Firebase console                      | Required with the `firebase` gateway                                               |
-| `VITE_USE_FIREBASE_EMULATORS`  | `true`, `false` (default)                      | Sends the `firebase` gateway to the local emulators. A production build refuses it |
+| Variable                       | Values                                         | Meaning                                                                                 |
+| ------------------------------ | ---------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `VITE_APPLICATION_NAME`        | `web`                                          | Name of this application                                                                |
+| `VITE_APPLICATION_ENVIRONMENT` | `test`, `dev`, `prod`                          | Same values as the mobile app                                                           |
+| `VITE_ACCOUNT_ENABLED`         | `true`, `false` (default)                      | Shows the account screens (see below)                                                   |
+| `VITE_AUTH_GATEWAY`            | `unavailable` (default), `preview`, `firebase` | What answers the account screens (see below)                                            |
+| `VITE_FIREBASE_API_KEY`        | from the Firebase console                      | Required with the `firebase` gateway: the web app's settings (public, not secrets)      |
+| `VITE_FIREBASE_AUTH_DOMAIN`    | `<project>.firebaseapp.com`                    | Required with the `firebase` gateway: where the Google sign-in window is served         |
+| `VITE_FIREBASE_PROJECT_ID`     | `quadevapp-dev`, `quadevapp`                   | Required with the `firebase` gateway                                                    |
+| `VITE_FIREBASE_APP_ID`         | from the Firebase console                      | Required with the `firebase` gateway                                                    |
+| `VITE_USE_FIREBASE_EMULATORS`  | `true`, `false` (default)                      | Sends the `firebase` gateway to the local emulators. A production build refuses it      |
+| `VITE_RECAPTCHA_SITE_KEY`      | from the Google Cloud console                  | App Check: the site key of the reCAPTCHA Enterprise key (public). Not set: no App Check |
+| `VITE_APPCHECK_DEBUG_TOKEN`    | a debug token (**secret**)                     | App Check on your own machine. Only in `.env.dev.local`; never in a build               |
 
 A build with `VITE_AUTH_GATEWAY=firebase` and one of the four settings missing fails, and so does the
 page if it is started that way (`src/core/env.ts`).
@@ -183,6 +186,37 @@ there. Test sign-in on dev.quadev.net or locally.
   one separate file of 63 kB, which exists only in a build with the account screens on. In such a
   build every page requests it at start, because the session is needed everywhere.
 
+### App Check, for calls to the backend's functions
+
+Every callable function of `quadev-backend` refuses a call that does not carry an App Check token:
+proof that the call comes from this site. `src/core/firebase/functions.ts` gives the Functions
+service and starts App Check first (`appCheck.ts`), so the SDK adds the token to every call. Nothing
+on the site calls a function yet, so neither file is in any build today; the first screen that
+needs the backend loads them. The decisions are in [ADR 0006](docs/adr/0006-app-check.md).
+
+| Where the site runs             | What vouches for it                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------ |
+| dev.quadev.net                  | reCAPTCHA Enterprise, with no puzzle (`VITE_RECAPTCHA_SITE_KEY` in `.env.dev`)             |
+| Your machine (`yarn start:dev`) | A debug token registered for you in the Firebase console                                   |
+| Pull request previews           | Nothing: the key does not cover their addresses, so the functions refuse them              |
+| quadev.net                      | Not set up: `quadevapp` needs its own key for `quadev.net` and its site key in `.env.prod` |
+
+**The debug token, on your machine.** reCAPTCHA only answers on the domains listed for the key, so
+locally the SDK exchanges a debug token instead:
+
+1. Firebase console, project `quadevapp-dev` → App Check → Apps → "QuaDev website (dev)" → Manage
+   debug tokens → add one, and keep it in the password manager.
+2. Create `.env.dev.local` at the root of the repository (git ignores it) with one line:
+   `VITE_APPCHECK_DEBUG_TOKEN=<the token>`.
+3. Start again with `yarn start:dev`. The browser console says "App Check uses a debug token."
+   the first time a function is called.
+
+The token is a secret: with it anyone can pass as this site to the functions. It must never be in
+a committed file or in a build. Three guards: `vite.config.ts` gives every build an empty value in
+its place, so only the development server passes it on; `src/core/env.ts` refuses it in
+production; and `.env.dev.local` is in `.gitignore`. If a token leaks, delete it in the same
+console page.
+
 **Running it against the emulators** (no real project, no real email):
 
 ```bash
@@ -249,7 +283,8 @@ Why the stack is what it is, how each choice maps to the mobile app and where th
 [ADR 0002](docs/adr/0002-auth-gateway-boundary.md). Where the site is hosted and how it is released:
 [ADR 0003](docs/adr/0003-firebase-hosting-and-release-pipeline.md). The Firebase gateway:
 [ADR 0004](docs/adr/0004-firebase-gateway.md). The account screens after sign-in and the route
-guards: [ADR 0005](docs/adr/0005-account-screens-and-route-guards.md).
+guards: [ADR 0005](docs/adr/0005-account-screens-and-route-guards.md). App Check for calls to the
+backend's functions: [ADR 0006](docs/adr/0006-app-check.md).
 
 Rules (the same as in `qd-mobile` where they exist there):
 
@@ -646,10 +681,14 @@ skipped the files under the dot-folder `/.well-known/`, and a regular expression
 ### Content-Security-Policy
 
 ```
-default-src 'none'; script-src 'self' https://apis.google.com; style-src 'self'; img-src 'self';
-font-src 'self'; connect-src 'self' https://identitytoolkit.googleapis.com
-https://securetoken.googleapis.com https://firestore.googleapis.com;
-frame-src https://quadevapp-dev.firebaseapp.com https://quadevapp.firebaseapp.com;
+default-src 'none'; script-src 'self' https://apis.google.com https://www.google.com/recaptcha/
+https://www.gstatic.com/recaptcha/; style-src 'self'; img-src 'self'; font-src 'self';
+connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com
+https://firestore.googleapis.com https://content-firebaseappcheck.googleapis.com
+https://europe-west1-quadevapp-dev.cloudfunctions.net
+https://europe-west1-quadevapp.cloudfunctions.net;
+frame-src https://quadevapp-dev.firebaseapp.com https://quadevapp.firebaseapp.com
+https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/;
 manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 ```
 
@@ -658,13 +697,17 @@ attributes, no `eval`), its own images and fonts; neither React nor Tailwind nee
 here. The other origins are what Firebase sign-in needs, and nothing uses them while the account
 screens are off:
 
-| Directive     | Origin                                                       | Used for                                                                                                    |
-| ------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `connect-src` | `identitytoolkit.googleapis.com`                             | Firebase Authentication: sign in, sign up, emails, deleting the account                                     |
-| `connect-src` | `securetoken.googleapis.com`                                 | Renewing the session token                                                                                  |
-| `connect-src` | `firestore.googleapis.com`                                   | The profile document                                                                                        |
-| `script-src`  | `apis.google.com`                                            | Google's loader for the helper frame below; the Firebase SDK adds it when the Google sign-in window is used |
-| `frame-src`   | `quadevapp-dev.firebaseapp.com`, `quadevapp.firebaseapp.com` | A hidden helper frame through which the Google sign-in window hands back its result                         |
+| Directive     | Origin                                                                                       | Used for                                                                                                    |
+| ------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `connect-src` | `identitytoolkit.googleapis.com`                                                             | Firebase Authentication: sign in, sign up, emails, deleting the account                                     |
+| `connect-src` | `securetoken.googleapis.com`                                                                 | Renewing the session token                                                                                  |
+| `connect-src` | `firestore.googleapis.com`                                                                   | The profile document                                                                                        |
+| `script-src`  | `apis.google.com`                                                                            | Google's loader for the helper frame below; the Firebase SDK adds it when the Google sign-in window is used |
+| `frame-src`   | `quadevapp-dev.firebaseapp.com`, `quadevapp.firebaseapp.com`                                 | A hidden helper frame through which the Google sign-in window hands back its result                         |
+| `connect-src` | `content-firebaseappcheck.googleapis.com`                                                    | App Check: exchanging the proof for a token (not checked on the live site yet)                              |
+| `connect-src` | `europe-west1-quadevapp-dev.cloudfunctions.net`, `europe-west1-quadevapp.cloudfunctions.net` | The backend's callable functions (not used by any page yet)                                                 |
+| `script-src`  | `www.google.com/recaptcha/`, `www.gstatic.com/recaptcha/`                                    | reCAPTCHA Enterprise, loaded by App Check (from Google's guidance; not checked on the live site yet)        |
+| `frame-src`   | `www.google.com/recaptcha/`, `recaptcha.google.com/recaptcha/`                               | The hidden reCAPTCHA frame (same)                                                                           |
 
 One file serves both sites, so each lists both projects' sign-in domains. The Google sign-in window
 itself is a separate window and is not governed by this policy. Nothing was added for the local
@@ -685,6 +728,8 @@ To enforce it:
 
 Before enforcing it with the account screens on, repeat step 1 while signing in with email and with
 Google on the dev site: the token renewal and the profile read only happen with a real account.
+The App Check, reCAPTCHA and functions origins were added before any page used them: repeat step 1
+on the first page that calls a function, on dev.quadev.net, where reCAPTCHA really runs.
 
 ## The Hosting emulator
 
