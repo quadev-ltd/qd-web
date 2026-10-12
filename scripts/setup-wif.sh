@@ -9,7 +9,9 @@
 #
 # Creates (idempotent: existing resources are kept):
 #   - workload identity pool `github` (shared with quadev-backend, which created it; reused when present)
-#     and OIDC provider `qd-web`, accepting only tokens whose `repository` claim is quadev-ltd/qd-web;
+#     and OIDC provider `qd-web`, accepting only tokens whose `repository` claim is quadev-ltd/qd-web.
+#     On quadevapp (production) the token must also come from a job in the GitHub environment
+#     `production`, which is the approval step of release.yml;
 #   - service account hosting-deployer@<project>.iam.gserviceaccount.com with the role below;
 #   - a binding that lets that repository impersonate the service account.
 # Then prints the two GitHub repository variables the workflows need.
@@ -46,7 +48,7 @@ SA_NAME="hosting-deployer"
 PROJECT=""
 APPLY=0
 
-usage() { sed -n '2,15p' "$0"; exit "${1:-0}"; }
+usage() { sed -n '2,17p' "$0"; exit "${1:-0}"; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -59,9 +61,23 @@ while [ $# -gt 0 ]; do
 done
 
 # The GitHub variables are named after the environment, so one repository can hold both.
+# CONDITION is what a GitHub token must satisfy to be accepted by the provider.
+#   dev:  any workflow of the repository (the dev deploy on merge and pull request previews).
+#   prod: only a job that runs in the GitHub environment `production`. GitHub puts the environment
+#         in the token's subject, and a job gets there only through the environment's rules
+#         (required reviewer, version tags only). A pull request workflow can therefore not deploy
+#         production, even if someone edits it to try.
 case "$PROJECT" in
-  quadevapp-dev) VAR_SUFFIX="DEV" ;;
-  quadevapp) VAR_SUFFIX="PROD" ;;
+  quadevapp-dev)
+    VAR_SUFFIX="DEV"
+    CONDITION="assertion.repository == '$REPO'"
+    ACCEPTED="only $REPO is accepted"
+    ;;
+  quadevapp)
+    VAR_SUFFIX="PROD"
+    CONDITION="assertion.repository == '$REPO' && assertion.sub == 'repo:$REPO:environment:production'"
+    ACCEPTED="only $REPO, environment production, is accepted"
+    ;;
   "") echo "Missing --project (quadevapp-dev or quadevapp)." >&2; exit 1 ;;
   *) echo "Unknown project '$PROJECT' (expected quadevapp-dev or quadevapp)." >&2; exit 1 ;;
 esac
@@ -75,6 +91,24 @@ ROLES=(
 run() {
   printf '  '; printf '%q ' "$@"; printf '\n'
   if [ "$APPLY" -eq 1 ]; then "$@"; fi
+}
+
+# Like run, for a command that names the deploy service account. A service account created seconds
+# ago is not visible to every IAM endpoint yet, and binding a role to it fails with "Service account
+# ... does not exist" until it is, so the command is tried again for up to a minute.
+run_retry() {
+  printf '  '; printf '%q ' "$@"; printf '\n'
+  [ "$APPLY" -eq 1 ] || return 0
+  local attempt
+  for attempt in 1 2 3 4 5 6; do
+    if "$@"; then return 0; fi
+    if [ "$attempt" -lt 6 ]; then
+      echo "  (attempt $attempt failed; trying again in 10 s, a new service account takes a moment to be visible)"
+      sleep 10
+    fi
+  done
+  echo "Gave up after 6 attempts: $*" >&2
+  return 1
 }
 
 # Runs "create" only when "describe" fails (resource missing). In a dry run nothing is looked up, so
@@ -109,7 +143,7 @@ run gcloud services enable iam.googleapis.com iamcredentials.googleapis.com sts.
   --project "$PROJECT"
 
 echo
-echo "# 2. Workload identity pool (shared with quadev-backend) and GitHub OIDC provider (only $REPO is accepted)"
+echo "# 2. Workload identity pool (shared with quadev-backend) and GitHub OIDC provider ($ACCEPTED)"
 ensure "gcloud iam workload-identity-pools describe $POOL --project $PROJECT --location global" \
   gcloud iam workload-identity-pools create "$POOL" --project "$PROJECT" --location global \
   --display-name "GitHub Actions"
@@ -118,21 +152,31 @@ ensure "gcloud iam workload-identity-pools providers describe $PROVIDER --projec
   --workload-identity-pool "$POOL" --display-name "$REPO" \
   --issuer-uri "https://token.actions.githubusercontent.com" \
   --attribute-mapping "google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner,attribute.ref=assertion.ref" \
-  --attribute-condition "assertion.repository == '$REPO'"
+  --attribute-condition "$CONDITION"
 
 echo
 echo "# 3. Deploy service account and its role"
 ensure "gcloud iam service-accounts describe $SA_EMAIL --project $PROJECT" \
   gcloud iam service-accounts create "$SA_NAME" --project "$PROJECT" \
   --display-name "Firebase Hosting deploy from GitHub Actions ($REPO)"
+if [ "$APPLY" -eq 1 ]; then
+  # Wait until the account can be read back before binding roles to it (up to a minute).
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    if gcloud iam service-accounts describe "$SA_EMAIL" --project "$PROJECT" >/dev/null 2>&1; then break; fi
+    echo "  (waiting for $SA_EMAIL to be visible)"
+    sleep 5
+  done
+else
+  echo "  # then waits until the account is visible; the two bindings below are retried for up to a minute"
+fi
 for role in "${ROLES[@]}"; do
-  run gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$SA_EMAIL" --role "$role" \
+  run_retry gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$SA_EMAIL" --role "$role" \
     --condition None --quiet
 done
 
 echo
 echo "# 4. Let workflows from $REPO impersonate the service account"
-run gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" --project "$PROJECT" \
+run_retry gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" --project "$PROJECT" \
   --role roles/iam.workloadIdentityUser \
   --member "principalSet://iam.googleapis.com/${POOL_ID}/attribute.repository/${REPO}" --quiet
 

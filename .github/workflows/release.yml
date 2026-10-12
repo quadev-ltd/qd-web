@@ -1,0 +1,168 @@
+name: Release
+
+# Production release: pushing a tag vX.Y.Z (matching package.json "version", on a commit that is
+# on main) runs the checks, waits for an approval on the GitHub environment `production`, then
+# deploys the production build (.env.prod) to Firebase Hosting on quadevapp (alias `prod` in
+# .firebaserc) and, during the move away from AWS, to S3 + CloudFront as before (ADR 0003).
+# quadev.net is served by whichever of the two its DNS points at.
+#
+# Needs the one-time setup in the README ("Production release"): the environment `production`
+# with a required reviewer, scripts/setup-wif.sh on quadevapp, and the repository variables
+# WIF_PROVIDER_PROD and WIF_SERVICE_ACCOUNT_PROD. Without the variables the release stops in
+# run-checks, before anything is deployed.
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # The tag rules, then the same checks as pr.yml and main.yml.
+  run-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Full history: the check below needs to know whether the tagged commit is on main.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack (Yarn 4 from packageManager)
+        run: corepack enable
+
+      - name: Check the tag matches package.json version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::Tag $TAG does not match package.json version $version (expected v$version)."
+            exit 1
+          fi
+          echo "Releasing $version"
+
+      # A tag can be pushed on any commit. Only commits on main went through a reviewed pull
+      # request and its checks (including the end-to-end tests, which this workflow does not repeat).
+      - name: Check the tagged commit is on main
+        run: |
+          commit=$(git rev-parse HEAD)
+          if ! git merge-base --is-ancestor "$commit" origin/main; then
+            echo "::error::Commit $commit is not on main. Tag a commit that has been merged."
+            exit 1
+          fi
+
+      - name: Check the production deploy is set up
+        env:
+          WIF_PROVIDER_PROD: ${{ vars.WIF_PROVIDER_PROD }}
+          WIF_SERVICE_ACCOUNT_PROD: ${{ vars.WIF_SERVICE_ACCOUNT_PROD }}
+        run: |
+          if [ -z "$WIF_PROVIDER_PROD" ] || [ -z "$WIF_SERVICE_ACCOUNT_PROD" ]; then
+            echo "::error::Repository variables WIF_PROVIDER_PROD and WIF_SERVICE_ACCOUNT_PROD are not set (README, \"Production release\")."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: TypeScript
+        run: yarn typecheck
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Tests
+        run: yarn test
+
+      - name: Build
+        run: yarn build
+
+      - name: App-link files unchanged in the build output
+        run: yarn check:well-known
+
+      - name: No preview auth gateway in the build output
+        run: yarn check:bundle
+
+  # Waits for the approval configured on the environment `production`, then builds once and
+  # deploys that build to both hosts. Firebase Hosting goes first: if it fails, nothing has
+  # been released and the run can be started again.
+  deploy-production:
+    needs: run-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://quadev.net
+    # One production deploy at a time; a newer release waits for the running one instead of cancelling it.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    # Only this job can ask for the identity token that Google Cloud exchanges for deploy rights.
+    # On quadevapp the token is accepted only from a job in the environment `production`
+    # (scripts/setup-wif.sh), so no other workflow or job in this repository can deploy there.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack (Yarn 4 from packageManager)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build (production configuration)
+        run: yarn build
+
+      - name: App-link files unchanged in the build output
+        run: yarn check:well-known
+
+      - name: No preview auth gateway in the build output
+        run: yarn check:bundle
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PROD }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT_PROD }}
+
+      # `yarn firebase` runs the pinned firebase-tools (package.json).
+      - name: Deploy to Firebase Hosting (production)
+        run: yarn firebase deploy --only hosting --project prod --non-interactive --message "$GITHUB_REF_NAME ($GITHUB_SHA)"
+
+      # The two steps below are the deploy main.yml ran on every merge until this workflow
+      # existed, unchanged. They go away once quadev.net is served by Firebase Hosting and the
+      # two-week rollback window has passed (ADR 0003, step 5).
+      - name: Deploy to S3
+        uses: jakejarvis/s3-sync-action@v0.5.1
+        with:
+          args: --delete
+        env:
+          AWS_S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          SOURCE_DIR: dist
+
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}

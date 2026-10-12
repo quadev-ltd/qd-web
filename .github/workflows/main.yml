@@ -9,7 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  # Runs the same checks as pr.yml, then deploys to production (quadev.net).
+  # Runs the same checks as pr.yml. Production (quadev.net) is not deployed from here: it is
+  # released by a version tag (release.yml).
   run-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -44,30 +45,8 @@ jobs:
       - name: No preview auth gateway in the build output
         run: yarn check:bundle
 
-      - name: Deploy to S3
-        uses: jakejarvis/s3-sync-action@v0.5.1
-        with:
-          args: --delete
-        env:
-          AWS_S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          SOURCE_DIR: dist
-
-      - name: Invalidate CloudFront Cache
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-
   # Deploys the dev build (.env.dev) to Firebase Hosting on quadevapp-dev (alias `dev` in
-  # .firebaserc): https://quadevapp-dev.web.app. It is a second job so the production deploy
-  # above stays exactly as it was; it starts once that job has passed.
+  # .firebaserc): https://quadevapp-dev.web.app. It starts once the checks have passed.
   # Authenticates with Workload Identity Federation (no JSON key). The job is skipped until
   # the owner runs scripts/setup-wif.sh and sets the repository variables WIF_PROVIDER_DEV
   # and WIF_SERVICE_ACCOUNT_DEV (README, "Deploy").

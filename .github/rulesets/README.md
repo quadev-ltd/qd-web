@@ -8,7 +8,8 @@ It mirrors the ruleset of `qd-mobile`:
 - `main` cannot be deleted or force-pushed;
 - organisation admins can bypass the rule in an emergency.
 
-Merging to `main` deploys to production, so these checks are the gate for every release.
+Merging to `main` deploys to the dev site, and a release can only be tagged on a commit that is on
+`main` (`release.yml`), so these checks are the gate for every release.
 
 ## Apply or update it
 
