@@ -17,6 +17,10 @@ import {
   initialExitState,
 } from '@/core/state/slices/exitSlice';
 import {
+  initialInterviewProfileState,
+  type InterviewProfileState,
+} from '@/core/state/slices/interviewProfileSlice';
+import {
   initialSessionState,
   type SessionState,
 } from '@/core/state/slices/sessionSlice';
@@ -31,6 +35,8 @@ interface Options {
   session?: Partial<SessionState>;
   /** How the user left the signed-in pages, on top of the initial state (nothing). */
   exit?: Partial<ExitState>;
+  /** The interview profile as already read, on top of the initial state (not read). */
+  interviewProfile?: Partial<InterviewProfileState>;
   /** The auth gateway the component calls. By default sign-in is unavailable. */
   gateway?: AuthGateway;
   /** The profile gateway the component calls. By default the profile is unavailable. */
@@ -49,6 +55,7 @@ interface Options {
 const createProviders = ({
   session,
   exit,
+  interviewProfile,
   gateway = unavailableGateway,
   profileGateway = unavailableProfileGateway,
   flags,
@@ -57,6 +64,7 @@ const createProviders = ({
   const store = createStore({
     session: { ...initialSessionState, ...session },
     exit: { ...initialExitState, ...exit },
+    interviewProfile: { ...initialInterviewProfileState, ...interviewProfile },
   });
   const flagsState = {
     flags: { ...DEFAULT_FLAGS, ...flags },

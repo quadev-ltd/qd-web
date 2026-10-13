@@ -1,7 +1,7 @@
 // Keyboard use: the account menu, and the focus ring colour on light and dark surfaces.
 import { expect, type Locator, test } from '@playwright/test';
 
-import { signIn } from './support';
+import { openProfile, signIn } from './support';
 
 // src/styles/theme.css: --color-focus (light surfaces) and --color-sky (dark surfaces).
 const FOCUS_ON_LIGHT = 'rgb(27, 143, 216)';
@@ -104,4 +104,50 @@ test('the account menu works with the keyboard', async ({ page }) => {
   await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL('/');
+});
+
+test('the add-a-resource panel works with the keyboard', async ({ page }) => {
+  await openProfile(page);
+  const opener = page.getByRole('button', { name: 'Add something else' });
+
+  // Enter opens the panel and the focus moves into it
+  await opener.focus();
+  await page.keyboard.press('Enter');
+  const panel = page.getByRole('dialog', { name: 'Add to your profile' });
+  await expect(panel).toBeVisible();
+  await expect(panel.locator(':focus')).toHaveCount(1);
+
+  // Tab never reaches the page behind: the focus is in the panel, or with the browser's own
+  // controls on its way round.
+  for (let press = 0; press < 8; press += 1) {
+    await page.keyboard.press('Tab');
+    expect(
+      await page.evaluate(() => {
+        const focused = document.activeElement;
+        return focused === document.body || Boolean(focused?.closest('dialog'));
+      }),
+    ).toBe(true);
+  }
+
+  // A form: the focus goes to its heading, and the fields follow
+  await panel
+    .getByRole('button', { name: /Paste or type text/ })
+    .press('Enter');
+  const form = page.getByRole('dialog', { name: 'Paste or type text' });
+  await expect(
+    form.getByRole('heading', { name: 'Paste or type text' }),
+  ).toBeFocused();
+  await page.keyboard.press('Tab'); // Close
+  await page.keyboard.press('Tab'); // Title
+  await expect(form.getByLabel('Title')).toBeFocused();
+  await page.keyboard.type('Stories');
+  await page.keyboard.press('Tab'); // Type: the chosen option
+  await expect(form.getByRole('radio', { name: 'Note' })).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(form.getByRole('radio', { name: 'Document' })).toBeChecked();
+
+  // Escape closes the panel and returns the focus to what opened it
+  await page.keyboard.press('Escape');
+  await expect(form).toBeHidden();
+  await expect(opener).toBeFocused();
 });

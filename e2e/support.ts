@@ -55,6 +55,40 @@ export const openVerificationLink = (page: Page) =>
 export const loseProfile = (page: Page) =>
   page.evaluate(() => window.qdPreview?.removeProfile());
 
+// The interview profile. The preview profile gateway offers what a test cannot wait for or
+// cause on `window.qdPreviewProfile` (src/core/profile/previewProfileGateway.ts).
+
+/** Signs in as the sample account (it has the interview tools on) and opens its profile. */
+export const openProfile = async (page: Page) => {
+  await signIn(page);
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'Profile' })
+    .click();
+  await expect(page).toHaveURL('/profile');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Profile' }),
+  ).toBeVisible();
+};
+
+/** The profile of the designs: six resources, one in each state. The page reads it again. */
+export const seedProfile = async (page: Page) => {
+  await page.evaluate(() => window.qdPreviewProfile?.seed());
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Resources · 6 of 20' }),
+  ).toBeVisible();
+};
+
+/** A small fictional CV, as the file a visitor would choose. */
+export const CV_FILE = {
+  name: 'maya-okafor-cv.pdf',
+  mimeType: 'application/pdf',
+  buffer: Buffer.from(
+    '%PDF-1.7\nMaya Okafor. Senior Backend Engineer at Fenwick Pay, 2021 to 2026.',
+  ),
+};
+
 /** No serious or critical accessibility violation on the page as it is now. */
 export const expectNoSeriousAccessibilityViolations = async (page: Page) => {
   const { violations } = await new AxeBuilder({ page }).analyze();

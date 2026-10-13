@@ -80,4 +80,33 @@ describe('FormTextInput', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Show' })).toBeInTheDocument();
   });
+
+  it('shows a counter for a field with a limit, tied to the field', () => {
+    render(<FormTextInput label="Title" counter={{ length: 19, max: 100 }} />);
+
+    const counter = screen.getByText('19 / 100');
+    expect(counter).toHaveClass('text-muted');
+    expect(screen.getByLabelText('Title')).toHaveAttribute(
+      'aria-describedby',
+      counter.id,
+    );
+  });
+
+  it('turns the counter red and bold past the limit, next to the error', () => {
+    render(
+      <FormTextInput
+        label="Title"
+        error={{ type: 'too_big', message: 'Shorten the title' }}
+        counter={{ length: 108, max: 100 }}
+      />,
+    );
+
+    expect(screen.getByText('108 / 100')).toHaveClass(
+      'text-danger',
+      'font-bold',
+    );
+    expect(screen.getByLabelText('Title')).toHaveAccessibleDescription(
+      'Shorten the title 108 / 100',
+    );
+  });
 });

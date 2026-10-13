@@ -8,6 +8,8 @@ import {
   type Merge,
 } from 'react-hook-form';
 
+import FieldCounter from './FieldCounter';
+
 export interface FormTextInputProps extends Omit<
   ComponentProps<'input'>,
   'id' | 'className'
@@ -20,6 +22,8 @@ export interface FormTextInputProps extends Omit<
   labelAction?: ReactNode;
   /** Shown inside the field, on the right (for example the "Show" button). */
   trailing?: ReactNode;
+  /** For a field with a limit: "19 / 100" under it, red once it is passed. */
+  counter?: { length: number; max: number };
 }
 
 export const FormTextInput: React.FC<FormTextInputProps> = ({
@@ -28,15 +32,19 @@ export const FormTextInput: React.FC<FormTextInputProps> = ({
   hint,
   labelAction,
   trailing,
+  counter,
   type = 'text',
   ...inputProps
 }) => {
   const id = useId();
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
+  const counterId = `${id}-counter`;
   const message = error?.message as string | undefined;
   const describedBy =
-    [message && errorId, hint && hintId].filter(Boolean).join(' ') || undefined;
+    [message && errorId, hint && hintId, counter && counterId]
+      .filter(Boolean)
+      .join(' ') || undefined;
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -59,6 +67,38 @@ export const FormTextInput: React.FC<FormTextInputProps> = ({
         />
         {trailing}
       </div>
+      <FieldMessages
+        errorId={errorId}
+        hintId={hintId}
+        counterId={counterId}
+        message={message}
+        hint={hint}
+        counter={counter}
+      />
+    </div>
+  );
+};
+
+interface FieldMessagesProps {
+  errorId: string;
+  hintId: string;
+  counterId: string;
+  message?: string;
+  hint?: ReactNode;
+  counter?: { length: number; max: number };
+}
+
+/** What stands under a field: its error, its hint and, on the right, its counter. */
+export const FieldMessages: React.FC<FieldMessagesProps> = ({
+  errorId,
+  hintId,
+  counterId,
+  message,
+  hint,
+  counter,
+}) => {
+  const words = (
+    <>
       {message && (
         <p
           id={errorId}
@@ -71,6 +111,15 @@ export const FormTextInput: React.FC<FormTextInputProps> = ({
           {hint}
         </div>
       )}
+    </>
+  );
+  if (!counter) {
+    return words;
+  }
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">{words}</div>
+      <FieldCounter id={counterId} {...counter} />
     </div>
   );
 };

@@ -24,3 +24,20 @@ vi.mock('i18next', () => {
 
 // jsdom has no scrolling; the router's scroll restoration calls it on navigation.
 vi.stubGlobal('scrollTo', vi.fn());
+
+// jsdom has no modal dialogs. Enough of <dialog> for the specs: it opens, it closes and it
+// says so. What the browser adds (the focus kept inside, Escape, the page behind made inert)
+// is checked by the end-to-end tests.
+if (!HTMLDialogElement.prototype.showModal) {
+  HTMLDialogElement.prototype.showModal = function showModal(
+    this: HTMLDialogElement,
+  ) {
+    this.setAttribute('open', '');
+  };
+  HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+    if (this.hasAttribute('open')) {
+      this.removeAttribute('open');
+      this.dispatchEvent(new Event('close'));
+    }
+  };
+}

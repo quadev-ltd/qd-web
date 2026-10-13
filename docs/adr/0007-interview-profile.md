@@ -1,9 +1,9 @@
 # ADR 0007: The interview profile on the website
 
 - **Status:** accepted (October 2026), and built slice by slice. Done: the checks of 13 Oct 2026
-  ("slice 0", before any screen) and the foundation ("slice 1": the flags, the gateway, `/profile`
-  behind the flag, the tests against the emulators). The screens follow; each slice updates this
-  record.
+  ("slice 0", before any screen), the foundation ("slice 1": the flags, the gateway, `/profile`
+  behind the flag, the tests against the emulators) and the profile page with "Add a resource"
+  ("slice 2"). The page of a resource and the skill map follow; each slice updates this record.
 - **Scope:** `src/core/profile/`, `src/core/firebase/` (the callables, the reads, the upload),
   `src/core/flags/`, `src/screens/Profile/`, the Content-Security-Policy in `firebase.json`,
   `e2e-emulators/` and the `e2e-emulators` job
@@ -173,6 +173,52 @@ What exists after it, and the choices made while building it:
 Left as it was: on the signed-in home, "Mock interview" and "Live interview" say "Available" for
 an account with the flag, although neither exists on the website. The home is redrawn in the last
 slice of this delivery.
+
+## The profile page and "Add a resource" (slice 2)
+
+- **The profile lives in the store** (`interviewProfile` slice), kept in step with the backend by
+  `InterviewProfileProvider`, as `SessionProvider` does for the session. The pages that follow
+  (a resource, the skill map, an item) read the same slice, so going from one to the other reads
+  nothing again.
+- **What is read, and when.** Everything once, by the first profile page of a session. Then only
+  the resources the backend has not finished, every 2 seconds, and the skill map once more when
+  one of them turns out to have added items. Coming back to the profile reads the unfinished
+  ones again, once.
+- **A resource is followed for 3 minutes**, counted from the backend's own time on the resource.
+  A resource the page itself just added is also followed for 3 minutes by the page's clock, so a
+  visitor whose clock is wrong still sees it become ready. After that the row keeps saying "Being
+  read…" or "Waiting for the upload…"; the page of the resource (next slice) is where "taking too
+  long" and "Remove" are.
+- **A file whose upload fails can be uploaded again for the same resource** ("Try again"): the
+  file store refuses a second upload only once a file is there. Sending the form again would
+  leave a first resource waiting for ever. When the file store itself refuses the file, there is
+  no second try.
+- **Closing the panel does not stop an upload.** It goes on, and the list shows the resource.
+- **Limits are checked before anything is sent,** with the messages of the designs: the file's
+  type, an empty file, 10 MB, the title's 100 characters, the text's 50,000, and the address of a
+  link with the backend's own check (`parseProfileLink`). The button waits while a limit is
+  broken; an empty field is said when the form is sent.
+- **Today's limit** is shown when it is reached: the count of today's usage document says so on
+  opening, and the backend's refusal says so otherwise (it also has a limit on cost that the
+  count does not show). "Three or fewer left" (question 18 of the design proposal) is not built:
+  the question is open and the state is not drawn.
+- **Panels are the native `<dialog>`,** opened as a modal: the focus stays inside, Escape closes
+  it and the focus returns to what opened it, with no code of ours. It does not close on a press
+  outside, so a form is not lost by accident. The unit tests cannot see a modal dialog (jsdom has
+  none), so the keyboard is tested in a real browser.
+
+Where the build goes beyond the artboards, or stops short of them:
+
+| Where                         | What                                                                             | Why                                                                                             |
+| ----------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| The list                      | A resource is not a link yet, and has no arrow                                   | The page it leads to is the next slice                                                          |
+| The skill map card            | No "Open the skill map" button                                                   | The skill map is the slice after                                                                |
+| A failed resource in the list | Nine of the ten short reasons are ours ("No text found", "File too large", ...)  | Only "Could not read this page" is drawn; the full sentences belong to the page of the resource |
+| "Upload a file"               | The form opens with an empty box and "Choose a file"                             | The artboards show the form once a file is chosen                                               |
+| The title of a file           | Proposed from the file name in every file form                                   | Drawn for "Add your CV" only; it saves typing in both                                           |
+| A file of another type        | "This file can't be read. Choose a PDF, a Word document (.docx) or a text file." | Not drawn                                                                                       |
+| A failed upload               | "The file didn't upload. Check your connection and try again.", with "Try again" | Not drawn: the artboard has "could not start" only                                              |
+| The empty profile             | A card in the middle of the page, with no button in the heading                  | Drawn for the phone only                                                                        |
 
 ## Consequences
 

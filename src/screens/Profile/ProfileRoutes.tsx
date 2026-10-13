@@ -5,6 +5,7 @@ import SignedInShell from '@/components/layout/SignedInShell';
 import NotAvailable from '@/components/NotAvailable';
 import Spinner from '@/components/Spinner';
 import { useFlag, useFlagsReady } from '@/core/flags/FlagsProvider';
+import { InterviewProfileProvider } from '@/core/profile/InterviewProfileProvider';
 import { ProfileGatewayProvider } from '@/core/profile/ProfileGatewayProvider';
 
 /** The main area of every profile page: the gutter, and room above the footer. */
@@ -29,8 +30,8 @@ const Waiting: React.FC = () => {
  * the interview tools, so it follows their flag (`interviewAssistant`):
  * - while the user's flags are being read, a page that only waits;
  * - flag off: "Not available for your account yet", at every address of the profile;
- * - flag on: the page, with the profile gateway. The gateway is loaded here, by the first
- *   profile page, and stays for the others.
+ * - flag on: the page, with the profile gateway and the profile itself. Both are loaded
+ *   here, by the first profile page, and stay for the others.
  */
 export const ProfileRoutes: React.FC = () => {
   const { t } = useTranslation();
@@ -55,7 +56,9 @@ export const ProfileRoutes: React.FC = () => {
   }
   return (
     <ProfileGatewayProvider fallback={<Waiting />}>
-      <Outlet />
+      <InterviewProfileProvider>
+        <Outlet />
+      </InterviewProfileProvider>
     </ProfileGatewayProvider>
   );
 };
