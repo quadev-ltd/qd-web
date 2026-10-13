@@ -16,6 +16,11 @@ import {
   signUp,
 } from './support';
 
+const expectAccessibleAndNotTooWide = async (page: Page) => {
+  await expectNoSeriousAccessibilityViolations(page);
+  await expectNoHorizontalScroll(page);
+};
+
 const PUBLIC_PAGES = [
   {
     name: 'public home',
@@ -102,6 +107,54 @@ test('profile, empty and with resources in every state: accessible and no horizo
   await expect(page.getByRole('heading', { name: 'Skill map' })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
   await expectNoHorizontalScroll(page);
+});
+
+test('a resource, ready, being read and failed, and the remove dialog: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await seedProfile(page);
+  const open = async (title: string) => {
+    await page.goto('/profile');
+    await page.getByRole('link', { name: new RegExp(title) }).click();
+    await expect(
+      page.getByRole('heading', { level: 1, name: title }),
+    ).toBeVisible();
+  };
+
+  // Ready, with its items
+  await open('Maya Okafor CV 2026');
+  await expect(
+    page.getByRole('heading', { name: 'Items from this resource · 6' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // The confirmation
+  await page.getByRole('button', { name: 'Remove this resource' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Remove this resource?' });
+  await expect(dialog).toBeVisible();
+  await expectInsideViewport(page, dialog);
+  await expectAccessibleAndNotTooWide(page);
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+
+  // Being read
+  await open('Stories for interviews');
+  await expect(page.getByRole('status')).toContainText(
+    /Reading this|taking longer/,
+  );
+  await expectAccessibleAndNotTooWide(page);
+
+  // Read, nothing new
+  await open('LinkedIn profile export');
+  await expect(page.getByRole('status')).toContainText('Nothing new was found');
+  await expectAccessibleAndNotTooWide(page);
+
+  // Failed
+  await open('Conference talk: Ledgers without tears');
+  await expect(page.getByRole('status')).toContainText(
+    'We couldn’t read this page',
+  );
+  await expectAccessibleAndNotTooWide(page);
 });
 
 test('add a resource, in its three forms and with their messages: accessible and no horizontal scroll', async ({
@@ -225,11 +278,6 @@ test('forgot password after sending: accessible and no horizontal scroll', async
   await expectNoSeriousAccessibilityViolations(page);
   await expectNoHorizontalScroll(page);
 });
-
-const expectAccessibleAndNotTooWide = async (page: Page) => {
-  await expectNoSeriousAccessibilityViolations(page);
-  await expectNoHorizontalScroll(page);
-};
 
 test('verify email, in each of its states: accessible and no horizontal scroll', async ({
   page,

@@ -54,4 +54,80 @@ test('add a CV as a file: created, uploaded, read by the backend, and in the ski
   await page.reload();
   await expect(row).toContainText('Ready · 1 item');
   await expect(skillMap).toContainText('1 item');
+
+  // The page of the resource lists the item; removeProfileResource takes both away
+  await row.getByRole('link').click();
+  await expect(
+    page.getByRole('heading', { name: 'Items from this resource · 1' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Remove this resource' }).click();
+  await page
+    .getByRole('dialog', { name: 'Remove this resource?' })
+    .getByRole('button', { name: 'Remove the resource and 1 item' })
+    .click();
+  await expect(page).toHaveURL('/profile');
+  await expect(
+    page.getByRole('heading', { name: 'Start with your CV' }),
+  ).toBeVisible();
+
+  // Gone from the backend, not only from the page
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Start with your CV' }),
+  ).toBeVisible();
+});
+
+test('pasted text is read; a link that cannot be read fails, says why, and is removed', async ({
+  page,
+}) => {
+  const account = await createAccount({ interviewAssistant: true });
+  await signIn(page, account);
+  await openProfile(page);
+
+  // Pasted text: stored and read by the backend itself
+  await page.getByRole('button', { name: 'Add something else' }).click();
+  await page.getByRole('button', { name: /Paste or type text/ }).click();
+  const textForm = page.getByRole('dialog', { name: 'Paste or type text' });
+  await textForm.getByLabel('Title').fill('Stories for interviews');
+  await textForm
+    .getByRole('textbox', { name: 'Text', exact: true })
+    .fill(
+      'Two weeks before the launch our load test failed. I asked for a two-week slip.',
+    );
+  await textForm.getByRole('button', { name: 'Add to profile' }).click();
+  await expect(textForm).toBeHidden();
+  const note = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Stories for interviews' });
+  await expect(note).toContainText('Note');
+  await expect(note).toContainText('Ready · 1 item');
+
+  // A link the backend's fake model cannot read (a host ending in .invalid)
+  await page.getByRole('button', { name: 'Add a resource' }).click();
+  await page.getByRole('button', { name: /Add a link/ }).click();
+  const linkForm = page.getByRole('dialog', { name: 'Add a link' });
+  await linkForm.getByLabel('Title').fill('Portfolio');
+  await linkForm.getByLabel('Address').fill('https://portfolio.invalid/maya');
+  await linkForm.getByRole('button', { name: 'Add to profile' }).click();
+  await expect(linkForm).toBeHidden();
+  const link = page.getByRole('listitem').filter({ hasText: 'Portfolio' });
+  await expect(link).toContainText('Could not read this page');
+  await expect(
+    page.getByRole('heading', { name: 'Resources · 2 of 20' }),
+  ).toBeVisible();
+
+  // The reason reaches the page of the resource; it is removed from there
+  await link.getByRole('link').click();
+  const reason = page.getByRole('status');
+  await expect(reason).toContainText('We couldn’t read this page');
+  await reason.getByRole('button', { name: 'Remove' }).click();
+  await page
+    .getByRole('dialog', { name: 'Remove this resource?' })
+    .getByRole('button', { name: 'Remove the resource', exact: true })
+    .click();
+  await expect(page).toHaveURL('/profile');
+  await expect(
+    page.getByRole('heading', { name: 'Resources · 1 of 20' }),
+  ).toBeVisible();
+  await expect(note).toContainText('Ready · 1 item');
 });

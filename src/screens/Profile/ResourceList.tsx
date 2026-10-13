@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router';
 
 import {
   RESOURCE_TYPE_ICONS,
@@ -12,8 +13,9 @@ import {
   PROFILE_MAX_RESOURCES,
   type ProfileResource,
 } from '@/core/profile/contract';
+import { resourcePath } from '@/core/profile/paths';
 
-/** The resources of the profile, newest first, each with where it is. */
+/** The resources of the profile, newest first, each with where it is and a way to its page. */
 export const ResourceList: React.FC<{ resources: ProfileResource[] }> = ({
   resources,
 }) => {
@@ -30,21 +32,28 @@ export const ResourceList: React.FC<{ resources: ProfileResource[] }> = ({
         {resources.map(resource => (
           <li
             key={resource.id}
-            className="flex items-center gap-3 border-border-faint py-3 not-first:border-t">
-            <span
-              aria-hidden="true"
-              className="flex size-10 flex-none items-center justify-center rounded-full bg-tint text-primary">
-              <Icon name={RESOURCE_TYPE_ICONS[resource.type]} size={18} />
-            </span>
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <p className="text-[13px] leading-normal text-muted">
-                {t(RESOURCE_TYPE_KEYS[resource.type])}
-              </p>
-              <p className="text-base leading-normal font-medium wrap-anywhere">
-                {resource.title}
-              </p>
-              <ResourceStatus resource={resource} />
-            </div>
+            className="border-border-faint not-first:border-t">
+            <Link
+              to={resourcePath(resource.id)}
+              className="flex items-center gap-3 rounded-control py-3 text-text no-underline hover:text-text">
+              <span
+                aria-hidden="true"
+                className="flex size-10 flex-none items-center justify-center rounded-full bg-tint text-primary">
+                <Icon name={RESOURCE_TYPE_ICONS[resource.type]} size={18} />
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-[13px] leading-normal text-muted">
+                  {t(RESOURCE_TYPE_KEYS[resource.type])}
+                </span>
+                <span className="text-base leading-normal font-medium wrap-anywhere">
+                  {resource.title}
+                </span>
+                <ResourceStatus resource={resource} />
+              </span>
+              <span className="flex text-muted">
+                <Icon name="right" />
+              </span>
+            </Link>
           </li>
         ))}
       </ul>
