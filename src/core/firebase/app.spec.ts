@@ -12,6 +12,7 @@ const testEnv = vi.hoisted(() => ({
   FIREBASE_AUTH_DOMAIN: 'demo.firebaseapp.com',
   FIREBASE_PROJECT_ID: 'demo',
   FIREBASE_APP_ID: '1:1:web:1',
+  FIREBASE_STORAGE_BUCKET: undefined as string | undefined,
   USE_FIREBASE_EMULATORS: false,
 }));
 const logMessage = vi.hoisted(() => vi.fn());
@@ -36,6 +37,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetFirebaseForTests();
   testEnv.FIREBASE_API_KEY = 'key';
+  testEnv.FIREBASE_STORAGE_BUCKET = undefined;
   testEnv.USE_FIREBASE_EMULATORS = false;
 });
 
@@ -54,6 +56,20 @@ describe('firebase app', () => {
     });
     expect(getAuth).toHaveBeenCalledWith({ name: 'app' });
     expect(getFirestore).toHaveBeenCalledWith({ name: 'app' });
+  });
+
+  it('names the storage bucket when the environment has one', () => {
+    testEnv.FIREBASE_STORAGE_BUCKET = 'demo.firebasestorage.app';
+
+    auth();
+
+    expect(initializeApp).toHaveBeenCalledWith({
+      apiKey: 'key',
+      authDomain: 'demo.firebaseapp.com',
+      projectId: 'demo',
+      appId: '1:1:web:1',
+      storageBucket: 'demo.firebasestorage.app',
+    });
   });
 
   it('does nothing until it is first used', () => {

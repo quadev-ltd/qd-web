@@ -7,6 +7,8 @@ import {
   type UserProfile,
 } from './types';
 
+import { type FlagValues } from '@/core/flags/registry';
+
 /**
  * The boundary between the account screens and whatever signs users in.
  *
@@ -32,7 +34,7 @@ export interface AuthGateway {
   ): () => void;
   getCurrentSessionUser(): SessionUser | null;
 
-  // ---------- Profile and claims ----------
+  // ---------- Profile, claims and flags ----------
 
   /** Listens to the user's profile. `onNext(null)` means the profile does not exist. */
   watchProfile(
@@ -48,6 +50,12 @@ export interface AuthGateway {
   /** Creates the profile, or completes it if one already exists. */
   saveProfile(uid: string, profile: UserProfile): Promise<void>;
   getClaims(forceRefresh?: boolean): Promise<Claims>;
+  /**
+   * The feature flags set for this user alone (`featureFlags/{uid}` in the backend), which
+   * win over the remote values and the code defaults. Empty when nothing is set. Read once:
+   * a change made by an admin shows the next time the site is opened.
+   */
+  getFlagOverrides(uid: string): Promise<FlagValues>;
 
   // ---------- Email and password ----------
 

@@ -5,6 +5,7 @@ import MainNav from './MainNav';
 import PageShell from './PageShell';
 
 import { HOME_PATH } from '@/core/auth/paths';
+import { PROFILE_PATH } from '@/core/profile/paths';
 import { useProfile, useSignOut } from '@/core/session/hooks';
 
 /** The id of the account section of the signed-in home. */
@@ -41,7 +42,13 @@ export const SignedInShell: React.FC<SignedInShellProps> = ({
       tone="light"
       title={title}
       mainClassName={mainClassName}
-      headerNav={<MainNav homePath={HOME_PATH} accountPath={ACCOUNT_PATH} />}
+      headerNav={
+        <MainNav
+          homePath={HOME_PATH}
+          profilePath={PROFILE_PATH}
+          accountPath={ACCOUNT_PATH}
+        />
+      }
       headerActions={
         <AccountMenu
           firstName={firstName}

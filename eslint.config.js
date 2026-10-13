@@ -9,7 +9,7 @@
 // `react-native/*`, `ft-flow/*` and `eslint-comments/*` rules.
 // Added for the web: `jsx-a11y` recommended, `import.meta.env` in the
 // configuration restriction (mobile restricts `process.env`), and the two import
-// restrictions that keep Firebase behind the auth gateway (the mobile README states
+// restrictions that keep Firebase behind the gateways (the mobile README states
 // the first one as a convention for its `core/firebase` folder).
 // Adapted: `plugin:jest/recommended` becomes the Vitest plugin's recommended set;
 // the `import/*` rules come from eslint-plugin-import-x (the maintained fork:
@@ -36,14 +36,14 @@ const RESTRICTED_IMPORT_PATHS = [
 const FIREBASE_SDK_IMPORTS = {
   regex: '^@?firebase(/|$)',
   message:
-    'Only src/core/firebase may import the Firebase SDK. Everything else uses the auth gateway (useAuthGateway).',
+    'Only src/core/firebase may import the Firebase SDK. Everything else uses a gateway (useAuthGateway, useProfileGateway).',
 };
 // `no-restricted-imports` does not see `import()`, so the same two rules again for it.
 const FIREBASE_DYNAMIC_IMPORT = {
   selector:
     'ImportExpression[source.value=/^@?firebase(\\/|$)|core\\/firebase(\\/|$)/]',
   message:
-    'Only src/core/auth/selectAuthGateway.ts loads the Firebase gateway, and only src/core/firebase imports the Firebase SDK.',
+    'Only src/core/auth/selectAuthGateway.ts and src/core/profile/selectProfileGateway.ts load the Firebase gateways, and only src/core/firebase imports the Firebase SDK.',
 };
 const ENV_ACCESS = {
   selector: "MemberExpression[object.type='MetaProperty'][property.name='env']",
@@ -52,7 +52,7 @@ const ENV_ACCESS = {
 const FIREBASE_FOLDER_IMPORTS = {
   regex: '(^@/|/)core/firebase(/|$)',
   message:
-    'Only src/core/auth/selectAuthGateway.ts loads src/core/firebase, on demand. Everything else uses the auth gateway (useAuthGateway).',
+    'Only src/core/auth/selectAuthGateway.ts and src/core/profile/selectProfileGateway.ts load src/core/firebase, on demand. Everything else uses a gateway (useAuthGateway, useProfileGateway).',
 };
 
 // eslint-plugin-import-x under the `import` name: its recommended rules, renamed.
@@ -71,9 +71,12 @@ export default tseslint.config(
     ignores: [
       'dist/',
       'dist-e2e/',
+      'dist-e2e-emulators/',
       'coverage/',
       'playwright-report/',
       'test-results/',
+      'playwright-report-emulators/',
+      'test-results-emulators/',
       'node_modules/',
       '.yarn/',
       'public/',
@@ -211,10 +214,12 @@ export default tseslint.config(
     },
   },
   {
-    // The one place that loads the Firebase gateway, with a dynamic import.
+    // The two places that load a Firebase gateway, each with a dynamic import.
     files: [
       'src/core/auth/selectAuthGateway.ts',
       'src/core/auth/selectAuthGateway.spec.ts',
+      'src/core/profile/selectProfileGateway.ts',
+      'src/core/profile/selectProfileGateway.spec.ts',
     ],
     rules: {
       'no-restricted-imports': [

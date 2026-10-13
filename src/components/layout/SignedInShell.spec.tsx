@@ -30,6 +30,10 @@ describe('SignedInShell', () => {
     expect(nav).toContainElement(
       screen.getByRole('link', { name: 'drawerMenu.home' }),
     );
+    expect(screen.getByRole('link', { name: 'profile.title' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
     expect(
       screen.getByRole('link', { name: 'home.accountLink' }),
     ).toHaveAttribute('href', `/home#${ACCOUNT_SECTION_ID}`);

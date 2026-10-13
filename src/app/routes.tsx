@@ -22,6 +22,7 @@ import {
   VERIFY_EMAIL_PATH,
 } from '@/core/auth/paths';
 import { env } from '@/core/env';
+import { PROFILE_PATH } from '@/core/profile/paths';
 import { useAppDispatch } from '@/core/state/hooks';
 import { accountDeletedNoticeCleared } from '@/core/state/slices/exitSlice';
 import DeleteAccountInfoScreen from '@/screens/DeleteAccountInfo/DeleteAccountInfoScreen';
@@ -93,6 +94,23 @@ const accountRoutes: RouteObject[] = [
             await import('@/screens/DeleteAccount/DeleteAccountScreen')
           ).DeleteAccountScreen,
         }),
+      },
+      // The interview profile. Its routes say "not available" to an account without the
+      // interviewAssistant flag, so the addresses work for everyone who is signed in.
+      {
+        lazy: async () => ({
+          Component: (await import('@/screens/Profile/ProfileRoutes'))
+            .ProfileRoutes,
+        }),
+        children: [
+          {
+            path: PROFILE_PATH,
+            lazy: async () => ({
+              Component: (await import('@/screens/Profile/ProfileScreen'))
+                .ProfileScreen,
+            }),
+          },
+        ],
       },
     ],
   },

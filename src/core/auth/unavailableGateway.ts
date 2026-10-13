@@ -21,6 +21,7 @@ export const unavailableGateway: AuthGateway = {
   createProfileIfMissing: unavailable,
   saveProfile: unavailable,
   getClaims: () => Promise.resolve(NO_CLAIMS),
+  getFlagOverrides: () => Promise.resolve({}),
   signUpWithEmail: unavailable,
   signInWithEmail: unavailable,
   sendVerificationEmail: unavailable,

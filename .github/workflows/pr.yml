@@ -81,6 +81,44 @@ jobs:
             test-results/
           retention-days: 7
 
+  # The website with the Firebase gateway against the real backend code: the emulators of
+  # quadev-backend at the commit in e2e-emulators/backend-commit, with its fake model
+  # (README, "End-to-end tests against the backend's emulators").
+  # The job always reports a result, and does the work only when it can fail:
+  # - the pull request touches what the tests go through (the list below);
+  # - the deploy key of the private backend is there. It is not for a pull request from a
+  #   fork or from Dependabot (they get no secrets), and not before the owner has created it.
+  e2e-emulators:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HAS_DEPLOY_KEY: ${{ secrets.BACKEND_DEPLOY_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The merge commit and its first parent (the target branch), to list what changed.
+          fetch-depth: 2
+
+      - name: Decide whether the tests have something to prove
+        id: decide
+        run: |
+          paths='^(src/core/(firebase|profile|flags|auth|session)/|src/screens/(Profile|SignIn)/|src/app/|e2e-emulators/|playwright\.emulators\.config\.ts$|scripts/e2e-emulators\.sh$|\.github/actions/e2e-emulators/|\.github/workflows/pr\.yml$|package\.json$|yarn\.lock$|vite\.config\.ts$|\.env\.dev$)'
+          if [ "$HAS_DEPLOY_KEY" != "true" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipped: the secret BACKEND_DEPLOY_KEY is not available to this run." >> "$GITHUB_STEP_SUMMARY"
+          elif git diff --name-only HEAD^1 HEAD | grep -qE "$paths"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipped: this pull request changes nothing the emulator tests go through." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: End-to-end tests against the backend's emulators
+        if: steps.decide.outputs.run == 'true'
+        uses: ./.github/actions/e2e-emulators
+        with:
+          backend-deploy-key: ${{ secrets.BACKEND_DEPLOY_KEY }}
+
   # A temporary copy of the pull request on Firebase Hosting: the dev build (.env.dev) on the
   # preview channel `pr-<number>` of quadevapp-dev (alias `dev` in .firebaserc). The channel
   # expires 7 days after the last push; its address is written to the job summary.

@@ -15,7 +15,11 @@ const mockLogger = vi.hoisted(() => ({
   logMessage: vi.fn(),
 }));
 vi.mock('@/core/logger', () => ({ default: vi.fn(() => mockLogger) }));
-vi.mock('@/core/flags/FlagsProvider', () => ({ useFlag: vi.fn(() => false) }));
+// Only `useFlag` is replaced: the render helper uses the rest of the module.
+vi.mock(import('@/core/flags/FlagsProvider'), async importOriginal => ({
+  ...(await importOriginal()),
+  useFlag: vi.fn(() => false),
+}));
 
 const mockUseFlag = vi.mocked(useFlag);
 

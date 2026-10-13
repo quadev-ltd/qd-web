@@ -44,6 +44,7 @@ describe('selectAuthGateway', () => {
     expect(window.qdPreview).toEqual({
       verifyEmail: expect.any(Function),
       removeProfile: expect.any(Function),
+      setFlag: expect.any(Function),
     });
     delete window.qdPreview;
     expect(createFirebaseGateway).not.toHaveBeenCalled();

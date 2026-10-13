@@ -4,32 +4,57 @@ import { MainNav } from './MainNav';
 
 import { renderWithProviders } from '@/testUtil/renderWithProviders';
 
+const renderNav = (route: string) =>
+  renderWithProviders(
+    <MainNav
+      homePath="/home"
+      profilePath="/profile"
+      accountPath="/home#account"
+    />,
+    { route },
+  );
+
 describe('MainNav', () => {
-  it('links to the home and to the account section, and marks the current page', () => {
-    renderWithProviders(
-      <MainNav homePath="/home" accountPath="/home#account" />,
-      { route: '/home' },
-    );
+  it('links to the home, the profile and the account section, and marks the current page', () => {
+    renderNav('/home');
 
     const nav = screen.getByRole('navigation', {
       name: 'header.mainNavAccessibilityLabel',
     });
-    const home = within(nav).getByRole('link', { name: 'drawerMenu.home' });
-    const account = within(nav).getByRole('link', { name: 'home.accountLink' });
+    const links = within(nav).getAllByRole('link');
+    expect(links.map(link => link.textContent)).toEqual([
+      'drawerMenu.home',
+      'profile.title',
+      'home.accountLink',
+    ]);
+    const [home, profile, account] = links;
     expect(home).toHaveAttribute('href', '/home');
     expect(home).toHaveAttribute('aria-current', 'page');
+    expect(profile).toHaveAttribute('href', '/profile');
+    expect(profile).not.toHaveAttribute('aria-current');
     expect(account).toHaveAttribute('href', '/home#account');
     expect(account).not.toHaveAttribute('aria-current');
   });
 
-  it('does not mark the home as current on another page', () => {
-    renderWithProviders(
-      <MainNav homePath="/home" accountPath="/home#account" />,
-      { route: '/forgot-password' },
-    );
+  it.each(['/profile', '/profile/skill-map', '/profile/resources/r1'])(
+    'marks the profile as current at %s',
+    route => {
+      renderNav(route);
 
-    expect(
-      screen.getByRole('link', { name: 'drawerMenu.home' }),
-    ).not.toHaveAttribute('aria-current');
+      expect(
+        screen.getByRole('link', { name: 'profile.title' }),
+      ).toHaveAttribute('aria-current', 'page');
+      expect(
+        screen.getByRole('link', { name: 'drawerMenu.home' }),
+      ).not.toHaveAttribute('aria-current');
+    },
+  );
+
+  it('marks nothing as current on another page', () => {
+    renderNav('/forgot-password');
+
+    for (const link of screen.getAllByRole('link')) {
+      expect(link).not.toHaveAttribute('aria-current');
+    }
   });
 });

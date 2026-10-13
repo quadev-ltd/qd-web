@@ -18,6 +18,7 @@ export const createMockGateway = (): Mocked<AuthGateway> => ({
   createProfileIfMissing: vi.fn(() => Promise.resolve(true)),
   saveProfile: vi.fn(() => Promise.resolve()),
   getClaims: vi.fn(() => Promise.resolve(NO_CLAIMS)),
+  getFlagOverrides: vi.fn(() => Promise.resolve({})),
   signUpWithEmail: vi.fn(),
   signInWithEmail: vi.fn(),
   sendVerificationEmail: vi.fn(() => Promise.resolve()),

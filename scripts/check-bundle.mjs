@@ -80,6 +80,10 @@ const FIREBASE_ADDRESSES = [
   ['identitytoolkit.googleapis.com', '@firebase/auth'],
   ['securetoken.googleapis.com', '@firebase/auth'],
   ['firestore.googleapis.com', '@firebase/firestore'],
+  // What the interview profile adds (src/core/firebase: functions.ts, appCheck.ts, storage.ts).
+  ['cloudfunctions.net', '@firebase/functions'],
+  ['firebaseappcheck.googleapis.com', '@firebase/app-check'],
+  ['firebasestorage.googleapis.com', '@firebase/storage'],
 ];
 // The production configuration, read as the build read it (.env.prod, then the environment).
 const accountEnabled =
