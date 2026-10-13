@@ -63,4 +63,12 @@ describe('Button', () => {
       ...classNames,
     );
   });
+
+  it('can be a quiet text button for a light surface', () => {
+    render(<Button variant="quiet">Change</Button>);
+
+    const button = screen.getByRole('button', { name: 'Change' });
+    expect(button).toHaveClass('text-link', 'px-1.5');
+    expect(button).not.toHaveClass('bg-primary');
+  });
 });

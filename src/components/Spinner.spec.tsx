@@ -19,6 +19,12 @@ describe('Spinner', () => {
     expect(screen.getByRole('status')).toHaveClass('size-5');
   });
 
+  it('can be tiny, next to a line of text', () => {
+    render(<Spinner size="tiny" />);
+
+    expect(screen.getByRole('status')).toHaveClass('size-3.5');
+  });
+
   it('can be decorative: hidden from assistive technology', () => {
     render(<Spinner decorative />);
 

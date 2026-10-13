@@ -253,9 +253,11 @@ profile.
 ## The interview profile
 
 The first feature that calls the backend: a candidate adds a CV and other resources, the backend
-reads them, and the result is a skill map. This repository has the foundation and the page's frame
-so far; the screens come slice by slice. The decisions, and what was tried against the backend
-before any of it was written, are in [ADR 0007](docs/adr/0007-interview-profile.md).
+reads them, and the result is a skill map. Built so far: the profile page (the resources in every
+state, the skill map in numbers, the limits) and "Add a resource" (a file, pasted text or a link).
+The page of one resource and the skill map come next, slice by slice. The decisions, and what was
+tried against the backend before any of it was written, are in
+[ADR 0007](docs/adr/0007-interview-profile.md).
 
 **Who sees it.** `/profile` is open to every signed-in user and follows the feature flag
 `interviewAssistant`: off, the page says "Not available for your account yet"; on, it shows the
@@ -296,6 +298,20 @@ The account sees it the next time it opens the site.
 - **Nothing about the candidate is logged:** an operation, an error code and the uid
   (`logProfileError`). Never a title, an address or the text of an item.
 
+**The profile in the store.** The profile pages do not call the gateway to read: they read the
+`interviewProfile` slice, which `InterviewProfileProvider` (`src/core/profile/`, mounted by
+`ProfileRoutes`) keeps in step with the backend:
+
+- the first profile page of a session reads the resources, the skill map and today's count;
+- while the backend is reading a resource, that resource is read again every 2 seconds (Firestore
+  Lite has no listener), for 3 minutes at most; the skill map is read again only when a resource
+  turns out to have added something, because each item is a billed read;
+- coming back to the profile later reads again only what was unfinished.
+
+A page asks for the rest by name with `useInterviewProfileActions()` (`reload`, `refreshResource`,
+`refreshItems`). "Add a resource" (`src/screens/Profile/AddResource/`) creates the resource, then
+uploads the file to the place the backend answers; closing the panel does not stop an upload.
+
 The preview gateway keeps a profile per account in the tab (`sessionStorage`) and behaves like the
 backend with its fake model: a link to a host ending in `.invalid` cannot be read, what the profile
 already has is not added twice, and the limits are the backend's. `window.qdPreviewProfile` stands
@@ -313,34 +329,38 @@ for what a test cannot wait for or cause (the end-to-end tests use it):
 ```
 src/
   app/          App.tsx (provider tree), routes.tsx, guards.tsx (route guards)
-  components/   ui/ (Button, ButtonLink, Card, Chip, Checkbox)
+  components/   ui/ (Button, ButtonLink, Card, Chip, Checkbox, Banner, SidePanel,
+                    SegmentedControl, FilePicker, ProgressBar)
                 layout/ (PageShell, SiteHeader, SiteFooter, BrandLink, Arcs, LegalPage,
                          MainNav, AccountMenu, SignedInShell)
-                FormTextInput, PasswordVisibilityToggle, Spinner, StatusIcon, AppLoading,
-                Icon, NotAvailable
+                FormTextInput, FormTextArea, FieldCounter, PasswordVisibilityToggle, Spinner,
+                StatusIcon, AppLoading, Icon, NotAvailable
                 HookFormInputs/ (HookFormTextInput, HookFormPasswordInput, HookFormDateInput)
                 SignIn/ (Layout, SSOForm, Divider, ErrorMessage, FooterPrompt, SubmitButton,
                          SignedInActions)
   core/         env.ts, logger.ts, contact.ts, i18n/ (i18n.ts, translations/en.json)
                 auth/ (types, gateway, errors, profile, reauth, paths, the unavailable and
                        preview gateways, selectAuthGateway, AuthGatewayProvider)
-                profile/ (contract, gateway, errors, paths, the unavailable and preview
-                          gateways, selectProfileGateway, ProfileGatewayProvider)
+                profile/ (contract, gateway, errors, paths, files, limits, the unavailable
+                          and preview gateways, selectProfileGateway, ProfileGatewayProvider,
+                          InterviewProfileProvider)
                 firebase/ (app, auth, profile, claims, flags, gateway: the Firebase gateway;
                            functions, appCheck, storage, interviewProfile, profileGateway: the
                            Firebase profile gateway. The only folder that imports the Firebase SDK)
-                state/ (store, hooks, slices/sessionSlice and exitSlice, selectors/)
+                state/ (store, hooks, slices/sessionSlice, exitSlice and
+                        interviewProfileSlice, selectors/)
                 session/ (SessionProvider, hooks)
                 flags/ (registry, evaluate, FlagsProvider)
                 sso/ (GoogleSSOCTA, AppleSSOCTA, useSSOSignIn, providers)
   hooks/        usePasswordValidation.ts
   schemas/      signInSchema.ts, signUpSchema.ts, forgotPasswordSchema.ts,
-                completeProfileSchema.ts
+                completeProfileSchema.ts, addResourceSchema.ts
   screens/      one folder per screen: PublicHome/, SignIn/, SignUp/, ForgotPassword/,
                 VerifyEmail/, CompleteProfile/, Home/, DeleteAccount/, Profile/, PrivacyPolicy/,
                 TermsAndConditions/, DeleteAccountInfo/, NotFound/, Error/
   styles/       theme.css (design tokens), global.css
-  testUtil/     renderWithProviders.tsx, mockGateway.ts, mockProfileGateway.ts
+  testUtil/     renderWithProviders.tsx, renderProfilePage.tsx, mockGateway.ts,
+                mockProfileGateway.ts, profileFixtures.ts
   util/         index.ts (date helpers)
 e2e/            Playwright tests (the two critical flows, accessibility, keyboard)
 e2e-emulators/  Playwright tests against the emulators of quadev-backend, and the backend
@@ -397,9 +417,15 @@ Rules (the same as in `qd-mobile` where they exist there):
 - **Firebase:** only `src/core/firebase/` imports the Firebase SDK (`firebase/*`), and only
   `selectAuthGateway.ts` and `selectProfileGateway.ts` load that folder. Both are lint errors
   anywhere else.
-- **The profile:** screens call the profile gateway from `useProfileGateway()` and react to the
-  code of a `ProfileError`. The routes of the profile are children of `ProfileRoutes`
-  (`src/screens/Profile/ProfileRoutes.tsx`), which checks the flag and provides the gateway.
+- **The profile:** screens read the profile from the store (`useInterviewProfile()`), change it
+  through the profile gateway (`useProfileGateway()`) and react to the code of a `ProfileError`.
+  The routes of the profile are children of `ProfileRoutes`
+  (`src/screens/Profile/ProfileRoutes.tsx`), which checks the flag and provides both.
+- **Panels and dialogs** are the native `<dialog>`, opened as a modal (`SidePanel`): the browser
+  keeps the focus inside, closes on Escape and returns the focus to what opened it.
+- **While something is sent to the backend** its button shows a spinner and the fields stay in
+  place, as on the account forms. Nothing is shown as done before the backend answers: its first
+  answer after a pause can take ten seconds (ADR 0007).
 - **Route guards** (`src/app/guards.tsx`) read the session status, like the app's Router. Each
   status has its page: `needsEmailVerification` → `/verify-email`, `needsProfile` →
   `/complete-profile`, `ready` → `/home` and `/account/delete`. While the session is `initializing`
@@ -511,8 +537,9 @@ yarn e2e --ui                      # interactive runner
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `auth-email-lifecycle.spec.ts` | Sign up → verify email (too early, resend, verified) → complete profile → home → reload → sign out → sign in → delete account (wrong password, then the right one) → confirmation on the public home; the tab that checks by itself; the ways out of the two onboarding screens; deleting with Google |
 | `auth-sign-in-errors.spec.ts`  | Empty and invalid fields, wrong password, forgot password (neutral message), then a successful sign-in                                                                                                                                                                                                |
-| `pages.spec.ts`                | Every page, every state of the account screens, and the profile with the interview tools on and off: no serious or critical accessibility violation (axe) and no horizontal scroll                                                                                                                    |
-| `keyboard.spec.ts`             | Keyboard-only sign-in, the account menu with the keyboard, the focus ring colour on light and dark surfaces                                                                                                                                                                                           |
+| `pages.spec.ts`                | Every page, every state of the account screens, the profile (not available, empty, with resources in every state) and "Add a resource" in its three forms with their messages: no serious or critical accessibility violation (axe) and no horizontal scroll                                          |
+| `keyboard.spec.ts`             | Keyboard-only sign-in, the account menu and the add-a-resource panel with the keyboard, the focus ring colour on light and dark surfaces                                                                                                                                                              |
+| `profile.spec.ts`              | The profile: add a CV as a file → "Being read…" → "Ready", with its items in the skill map; a pasted text that is too long, shortened and added; a link whose address is not accepted, and one that cannot be read                                                                                    |
 
 The detailed cases (every validation rule, every error code) are unit tests; the end-to-end tests
 cover the paths that cross screens. They prove the screens, the session and the guards, not the
@@ -537,9 +564,10 @@ It needs Node 24, Java 21 and the backend's dependencies (`npm ci` in its folder
 emulators already running (`npm run emulators` in `quadev-backend`),
 `yarn playwright test -c playwright.emulators.config.ts` runs the tests alone.
 
-| File                     | What it proves                                                                                                                                                   |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `profile-access.spec.ts` | The flag is read from the backend's document through its rules: an account without it, and one with it off, see "Not available"; one with it on gets the profile |
+| File                     | What it proves                                                                                                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `profile-access.spec.ts` | The flag is read from the backend's document through its rules: an account without it, and one with it off, see "Not available"; one with it on gets the profile           |
+| `profile.spec.ts`        | Add a CV as a file: `createProfileResource`, the upload under the Storage rules, the trigger that reads it, the resource followed to "Ready" and its item in the skill map |
 
 **The backend commit is pinned** in `e2e-emulators/backend-commit`. The pipeline tests against that
 commit, so a change in the backend cannot break an unrelated pull request here. Move it forward on

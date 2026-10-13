@@ -3,12 +3,15 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import {
+  CV_FILE,
   expectInsideViewport,
   expectNoHorizontalScroll,
   expectNoSeriousAccessibilityViolations,
   loseProfile,
+  openProfile,
   openVerificationLink,
   PASSWORD,
+  seedProfile,
   signIn,
   signUp,
 } from './support';
@@ -79,23 +82,87 @@ test('signed-in home: accessible and no horizontal scroll, also with the account
   await expectNoHorizontalScroll(page);
 });
 
-test('profile: accessible and no horizontal scroll', async ({ page }) => {
+test('profile, empty and with resources in every state: accessible and no horizontal scroll', async ({
+  page,
+}) => {
   // The sample account has the interview tools on.
-  await signIn(page);
-  await page
-    .getByRole('navigation', { name: 'Main' })
-    .getByRole('link', { name: 'Profile' })
-    .click();
-  await expect(page).toHaveURL('/profile');
-  await expect(
-    page.getByRole('heading', { level: 1, name: 'Profile' }),
-  ).toBeVisible();
+  await openProfile(page);
   await expect(
     page.getByText('What you have done, read once and reused for every job.'),
   ).toBeVisible();
-
+  await expect(
+    page.getByRole('heading', { name: 'Start with your CV' }),
+  ).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
   await expectNoHorizontalScroll(page);
+
+  // Ready, being read, waiting for the upload, nothing new found, failed.
+  await seedProfile(page);
+  await expect(page.getByText('Could not read this page')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Skill map' })).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page);
+  await expectNoHorizontalScroll(page);
+});
+
+test('add a resource, in its three forms and with their messages: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await seedProfile(page);
+  const open = async (option: RegExp) => {
+    await page.getByRole('button', { name: 'Add a resource' }).click();
+    await expect(
+      page.getByRole('dialog', { name: 'Add to your profile' }),
+    ).toBeVisible();
+    if (option.source !== 'none') {
+      await page.getByRole('button', { name: option }).click();
+    }
+  };
+  const close = () => page.getByRole('button', { name: 'Close' }).click();
+  const check = async () => {
+    await expectInsideViewport(page, page.getByRole('dialog'));
+    await expectNoSeriousAccessibilityViolations(page);
+    await expectNoHorizontalScroll(page);
+  };
+
+  // How to add
+  await open(/none/);
+  await check();
+  await close();
+
+  // A file: chosen, then one over the limit
+  await open(/Upload a file/);
+  const file = page.locator('input[type=file]');
+  await file.setInputFiles(CV_FILE);
+  await expect(page.getByText('maya-okafor-cv.pdf')).toBeVisible();
+  await check();
+  await file.setInputFiles({
+    name: 'photo.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('not a document'),
+  });
+  await expect(page.getByText(/This file can’t be read/)).toBeVisible();
+  await check();
+  await close();
+
+  // Pasted text, too long
+  await open(/Paste or type text/);
+  await page.getByLabel('Title').fill('a'.repeat(101));
+  await page
+    .getByRole('textbox', { name: 'Text', exact: true })
+    .fill('a'.repeat(50_001));
+  await expect(
+    page.getByText('Shorten the title to 100 characters'),
+  ).toBeVisible();
+  await expect(page.getByText('50,001 / 50,000')).toBeVisible();
+  await check();
+  await close();
+
+  // A link, with an address that is not accepted
+  await open(/Add a link/);
+  await page.getByLabel('Address').fill('http://wiki.fenwickpay.internal/maya');
+  await expect(page.getByText(/Pages on a private network/)).toBeVisible();
+  await check();
 });
 
 test('profile, not available for the account yet: accessible and no horizontal scroll', async ({
