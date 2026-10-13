@@ -2,7 +2,7 @@
 // in a browser. The same use case against the real backend code is in e2e-emulators/.
 import { expect, test } from '@playwright/test';
 
-import { CV_FILE, openProfile, seedProfile } from './support';
+import { CV_FILE, openProfile, seedProfile, signIn } from './support';
 
 test('add a CV as a file: it is uploaded, read, and its items reach the skill map', async ({
   page,
@@ -72,6 +72,9 @@ test('add a CV as a file: it is uploaded, read, and its items reach the skill ma
   await expect(page.getByText(/Go and PostgreSQL in production/)).toBeVisible();
   await page.getByRole('button', { name: 'Show all 6' }).click();
   await expect(page.getByText(/From: Maya Okafor CV 2026/)).toHaveCount(6);
+  await expect(
+    page.getByRole('link', { name: 'Download the file' }),
+  ).toHaveAttribute('target', '_blank');
 
   // And the way back.
   await page.getByRole('link', { name: 'Profile', exact: true }).last().click();
@@ -221,4 +224,70 @@ test('removing a resource takes its items out of the skill map', async ({
 
   await expect(page).toHaveURL('/profile');
   await expect(skillMap).toContainText('6 items');
+});
+
+test('the home starts with "Add your CV", and says so once the CV is in the profile', async ({
+  page,
+}) => {
+  // The sample account has the interview tools on.
+  await signIn(page);
+  await expect(page).toHaveURL('/home');
+  await expect(page.getByText('Start here')).toBeVisible();
+  await expect(
+    page.getByText(
+      'Everything else builds on it. We read it once and build your skill map: skills, experience, projects, achievements and stories.',
+    ),
+  ).toBeVisible();
+  // The tools that are not built yet do not claim to be available.
+  await expect(page.getByText('Coming soon')).toHaveCount(3);
+  await expect(page.getByText('Available', { exact: true })).toHaveCount(0);
+
+  // "Add your CV" leads to the profile, with its panel open
+  await page.getByRole('link', { name: 'Add your CV' }).click();
+  await expect(page).toHaveURL('/profile');
+  const panel = page.getByRole('dialog', { name: 'Add your CV' });
+  await expect(panel).toBeVisible();
+  await panel.getByRole('button', { name: /Upload a file/ }).click();
+  const form = page.getByRole('dialog', { name: 'Upload your CV' });
+  await form.locator('input[type=file]').setInputFiles(CV_FILE);
+  await form.getByRole('button', { name: 'Add to profile' }).click();
+  await expect(form).toBeHidden();
+  await expect(
+    page.getByRole('listitem').filter({ hasText: 'maya-okafor-cv' }),
+  ).toContainText('Ready · 6 items');
+
+  // A reload of the profile does not open the panel again
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Resources · 1 of 20' }),
+  ).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  // Back on the home: the invitation became one line that leads to the profile
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'Home' })
+    .click();
+  await expect(page).toHaveURL('/home');
+  const done = page.getByRole('link', { name: /Your CV is in your profile/ });
+  await expect(done).toContainText('6 items in your skill map');
+  await expect(page.getByText('Start here')).toHaveCount(0);
+  await done.click();
+  await expect(page).toHaveURL('/profile');
+});
+
+test('an account without the interview tools has the home as before: no starting card', async ({
+  page,
+}) => {
+  await signIn(page);
+  await page.evaluate(() =>
+    window.qdPreview?.setFlag('interviewAssistant', false),
+  );
+  await page.reload();
+
+  await expect(
+    page.getByRole('heading', { level: 1, name: /Welcome back/ }),
+  ).toBeVisible();
+  await expect(page.getByText('Coming soon')).toHaveCount(3);
+  await expect(page.getByText('Start here')).toHaveCount(0);
 });

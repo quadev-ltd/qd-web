@@ -60,6 +60,10 @@ test('add a CV as a file: created, uploaded, read by the backend, and in the ski
   await expect(
     page.getByRole('heading', { name: 'Items from this resource · 1' }),
   ).toBeVisible();
+  // The address that downloads the stored file comes from the file store, for a normal link
+  await expect(
+    page.getByRole('link', { name: 'Download the file' }),
+  ).toHaveAttribute('href', /document\.pdf/);
   await page.getByRole('button', { name: 'Remove this resource' }).click();
   await page
     .getByRole('dialog', { name: 'Remove this resource?' })

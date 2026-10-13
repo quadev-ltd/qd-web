@@ -124,7 +124,13 @@
     "googleMethod": "Google",
     "appleMethod": "Apple",
     "passwordLabel": "Password",
-    "changePasswordLink": "Change password"
+    "changePasswordLink": "Change password",
+    "startChip": "Start here",
+    "startTitle": "Add your CV",
+    "startDescription": "Everything else builds on it. We read it once and build your skill map: skills, experience, projects, achievements and stories.",
+    "startDoneTitle": "Your CV is in your profile",
+    "startDoneDescription_one": "{{count}} item in your skill map",
+    "startDoneDescription_other": "{{count}} items in your skill map"
   },
   "access": {
     "notAvailableChip": "Not available for your account yet",
@@ -296,7 +302,8 @@
     "removeConfirmItemsButton_other": "Remove the resource and {{count}} items",
     "removingButton": "Removing…",
     "cancelButton": "Cancel",
-    "removeFailedMessage": "We couldn’t remove this. Check your connection and try again."
+    "removeFailedMessage": "We couldn’t remove this. Check your connection and try again.",
+    "downloadLink": "Download the file"
   },
   "sidePanel": {
     "closeAccessibilityLabel": "Close"

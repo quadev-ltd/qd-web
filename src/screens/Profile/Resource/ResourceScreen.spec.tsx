@@ -5,6 +5,7 @@ import { Route, Routes, useLocation } from 'react-router';
 import { ResourceScreen } from './ResourceScreen';
 
 import { type ProfileResource } from '@/core/profile/contract';
+import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import { RESOURCE_WATCH_MS } from '@/core/profile/InterviewProfileProvider';
 import { type InterviewProfileState } from '@/core/state/slices/interviewProfileSlice';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
@@ -200,6 +201,70 @@ describe('ResourceScreen', () => {
       expect(details()).toHaveTextContent(
         'resource.contentLabelresource.contentText',
       );
+    });
+  });
+
+  describe('the original file', () => {
+    const download = () =>
+      screen.queryByRole('link', { name: 'resource.downloadLink' });
+
+    it('can be downloaded through a normal link, in another tab', async () => {
+      const gateway = createMockProfileGateway();
+      gateway.getFileUrl.mockResolvedValue(
+        'https://files.example/document.pdf?token=abc',
+      );
+      setUp(ready(), {}, gateway);
+
+      await waitFor(() => expect(download()).toBeInTheDocument());
+      expect(download()).toHaveAttribute(
+        'href',
+        'https://files.example/document.pdf?token=abc',
+      );
+      expect(download()).toHaveAttribute('target', '_blank');
+      expect(download()).toHaveAttribute('rel', 'noreferrer');
+      expect(gateway.getFileUrl).toHaveBeenCalledExactlyOnceWith({
+        storagePath: 'users/uid-1/interview-docs/r1/document.pdf',
+      });
+    });
+
+    it('is offered for a file that failed to be read too', async () => {
+      setUp(ready({ status: 'failed', failure: 'unsupported-file' }));
+
+      await waitFor(() => expect(download()).toBeInTheDocument());
+    });
+
+    it.each([
+      ['pasted text', ready({ type: 'note', source: 'text' })],
+      [
+        'a link',
+        ready({ type: 'link', source: 'link', url: 'https://a.example/' }),
+      ],
+      [
+        'a file that has not arrived yet',
+        ready({
+          status: 'awaitingUpload',
+          itemCount: 0,
+          createdAt: NOW,
+          updatedAt: NOW,
+        }),
+      ],
+    ])('is not asked for with %s', (_name, resource) => {
+      const gateway = createMockProfileGateway();
+      setUp(resource, {}, gateway);
+
+      expect(download()).not.toBeInTheDocument();
+      expect(gateway.getFileUrl).not.toHaveBeenCalled();
+    });
+
+    it('has no link when its address cannot be had', async () => {
+      const gateway = createMockProfileGateway();
+      gateway.getFileUrl.mockRejectedValue(
+        new ProfileError(ProfileErrorCode.NotFound),
+      );
+      setUp(ready(), {}, gateway);
+
+      await waitFor(() => expect(gateway.getFileUrl).toHaveBeenCalled());
+      expect(download()).not.toBeInTheDocument();
     });
   });
 

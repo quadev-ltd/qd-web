@@ -3,8 +3,10 @@
 - **Status:** accepted (October 2026), and built slice by slice. Done: the checks of 13 Oct 2026
   ("slice 0", before any screen), the foundation ("slice 1": the flags, the gateway, `/profile`
   behind the flag, the tests against the emulators), the profile page with "Add a resource"
-  ("slice 2") and the page of a resource ("slice 3"). The skill map follows; each slice updates
-  this record.
+  ("slice 2"), the page of a resource ("slice 3") and the finish ("slice 5": what was read, on the
+  page of each resource, the download, the home's starting card, Remote Config). The skill map and
+  the item ("slice 4") wait: the owner took them out of this delivery on 14 Oct 2026 (see "The
+  skill map waits"). Left: the walk-through on the dev site with the real model.
 - **Scope:** `src/core/profile/`, `src/core/firebase/` (the callables, the reads, the upload),
   `src/core/flags/`, `src/screens/Profile/`, the Content-Security-Policy in `firebase.json`,
   `e2e-emulators/` and the `e2e-emulators` job
@@ -256,6 +258,43 @@ facts both share, with their stars and edits, when the old one goes. The dialog 
 items go, as drawn; it does not explain this case. It could not be observed against the emulators
 either: the fake model never gives the same fact twice.
 
+## The finish (slice 5)
+
+- **Remote Config is the second layer of the flags,** after the user's override, as in the
+  backend. It was tried from a browser against the dev project before it was wired in (13 Oct
+  2026): the fetch answers with the web app's own key, with the three flags of the client
+  template, after one request to `firebaseinstallations.googleapis.com` and one to
+  `firebaseremoteconfig.googleapis.com`. Both origins are in the policy now.
+  - It is read once after sign-in, with the override, and a fetched template is trusted for an
+    hour. A page waits for both layers (5 seconds at most for Remote Config) before it says "not
+    available". A layer that cannot be read decides nothing.
+  - Its part of the SDK is loaded on demand after sign-in, not with the Firebase gateway that
+    every page of a build with accounts requests.
+  - Against the emulators nothing is read: there is no Remote Config emulator, and the backend
+    skips it there too.
+- **A percentage rollout would not match the backend.** Remote Config decides a percentage per
+  installation (per browser) on the client, and the functions decide it per account
+  (`randomizationId: uid`). The same account could have a feature on one side and not on the
+  other, for good. A release as the backend's guide describes it (one account, then everyone) has
+  no such problem. Nothing here prevents a rollout from being set in the console; the README says
+  not to.
+- **The download is a link whose address is asked for when the page of the resource opens,** not
+  at the press on "Download": a link the browser follows by itself is never blocked as a window
+  the page opened, and the page never reads the file. When the address cannot be had (the stored
+  file is gone), there is no link.
+- **The home starts with "Add your CV"** for an account with the interview tools (D58, the first
+  card only): it opens the profile with the CV panel. Once a CV is in the profile it is one line
+  that says so. The card reads the profile through the same provider as the profile's pages, so
+  opening the profile afterwards reads nothing again. A CV that could not be read does not count.
+- **The three tools on the home say "Coming soon" to everyone.** Until now "Mock interview" and
+  "Live interview" said "Available" to an account with the flag, although neither exists on the
+  website. That made sense only while nothing read the flag.
+- **One profile gateway for the page.** The home's card and the profile's routes each provide the
+  gateway; `selectProfileGateway` now gives the same one every time. The browser tests found the
+  need: the in-memory gateway was created twice and the second one did not know who was signed in.
+- **The pipeline caches the packages and the browser** in `run-checks` and `e2e` too (they were
+  only in the new emulator job), to keep the run inside the plan's budget.
+
 ## Consequences
 
 - The plan holds: nothing found here changes a screen or needs a change in the backend.
@@ -279,7 +318,8 @@ either: the fake model never gives the same fact twice.
   has its own results for them; the walk-through at the end of the delivery repeats them here.
 - **A large upload to the real bucket.** The dev run uploaded 549 bytes; the progress events were
   seen on the emulator only.
-- **Remote Config on the website.** It comes with the last slice.
+- **Remote Config with a flag turned on for everyone.** The fetch was seen with every flag off.
+  `set-global-flag --on` on dev, and the site following it, is part of the walk-through.
 
 ## Alternatives considered
 

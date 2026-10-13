@@ -13,6 +13,7 @@ import { PROFILE_MAIN } from '../ProfileRoutes';
 import RemoveResourceDialog from './RemoveResourceDialog';
 import { addedAt, contentOf, formatDay } from './resourceMeta';
 import ResourceStatusPanel from './ResourceStatusPanel';
+import { useFileUrl } from './useFileUrl';
 
 import Icon from '@/components/Icon';
 import SignedInShell from '@/components/layout/SignedInShell';
@@ -20,6 +21,7 @@ import Spinner from '@/components/Spinner';
 import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/ButtonLink';
+import { buttonClassName } from '@/components/ui/buttonStyles';
 import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
 import { type ProfileResource } from '@/core/profile/contract';
@@ -90,6 +92,7 @@ export const ResourceScreen: React.FC = () => {
   const [now, setNow] = useState(() => Date.now());
 
   const resource = resources.find(({ id }) => id === resourceId);
+  const fileUrl = useFileUrl(resource);
   const pending = resource ? isPending(resource) : false;
   // Only a resource that is still young or unfinished changes with the clock.
   useEffect(() => {
@@ -272,6 +275,21 @@ export const ResourceScreen: React.FC = () => {
                 )}
               </dd>
             </dl>
+            {fileUrl && (
+              // A normal link: the browser fetches the file, the page never reads it.
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonClassName({
+                  variant: 'secondary',
+                  size: 'small',
+                  className: 'gap-2 text-[15px]',
+                })}>
+                <Icon name="download" size={18} />
+                {t('resource.downloadLink')}
+              </a>
+            )}
             <Button
               variant="quietDanger"
               size="small"

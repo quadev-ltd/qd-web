@@ -1,6 +1,9 @@
 import { ProfileErrorCode } from './errors';
 import { type ProfileGateway } from './gateway';
-import { selectProfileGateway } from './selectProfileGateway';
+import {
+  resetProfileGatewayForTests,
+  selectProfileGateway,
+} from './selectProfileGateway';
 import { unavailableProfileGateway } from './unavailableProfileGateway';
 
 const firebaseGateway = vi.hoisted(() => ({ name: 'the Firebase gateway' }));
@@ -13,6 +16,7 @@ vi.mock('@/core/firebase/profileGateway', () => ({
 
 describe('selectProfileGateway', () => {
   beforeEach(() => {
+    resetProfileGatewayForTests();
     createFirebaseProfileGateway.mockReset();
     createFirebaseProfileGateway.mockReturnValue(firebaseGateway);
   });
@@ -71,6 +75,26 @@ describe('selectProfileGateway', () => {
       expect(createFirebaseProfileGateway).not.toHaveBeenCalled();
     },
   );
+
+  it('gives the same gateway every time: the profile’s routes and the home must share it', async () => {
+    vi.stubEnv('VITE_AUTH_GATEWAY', 'preview');
+
+    const first = selectProfileGateway();
+    const second = selectProfileGateway();
+
+    expect(second).toBe(first);
+    expect(await second).toBe(await first);
+  });
+
+  it('creates the Firebase gateway once, however often it is asked for', async () => {
+    vi.stubEnv('VITE_AUTH_GATEWAY', 'firebase');
+    vi.stubEnv('VITE_ACCOUNT_ENABLED', 'true');
+
+    await selectProfileGateway();
+    await selectProfileGateway();
+
+    expect(createFirebaseProfileGateway).toHaveBeenCalledTimes(1);
+  });
 
   it('does not load Firebase for another gateway, even with the account screens on', () => {
     vi.stubEnv('VITE_AUTH_GATEWAY', 'unavailable');

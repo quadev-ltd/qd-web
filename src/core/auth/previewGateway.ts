@@ -269,6 +269,8 @@ export const createPreviewGateway = (
     },
     getClaims: async () => NO_CLAIMS,
     getFlagOverrides: async uid => ({ ...findByUid(uid)?.flags }),
+    // Nothing is released to everyone here: a flag is on for the accounts it was set for.
+    getRemoteFlags: async () => ({}),
 
     signUpWithEmail: async (email, password, profile) => {
       if (findByEmail(email)) {

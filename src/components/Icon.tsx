@@ -18,6 +18,13 @@ const PATHS = {
       <path d="M12 7v5l3 2" />
     </>
   ),
+  download: (
+    <>
+      <path d="M12 4v12" />
+      <path d="M7 11l5 5 5-5" />
+      <path d="M4 20h16" />
+    </>
+  ),
   eyeOff: (
     <>
       <path d="M3 3l18 18" />

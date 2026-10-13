@@ -24,6 +24,12 @@ jobs:
       - name: Enable Corepack (Yarn 4 from packageManager)
         run: corepack enable
 
+      - name: Cache the packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.yarn/berry/cache
+          key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+
       - name: Install dependencies
         run: yarn install --immutable
 

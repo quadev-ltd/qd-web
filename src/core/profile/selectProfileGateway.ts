@@ -2,7 +2,7 @@ import { type ProfileGateway } from './gateway';
 import { unavailableProfileGateway } from './unavailableProfileGateway';
 
 /**
- * The one place that chooses the profile gateway, with the same rule and for the same
+ * Chooses the profile gateway, in the one place that does, with the same rule and for the same
  * reason as src/core/auth/selectAuthGateway.ts: each condition is the literal expression,
  * in the same file as its import, so the bundler leaves out of a build the gateways that
  * build does not ask for (`yarn check:bundle` verifies it).
@@ -13,8 +13,7 @@ import { unavailableProfileGateway } from './unavailableProfileGateway';
  *   of it.
  * - anything else: the unavailable gateway, at once.
  */
-export const selectProfileGateway = ():
-  ProfileGateway | Promise<ProfileGateway> => {
+const chooseProfileGateway = (): ProfileGateway | Promise<ProfileGateway> => {
   // eslint-disable-next-line no-restricted-syntax -- see the comment above
   if (import.meta.env.VITE_AUTH_GATEWAY === 'preview') {
     return import('./previewProfileGateway').then(
@@ -33,6 +32,24 @@ export const selectProfileGateway = ():
     );
   }
   return unavailableProfileGateway;
+};
+
+let selected: ProfileGateway | Promise<ProfileGateway> | undefined;
+
+/**
+ * The profile gateway of the page: chosen the first time it is asked for, and the same one
+ * every time after. More than one place provides it (the profile's routes, the home's
+ * starting card), and they must all talk to the same gateway.
+ */
+export const selectProfileGateway = ():
+  ProfileGateway | Promise<ProfileGateway> => {
+  selected ??= chooseProfileGateway();
+  return selected;
+};
+
+/** Test helper: lets a test choose again after changing the environment. */
+export const resetProfileGatewayForTests = () => {
+  selected = undefined;
 };
 
 export default selectProfileGateway;

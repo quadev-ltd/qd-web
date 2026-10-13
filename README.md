@@ -252,29 +252,48 @@ profile.
 
 ## The interview profile
 
-The first feature that calls the backend: a candidate adds a CV and other resources, the backend
-reads them, and the result is a skill map. Built so far: the profile page (the resources in every
-state, the skill map in numbers, the limits), "Add a resource" (a file, pasted text or a link) and
-the page of one resource (where it is, why it failed, what it added, "Remove"). The skill map comes
-next. The decisions, and what was tried against the backend before any of it was written, are in
+The first feature that calls the backend: a candidate adds a CV and other resources, and the
+backend reads them into items: skills, experience, projects, achievements and stories. Built: the
+profile page (the resources in every state, what was found in numbers, the limits), "Add a
+resource" (a file, pasted text or a link) and the page of one resource (where it is, why it failed,
+what was read from it, "Remove"). The original file of a resource can be downloaded, and the
+signed-in home starts with "Add your CV". The skill map and the page of an item wait: the owner took
+them out on 14 Oct 2026, so until they come back an item cannot be changed on its own. The
+decisions, and what was tried against the backend before any of it was written, are in
 [ADR 0007](docs/adr/0007-interview-profile.md).
 
 **Who sees it.** `/profile` is open to every signed-in user and follows the feature flag
 `interviewAssistant`: off, the page says "Not available for your account yet"; on, it shows the
-profile. The flag is off for everyone unless it was set for an account (below).
+profile. The flag is off for everyone unless it was set for an account, or released (below).
 
-**Feature flags are read from the backend.** After sign-in the site reads the user's overrides
-(`featureFlags/{uid}`, through the auth gateway) once; `useFlag('key')` then answers, and
-`useFlagsReady()` says whether they have arrived, so a page can wait instead of showing "not
-available" for a moment. Remote Config, the second layer of the backend's order, is not read by
-the website yet: a flag is on only for the accounts it was set for. To set one on dev, in
-`quadev-backend`:
+**Feature flags are read from the backend,** in the backend's own order: the user's override
+(`featureFlags/{uid}`), then Remote Config (what is set for everyone), then the code default. After
+sign-in the site reads the first two once, through the auth gateway; `useFlag('key')` then answers,
+and `useFlagsReady()` says whether they have arrived, so a page can wait instead of showing "not
+available" for a moment. A layer that cannot be read decides nothing. The Remote Config part of
+the SDK is a file of its own, loaded after sign-in; a visitor who is not signed in loads none of
+it. In `quadev-backend` (its `docs/operations/releases.md` has the whole path of a release):
 
 ```bash
+# One account
 npm run set-flag -- --project quadevapp-dev --email <account> --flag interviewAssistant --on --apply
+# Everyone: the client template the website reads, and the server template the functions read
+npm run set-global-flag -- --apply --project quadevapp-dev --flag interviewAssistant --on
 ```
 
-The account sees it the next time it opens the site.
+If the first command stops with a message about `identitytoolkit.googleapis.com` and another
+project, your gcloud login bills that other project, where the lookup by email is not allowed. Put
+`GOOGLE_CLOUD_QUOTA_PROJECT=quadevapp-dev` in front of the command. It prints
+`Updated featureFlags/<uid> ...` when it has worked.
+
+An account sees its own flag the next time it opens the site. A release reaches an open browser
+within the hour (the site trusts a fetched template that long); the functions follow within a
+minute and have the last word: where the two disagree for a moment, the page shows the profile and
+the backend answers "not available for your account yet", or the other way round.
+
+A percentage rollout (a condition in the Firebase console) is decided per browser here and per
+account in the functions, so the two can disagree for good. Do not use one for a feature of the
+website without solving that first (ADR 0007).
 
 **The profile gateway.** Like the account, the profile is reached through one interface,
 `ProfileGateway` (`src/core/profile/gateway.ts`), chosen in one place
@@ -443,8 +462,9 @@ Rules (the same as in `qd-mobile` where they exist there):
 - **Feature flags:** `useFlag('key')` from `src/core/flags/FlagsProvider.tsx`. The registry mirrors
   the app's (and the backend's): never add a flag here that the backend does not have. The user's
   overrides are read from the backend after sign-in (see [The interview profile](#the-interview-profile));
-  everything else has its code default (all off). On the signed-in home, "Mock interview" and "Live
-  interview" follow `interviewAssistant`; the "CV tool" has no flag yet and is always "Coming soon".
+  then Remote Config, then the code default (all off). On the signed-in home, an account with
+  `interviewAssistant` starts with "Add your CV"; the three tools below it are not built on the
+  website yet and say "Coming soon" to everyone.
 - **Focus ring:** one rule for every interactive element (`global.css`). Its colour follows the
   surface: `data-surface="dark"` (brand and indigo backgrounds) uses the sky blue, light surfaces a
   darker blue, so the ring always has enough contrast.
@@ -856,6 +876,7 @@ default-src 'none'; script-src 'self' https://apis.google.com https://www.google
 https://www.gstatic.com/recaptcha/; style-src 'self'; img-src 'self'; font-src 'self';
 connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com
 https://firestore.googleapis.com https://firebasestorage.googleapis.com
+https://firebaseremoteconfig.googleapis.com https://firebaseinstallations.googleapis.com
 https://content-firebaseappcheck.googleapis.com
 https://europe-west1-quadevapp-dev.cloudfunctions.net
 https://europe-west1-quadevapp.cloudfunctions.net;
@@ -875,6 +896,7 @@ screens are off:
 | `connect-src` | `securetoken.googleapis.com`                                                                 | Renewing the session token                                                                                  |
 | `connect-src` | `firestore.googleapis.com`                                                                   | The profile document, the feature flags and the interview profile                                           |
 | `connect-src` | `firebasestorage.googleapis.com`                                                             | Uploading a file of the interview profile, and asking for its download address                              |
+| `connect-src` | `firebaseremoteconfig.googleapis.com`, `firebaseinstallations.googleapis.com`                | The feature flags set for everyone (Remote Config, and the installation id it asks for first)               |
 | `script-src`  | `apis.google.com`                                                                            | Google's loader for the helper frame below; the Firebase SDK adds it when the Google sign-in window is used |
 | `frame-src`   | `quadevapp-dev.firebaseapp.com`, `quadevapp.firebaseapp.com`                                 | A hidden helper frame through which the Google sign-in window hands back its result                         |
 | `connect-src` | `content-firebaseappcheck.googleapis.com`                                                    | App Check: exchanging the proof for a token                                                                 |
