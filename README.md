@@ -284,7 +284,8 @@ Why the stack is what it is, how each choice maps to the mobile app and where th
 [ADR 0003](docs/adr/0003-firebase-hosting-and-release-pipeline.md). The Firebase gateway:
 [ADR 0004](docs/adr/0004-firebase-gateway.md). The account screens after sign-in and the route
 guards: [ADR 0005](docs/adr/0005-account-screens-and-route-guards.md). App Check for calls to the
-backend's functions: [ADR 0006](docs/adr/0006-app-check.md).
+backend's functions: [ADR 0006](docs/adr/0006-app-check.md). The interview profile, and what was
+checked against the backend before building it: [ADR 0007](docs/adr/0007-interview-profile.md).
 
 Rules (the same as in `qd-mobile` where they exist there):
 
