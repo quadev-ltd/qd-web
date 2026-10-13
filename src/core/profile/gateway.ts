@@ -1,0 +1,95 @@
+import {
+  type CreateProfileResourceRequest,
+  type ProfileResource,
+  type ProfileUploadContentType,
+  type SkillMapItem,
+} from './contract';
+
+/** Where a file goes, as `createResource` answers for a file. */
+export interface UploadTarget {
+  /** Cloud Storage path in the default bucket. */
+  path: string;
+  contentType: ProfileUploadContentType;
+  maxBytes: number;
+}
+
+export interface CreatedResource {
+  resourceId: string;
+  /** Only for a file: upload it here, once. */
+  upload?: UploadTarget;
+}
+
+export interface UploadOptions {
+  /** Called as the file goes up, with the part sent so far (0 to 1). */
+  onProgress?: (fraction: number) => void;
+  /** Stops the upload; it then rejects with ProfileErrorCode.UploadCancelled. */
+  signal?: AbortSignal;
+}
+
+/** One change at least: new text, a star, or hiding the item. */
+export interface ItemChange {
+  text?: string;
+  starred?: boolean;
+  hidden?: boolean;
+}
+
+/**
+ * The boundary between the profile screens and the backend of the interview profile
+ * (quadev-backend, codebase `interview-profile`), as AuthGateway is for the account
+ * (docs/adr/0007-interview-profile.md).
+ *
+ * Reads go straight to the owner's documents; every change is a callable. A resource is
+ * read by the backend after it is created, so its status is followed by reading it again
+ * (`getResource`): there is no live listener.
+ *
+ * Every function rejects with a ProfileError (./errors.ts). Implementations:
+ * - `unavailableProfileGateway`: the default; every call fails with "unavailable".
+ * - `previewProfileGateway`: an in-memory fake for local preview and tests only.
+ * - the Firebase one (`src/core/firebase/profileGateway.ts`).
+ */
+export interface ProfileGateway {
+  // ---------- Reads ----------
+
+  /** The resources of the profile, newest first. */
+  getResources(uid: string): Promise<ProfileResource[]>;
+  /** One resource; `null` when it does not exist (any more). */
+  getResource(uid: string, resourceId: string): Promise<ProfileResource | null>;
+  /**
+   * Every item of the skill map, in no particular order: the pages sort them. Each item
+   * is a billed read, so call this when a page opens and after a change, not while waiting
+   * for a resource.
+   */
+  getItems(uid: string): Promise<SkillMapItem[]>;
+  /** How many resources were read for this user today (UTC), for the daily limit. */
+  getExtractionsToday(uid: string): Promise<number>;
+
+  // ---------- Changes ----------
+
+  /**
+   * Adds a resource. Text and links are stored and read by the backend straight away. A
+   * file is not sent here: the answer says where to upload it (`uploadFile`).
+   */
+  createResource(
+    request: CreateProfileResourceRequest,
+  ): Promise<CreatedResource>;
+  /**
+   * Uploads the file of a resource to the place `createResource` answered, with its
+   * content type, once. A finished upload cannot be repeated: a new attempt is a new
+   * resource.
+   */
+  uploadFile(
+    target: UploadTarget,
+    file: Blob,
+    options?: UploadOptions,
+  ): Promise<void>;
+  /** Changes one item of the skill map. */
+  updateItem(itemId: string, change: ItemChange): Promise<void>;
+  removeItem(itemId: string): Promise<void>;
+  /** Removes a resource, its stored content and every item that came from it. */
+  removeResource(resourceId: string): Promise<{ itemsRemoved: number }>;
+
+  // ---------- The original file ----------
+
+  /** An address that downloads the file of a resource, to open as a normal link. */
+  getFileUrl(resource: Pick<ProfileResource, 'storagePath'>): Promise<string>;
+}

@@ -45,6 +45,29 @@ jobs:
       - name: No preview auth gateway in the build output
         run: yarn check:bundle
 
+  # The website against the real backend code (the emulators of quadev-backend at the commit
+  # in e2e-emulators/backend-commit). On `main` it always runs, so a change that slipped
+  # past the path list of pr.yml shows here. It does not hold back the dev deploy.
+  # Skipped until the owner has created the secret BACKEND_DEPLOY_KEY.
+  e2e-emulators:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HAS_DEPLOY_KEY: ${{ secrets.BACKEND_DEPLOY_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Say why nothing ran
+        if: env.HAS_DEPLOY_KEY != 'true'
+        run: |
+          echo "Skipped: the secret BACKEND_DEPLOY_KEY does not exist yet." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: End-to-end tests against the backend's emulators
+        if: env.HAS_DEPLOY_KEY == 'true'
+        uses: ./.github/actions/e2e-emulators
+        with:
+          backend-deploy-key: ${{ secrets.BACKEND_DEPLOY_KEY }}
+
   # Deploys the dev build (.env.dev) to Firebase Hosting on quadevapp-dev (alias `dev` in
   # .firebaserc): https://quadevapp-dev.web.app. It starts once the checks have passed.
   # Authenticates with Workload Identity Federation (no JSON key). The job is skipped until

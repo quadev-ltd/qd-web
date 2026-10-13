@@ -7,12 +7,18 @@ const LINK =
 export interface MainNavProps {
   /** The signed-in home. */
   homePath: string;
+  /** The interview profile. Its pages (a resource, the skill map) keep it marked. */
+  profilePath: string;
   /** The account section of the home. */
   accountPath: string;
 }
 
 /** The main navigation of the signed-in pages, next to the brand in the header. */
-export const MainNav: React.FC<MainNavProps> = ({ homePath, accountPath }) => {
+export const MainNav: React.FC<MainNavProps> = ({
+  homePath,
+  profilePath,
+  accountPath,
+}) => {
   const { t } = useTranslation();
   return (
     <nav
@@ -23,6 +29,11 @@ export const MainNav: React.FC<MainNavProps> = ({ homePath, accountPath }) => {
         end
         className={({ isActive }) => (isActive ? `${LINK} bg-white/14` : LINK)}>
         {t('drawerMenu.home')}
+      </NavLink>
+      <NavLink
+        to={profilePath}
+        className={({ isActive }) => (isActive ? `${LINK} bg-white/14` : LINK)}>
+        {t('profile.title')}
       </NavLink>
       <Link to={accountPath} className={LINK}>
         {t('home.accountLink')}

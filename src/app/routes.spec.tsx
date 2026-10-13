@@ -74,6 +74,7 @@ describe('routes', () => {
       '/verify-email',
       '/complete-profile',
       '/account/delete',
+      '/profile',
     ])('shows the not found page at %s', async path => {
       await renderRoute(path, signedOut);
 
@@ -100,7 +101,13 @@ describe('routes', () => {
       ).toBeInTheDocument();
     });
 
-    it.each(['/home', '/verify-email', '/complete-profile', '/account/delete'])(
+    it.each([
+      '/home',
+      '/verify-email',
+      '/complete-profile',
+      '/account/delete',
+      '/profile',
+    ])(
       'guards %s: a signed-out visitor is sent to the sign-in screen',
       async path => {
         const { router } = await renderRoute(path, signedOut);
@@ -114,6 +121,40 @@ describe('routes', () => {
         expect(router.state.location.pathname).toBe('/sign-in');
       },
     );
+
+    describe('the profile, for a signed-in user', () => {
+      const signedIn = {
+        session: {
+          status: SessionStatus.Ready,
+          profile: { firstName: 'Maya', lastName: 'Okafor' },
+        },
+      };
+
+      it('says "not available for your account yet" while the interview tools are off for the account', async () => {
+        await renderRoute('/profile', signedIn);
+
+        expect(
+          await screen.findByText('access.notAvailableChip'),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole('heading', { level: 1, name: 'profile.title' }),
+        ).toBeInTheDocument();
+      });
+
+      it('shows the profile when they are on', async () => {
+        await renderRoute('/profile', {
+          ...signedIn,
+          flags: { interviewAssistant: true },
+        });
+
+        expect(
+          await screen.findByText('profile.description'),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByText('access.notAvailableChip'),
+        ).not.toBeInTheDocument();
+      });
+    });
 
     it('still shows the public pages', async () => {
       await renderRoute('/privacy-policy', signedOut);

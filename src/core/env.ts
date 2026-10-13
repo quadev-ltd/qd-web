@@ -51,6 +51,9 @@ export const envSchema = z
     FIREBASE_AUTH_DOMAIN: optionalText,
     FIREBASE_PROJECT_ID: optionalText,
     FIREBASE_APP_ID: optionalText,
+    // The project's default Cloud Storage bucket, where the files of the interview profile
+    // are uploaded. Without it nothing can be uploaded.
+    FIREBASE_STORAGE_BUCKET: optionalText,
     // "true" sends the Firebase gateway to the local emulators of quadev-backend instead of
     // a real project. Never in production.
     USE_FIREBASE_EMULATORS: switchSchema,
@@ -124,6 +127,7 @@ export const env = parseEnv({
   FIREBASE_AUTH_DOMAIN: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   FIREBASE_PROJECT_ID: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   FIREBASE_APP_ID: import.meta.env.VITE_FIREBASE_APP_ID,
+  FIREBASE_STORAGE_BUCKET: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   USE_FIREBASE_EMULATORS: import.meta.env.VITE_USE_FIREBASE_EMULATORS,
   RECAPTCHA_SITE_KEY: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
   APPCHECK_DEBUG_TOKEN: import.meta.env.VITE_APPCHECK_DEBUG_TOKEN,

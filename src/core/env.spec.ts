@@ -124,6 +124,25 @@ describe('env', () => {
     });
   });
 
+  describe('the storage bucket', () => {
+    it('is optional, and empty means none', () => {
+      expect(parseEnv(valid).FIREBASE_STORAGE_BUCKET).toBeUndefined();
+      expect(
+        parseEnv({ ...valid, FIREBASE_STORAGE_BUCKET: '  ' })
+          .FIREBASE_STORAGE_BUCKET,
+      ).toBeUndefined();
+    });
+
+    it('is read when it is set', () => {
+      expect(
+        parseEnv({
+          ...valid,
+          FIREBASE_STORAGE_BUCKET: 'quadevapp-dev.firebasestorage.app',
+        }).FIREBASE_STORAGE_BUCKET,
+      ).toBe('quadevapp-dev.firebasestorage.app');
+    });
+  });
+
   describe('App Check', () => {
     it('has no site key and no debug token by default', () => {
       const unset = parseEnv(valid);

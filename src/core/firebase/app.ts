@@ -28,12 +28,19 @@ const createApp = (): FirebaseApp => {
     FIREBASE_AUTH_DOMAIN: authDomain,
     FIREBASE_PROJECT_ID: projectId,
     FIREBASE_APP_ID: appId,
+    FIREBASE_STORAGE_BUCKET: storageBucket,
   } = env;
   // src/core/env.ts already refuses the Firebase gateway without them; this narrows the types.
   if (!apiKey || !authDomain || !projectId || !appId) {
     throw new Error('Firebase is not configured (VITE_FIREBASE_*).');
   }
-  return initializeApp({ apiKey, authDomain, projectId, appId });
+  return initializeApp({
+    apiKey,
+    authDomain,
+    projectId,
+    appId,
+    ...(storageBucket ? { storageBucket } : {}),
+  });
 };
 
 /** The one Firebase app of the page. For this folder only (functions.ts). */

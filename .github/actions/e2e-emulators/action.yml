@@ -1,0 +1,105 @@
+# The end-to-end tests of e2e-emulators/, against the emulators of quadev-backend at the
+# commit pinned in e2e-emulators/backend-commit. Used by pr.yml and main.yml, after their
+# own checkout of this repository.
+#
+# quadev-backend is private and this repository is public, so:
+# - the backend is read with a deploy key that can only read that one repository;
+# - nothing of the backend is uploaded: the artifact below holds Playwright's report of
+#   this repository's tests and nothing from the `backend/` folder;
+# - this job's log is public. It shows the emulators' output: the names of the functions
+#   and the events they log for the fictional accounts of the tests.
+name: End-to-end tests against the backend's emulators
+description: Checks out quadev-backend at the pinned commit, starts its emulators and runs e2e-emulators/.
+
+inputs:
+  backend-deploy-key:
+    description: The private half of the read-only deploy key of quadev-backend (secret BACKEND_DEPLOY_KEY).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Read the pinned backend commit
+      id: pin
+      shell: bash
+      run: echo "commit=$(tr -d '[:space:]' < e2e-emulators/backend-commit)" >> "$GITHUB_OUTPUT"
+
+    - name: Check out quadev-backend at that commit
+      uses: actions/checkout@v7
+      with:
+        repository: quadev-ltd/quadev-backend
+        ref: ${{ steps.pin.outputs.commit }}
+        ssh-key: ${{ inputs.backend-deploy-key }}
+        path: backend
+        persist-credentials: false
+
+    # Both repositories use Node 24 (.nvmrc). The cache is the backend's npm packages.
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+        cache-dependency-path: backend/package-lock.json
+
+    # The Firebase emulators need Java 21 or newer.
+    - uses: actions/setup-java@v6
+      with:
+        distribution: temurin
+        java-version: '21'
+
+    - name: Enable Corepack (Yarn 4 from packageManager)
+      shell: bash
+      run: corepack enable
+
+    - name: Cache the website's packages
+      uses: actions/cache@v6
+      with:
+        path: ~/.yarn/berry/cache
+        key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+
+    - name: Install the website's dependencies
+      shell: bash
+      run: yarn install --immutable
+
+    - name: Install the backend's dependencies
+      shell: bash
+      working-directory: backend
+      run: npm ci
+
+    - name: Read the Playwright and Firebase CLI versions
+      id: versions
+      shell: bash
+      run: |
+        echo "playwright=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+        echo "firebase=$(node -p "require('./package.json').scripts.firebase.split('@').pop()")" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Chromium for Playwright
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.versions.outputs.playwright }}
+
+    - name: Install Chromium for Playwright
+      shell: bash
+      run: yarn playwright install --with-deps chromium
+
+    - name: Cache the emulator files
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/firebase/emulators
+        key: firebase-emulators-${{ runner.os }}-${{ steps.versions.outputs.firebase }}
+
+    - name: End-to-end tests against the emulators
+      shell: bash
+      run: yarn e2e:emulators backend
+
+    # Only the report of this repository's tests: pages, requests to the emulators and the
+    # tests' own source. Nothing under backend/ (its source, its build, the emulator logs).
+    - name: Upload the Playwright report
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: playwright-report-emulators
+        path: |
+          playwright-report-emulators/
+          test-results-emulators/
+        retention-days: 7

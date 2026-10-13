@@ -12,6 +12,8 @@ import {
   type UserProfile,
 } from './types';
 
+import { type FlagKey, type FlagValues } from '@/core/flags/registry';
+
 /**
  * An in-memory fake of the account backend, for local preview and tests ONLY.
  *
@@ -23,6 +25,10 @@ import {
  * It knows one sample account (PREVIEW_USER) and the accounts created with the sign-up form.
  * They live in memory and in sessionStorage, so reloading the page keeps the session and
  * closing the tab forgets everything. Nothing is sent anywhere. Never type a real password.
+ *
+ * The sample account has the interview tools switched on (the `interviewAssistant` flag), as
+ * an account an admin opened them for. An account created with the sign-up form has no flag
+ * set, as on the real backend, and sees "Not available for your account yet".
  *
  * An account created with the sign-up form starts with an unverified email, as on the real
  * backend, but no email exists here. `window.qdPreview` (PreviewControls) stands for what
@@ -46,6 +52,8 @@ interface PreviewAccount {
   emailVerified: boolean;
   /** `null`: the account has no profile document (see PreviewControls.removeProfile). */
   profile: UserProfile | null;
+  /** The feature flags set for this account alone (see PreviewControls.setFlag). */
+  flags?: FlagValues;
 }
 
 /** What happens outside the site, for the signed-in preview account. Test and preview only. */
@@ -54,6 +62,11 @@ export interface PreviewControls {
   verifyEmail(): void;
   /** The profile document is gone (a failed write at sign-up): the site asks for the names. */
   removeProfile(): void;
+  /**
+   * An admin set a feature flag for this account. As on the backend, the site reads the
+   * flags once: reload the page to see the change.
+   */
+  setFlag(key: FlagKey, value: boolean): void;
 }
 
 /** The gateway, and the controls that `window.qdPreview` exposes. */
@@ -68,6 +81,8 @@ declare global {
 interface PreviewState {
   accounts: PreviewAccount[];
   currentUid: string | null;
+  /** The flags of the sample account, when a test changed them (it is not in `accounts`). */
+  sampleFlags?: FlagValues;
 }
 
 /** The part of the Web Storage API the gateway needs (sessionStorage, or a fake in tests). */
@@ -80,6 +95,7 @@ const SEEDED_ACCOUNT: PreviewAccount = {
   providerIds: [PASSWORD_PROVIDER_ID, GOOGLE_PROVIDER_ID, APPLE_PROVIDER_ID],
   emailVerified: true,
   profile: { ...PREVIEW_USER.profile },
+  flags: { interviewAssistant: true },
 };
 
 const browserStorage = (): PreviewStorage | null => {
@@ -103,6 +119,9 @@ const readState = (storage: PreviewStorage | null): PreviewState => {
       accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
       currentUid:
         typeof parsed.currentUid === 'string' ? parsed.currentUid : null,
+      ...(parsed.sampleFlags && typeof parsed.sampleFlags === 'object'
+        ? { sampleFlags: parsed.sampleFlags }
+        : {}),
     };
   } catch {
     return empty;
@@ -131,6 +150,7 @@ export const createPreviewGateway = (
   const sampleAccount: PreviewAccount = {
     ...SEEDED_ACCOUNT,
     profile: { ...PREVIEW_USER.profile },
+    flags: { ...SEEDED_ACCOUNT.flags, ...state.sampleFlags },
   };
 
   const accounts = () => [sampleAccount, ...state.accounts];
@@ -191,6 +211,14 @@ export const createPreviewGateway = (
       save();
       notifyProfile(account);
     },
+    setFlag: (key, value) => {
+      const account = requireCurrentAccount();
+      account.flags = { ...account.flags, [key]: value };
+      if (account === sampleAccount) {
+        state.sampleFlags = account.flags;
+      }
+      save();
+    },
   };
 
   return {
@@ -240,6 +268,7 @@ export const createPreviewGateway = (
       notifyProfile(account);
     },
     getClaims: async () => NO_CLAIMS,
+    getFlagOverrides: async uid => ({ ...findByUid(uid)?.flags }),
 
     signUpWithEmail: async (email, password, profile) => {
       if (findByEmail(email)) {

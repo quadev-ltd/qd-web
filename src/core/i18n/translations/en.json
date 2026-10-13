@@ -126,6 +126,16 @@
     "passwordLabel": "Password",
     "changePasswordLink": "Change password"
   },
+  "access": {
+    "notAvailableChip": "Not available for your account yet",
+    "stagesDescription": "We are opening this tool to accounts in stages. You don’t need to do anything."
+  },
+  "profile": {
+    "documentTitle": "Profile | QuaDev",
+    "title": "Profile",
+    "description": "What you have done, read once and reused for every job.",
+    "notAvailableDescription": "Add your CV and other documents once. We read them and build your skill map: skills, experience, projects, achievements and stories."
+  },
   "drawerMenu": {
     "home": "Home",
     "deleteAccount": "Delete account",

@@ -42,6 +42,7 @@ fails instead of deploying a blank page.
 | `VITE_FIREBASE_AUTH_DOMAIN`    | `<project>.firebaseapp.com`                    | Required with the `firebase` gateway: where the Google sign-in window is served         |
 | `VITE_FIREBASE_PROJECT_ID`     | `quadevapp-dev`, `quadevapp`                   | Required with the `firebase` gateway                                                    |
 | `VITE_FIREBASE_APP_ID`         | from the Firebase console                      | Required with the `firebase` gateway                                                    |
+| `VITE_FIREBASE_STORAGE_BUCKET` | `<project>.firebasestorage.app`                | The project's default bucket: where the files of the interview profile are uploaded     |
 | `VITE_USE_FIREBASE_EMULATORS`  | `true`, `false` (default)                      | Sends the `firebase` gateway to the local emulators. A production build refuses it      |
 | `VITE_RECAPTCHA_SITE_KEY`      | from the Google Cloud console                  | App Check: the site key of the reCAPTCHA Enterprise key (public). Not set: no App Check |
 | `VITE_APPCHECK_DEBUG_TOKEN`    | a debug token (**secret**)                     | App Check on your own machine. Only in `.env.dev.local`; never in a build               |
@@ -120,10 +121,11 @@ backend, and lands on the verify-email screen. No email exists in the preview, s
 `window.qdPreview` stands for what happens outside the site. Type these in the browser console (the
 end-to-end tests call the same functions):
 
-| Console                     | Stands for                                                                                           |
-| --------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `qdPreview.verifyEmail()`   | The user opened the link in the email. Then press "I've verified my email", or come back to the tab. |
-| `qdPreview.removeProfile()` | The profile was not written at sign-up. The site then asks for the names (complete-profile screen).  |
+| Console                      | Stands for                                                                                                                          |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `qdPreview.verifyEmail()`    | The user opened the link in the email. Then press "I've verified my email", or come back to the tab.                                |
+| `qdPreview.removeProfile()`  | The profile was not written at sign-up. The site then asks for the names (complete-profile screen).                                 |
+| `qdPreview.setFlag(key, on)` | An admin set a feature flag for this account, for example `('interviewAssistant', true)`. Reload the page: the flags are read once. |
 
 Deleting an account always asks a preview account for its password (the real backend asks only when
 the sign-in is old), so that step can be seen. The sample account also has Google, so it confirms
@@ -135,6 +137,10 @@ the sign-in is old), so that step can be seen. The sample account also has Googl
 | Password       | `Preview123!`         |
 
 It is a fake for clicking through the screens: never type a real password into it.
+
+The sample account has the interview tools on (the `interviewAssistant` flag), like an account an
+admin opened them for. An account created with the sign-up form has no flag, as on the real
+backend, and sees "Not available for your account yet" on the profile.
 
 **The preview gateway cannot reach production.** Three guards:
 
@@ -190,9 +196,9 @@ there. Test sign-in on dev.quadev.net or locally.
 
 Every callable function of `quadev-backend` refuses a call that does not carry an App Check token:
 proof that the call comes from this site. `src/core/firebase/functions.ts` gives the Functions
-service and starts App Check first (`appCheck.ts`), so the SDK adds the token to every call. Nothing
-on the site calls a function yet, so neither file is in any build today; the first screen that
-needs the backend loads them. The decisions are in [ADR 0006](docs/adr/0006-app-check.md).
+service and starts App Check first (`appCheck.ts`), so the SDK adds the token to every call. Both
+files are loaded with the profile gateway, by the first profile page; signing in loads neither. The
+decisions are in [ADR 0006](docs/adr/0006-app-check.md).
 
 | Where the site runs             | What vouches for it                                                                        |
 | ------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -217,23 +223,90 @@ its place, so only the development server passes it on; `src/core/env.ts` refuse
 production; and `.env.dev.local` is in `.gitignore`. If a token leaks, delete it in the same
 console page.
 
-**Running it against the emulators** (no real project, no real email):
+**Running it against the emulators** (no real project, no real email, no model):
 
 ```bash
-# 1. In quadev-backend (Node 24, JDK 21): Auth, Firestore and Functions emulators
+# 1. In quadev-backend (Node 24, JDK 21): Auth, Firestore, Functions and Storage emulators
 npm run emulators            # project demo-quadev
 
 # 2. Here
 VITE_ACCOUNT_ENABLED=true VITE_AUTH_GATEWAY=firebase VITE_USE_FIREBASE_EMULATORS=true \
 VITE_FIREBASE_PROJECT_ID=demo-quadev VITE_FIREBASE_API_KEY=demo \
-VITE_FIREBASE_AUTH_DOMAIN=demo-quadev.firebaseapp.com VITE_FIREBASE_APP_ID=demo yarn start:dev
+VITE_FIREBASE_AUTH_DOMAIN=demo-quadev.firebaseapp.com VITE_FIREBASE_APP_ID=demo \
+VITE_FIREBASE_STORAGE_BUCKET=demo-quadev.appspot.com yarn start:dev
 ```
 
-`VITE_FIREBASE_PROJECT_ID` must be the project the emulators were started with; the other three
-values only have to be present. Verification and reset emails are not sent: the Auth emulator lists
-them at `http://localhost:9099/emulator/v1/projects/demo-quadev/oobCodes`, and opening an `oobLink`
-applies it. "Sign in with Google" opens the emulator's own account page. The emulator UI is at
+`VITE_FIREBASE_PROJECT_ID` must be the project the emulators were started with, and
+`VITE_FIREBASE_STORAGE_BUCKET` the bucket the Functions emulator gives it
+(`demo-quadev.appspot.com`); the other three values only have to be present. Verification and reset
+emails are not sent: the Auth emulator lists them at
+`http://localhost:9099/emulator/v1/projects/demo-quadev/oobCodes`, and opening an `oobLink` applies
+it. "Sign in with Google" opens the emulator's own account page. The emulator UI is at
 `http://localhost:4000`.
+
+Against the emulators App Check uses neither reCAPTCHA nor a debug token (both are exchanged with
+Google for the real project): `appCheck.ts` gives the SDK a token with no signature, which the
+Functions emulator accepts and a deployed function refuses. A new account has no feature flag; set
+one in the emulator UI (Firestore → `featureFlags/<uid>` → `interviewAssistant: true`) to open the
+profile.
+
+## The interview profile
+
+The first feature that calls the backend: a candidate adds a CV and other resources, the backend
+reads them, and the result is a skill map. This repository has the foundation and the page's frame
+so far; the screens come slice by slice. The decisions, and what was tried against the backend
+before any of it was written, are in [ADR 0007](docs/adr/0007-interview-profile.md).
+
+**Who sees it.** `/profile` is open to every signed-in user and follows the feature flag
+`interviewAssistant`: off, the page says "Not available for your account yet"; on, it shows the
+profile. The flag is off for everyone unless it was set for an account (below).
+
+**Feature flags are read from the backend.** After sign-in the site reads the user's overrides
+(`featureFlags/{uid}`, through the auth gateway) once; `useFlag('key')` then answers, and
+`useFlagsReady()` says whether they have arrived, so a page can wait instead of showing "not
+available" for a moment. Remote Config, the second layer of the backend's order, is not read by
+the website yet: a flag is on only for the accounts it was set for. To set one on dev, in
+`quadev-backend`:
+
+```bash
+npm run set-flag -- --project quadevapp-dev --email <account> --flag interviewAssistant --on --apply
+```
+
+The account sees it the next time it opens the site.
+
+**The profile gateway.** Like the account, the profile is reached through one interface,
+`ProfileGateway` (`src/core/profile/gateway.ts`), chosen in one place
+(`src/core/profile/selectProfileGateway.ts`) by the same `VITE_AUTH_GATEWAY`:
+
+| Value         | Profile gateway                                                                                                                             |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `unavailable` | Every call fails with "unavailable". No network call.                                                                                       |
+| `preview`     | An in-memory fake (`previewProfileGateway.ts`): resources are "read" after a moment and give a few fictional items. Nothing is sent.        |
+| `firebase`    | `src/core/firebase/` (`interviewProfile.ts`, `profileGateway.ts`): the owner's documents in Firestore, the backend's callables, the upload. |
+
+- It is loaded by the first profile page, not with the application: the Firebase one brings the
+  Functions, App Check and Storage parts of the SDK (19 kB gzip), which no other page needs.
+- Every function rejects with a `ProfileError` whose code is in the words of the screens
+  (`profile/daily-limit`, `profile/max-resources`, `profile/upload-refused`, ...): no screen reads a
+  Firebase error.
+- **The contract is a copy.** `src/core/profile/contract.ts` mirrors the backend's
+  `packages/shared/src/interviewProfile.ts` (names, limits, the link check, the documents), because
+  `@quadev/shared` is private. Change it only after the backend's `docs/api.md` says the same; the
+  tests against the emulators catch a difference.
+- **Nothing about the candidate is logged:** an operation, an error code and the uid
+  (`logProfileError`). Never a title, an address or the text of an item.
+
+The preview gateway keeps a profile per account in the tab (`sessionStorage`) and behaves like the
+backend with its fake model: a link to a host ending in `.invalid` cannot be read, what the profile
+already has is not added twice, and the limits are the backend's. `window.qdPreviewProfile` stands
+for what a test cannot wait for or cause (the end-to-end tests use it):
+
+| Console                                    | Stands for                                                                |
+| ------------------------------------------ | ------------------------------------------------------------------------- |
+| `qdPreviewProfile.seed()`                  | The profile of the designs: six resources, one in each state.             |
+| `qdPreviewProfile.failNext('too-long')`    | The next resource cannot be read, for that reason (any of the backend's). |
+| `qdPreviewProfile.stallNext()`             | The next resource is never read: it stays "being read".                   |
+| `qdPreviewProfile.setExtractionsToday(20)` | Today's limit is already used.                                            |
 
 # Architecture
 
@@ -243,15 +316,19 @@ src/
   components/   ui/ (Button, ButtonLink, Card, Chip, Checkbox)
                 layout/ (PageShell, SiteHeader, SiteFooter, BrandLink, Arcs, LegalPage,
                          MainNav, AccountMenu, SignedInShell)
-                FormTextInput, PasswordVisibilityToggle, Spinner, StatusIcon, AppLoading
+                FormTextInput, PasswordVisibilityToggle, Spinner, StatusIcon, AppLoading,
+                Icon, NotAvailable
                 HookFormInputs/ (HookFormTextInput, HookFormPasswordInput, HookFormDateInput)
                 SignIn/ (Layout, SSOForm, Divider, ErrorMessage, FooterPrompt, SubmitButton,
                          SignedInActions)
   core/         env.ts, logger.ts, contact.ts, i18n/ (i18n.ts, translations/en.json)
                 auth/ (types, gateway, errors, profile, reauth, paths, the unavailable and
                        preview gateways, selectAuthGateway, AuthGatewayProvider)
-                firebase/ (app, auth, profile, claims, gateway: the Firebase gateway, the only
-                           folder that imports the Firebase SDK)
+                profile/ (contract, gateway, errors, paths, the unavailable and preview
+                          gateways, selectProfileGateway, ProfileGatewayProvider)
+                firebase/ (app, auth, profile, claims, flags, gateway: the Firebase gateway;
+                           functions, appCheck, storage, interviewProfile, profileGateway: the
+                           Firebase profile gateway. The only folder that imports the Firebase SDK)
                 state/ (store, hooks, slices/sessionSlice and exitSlice, selectors/)
                 session/ (SessionProvider, hooks)
                 flags/ (registry, evaluate, FlagsProvider)
@@ -260,13 +337,16 @@ src/
   schemas/      signInSchema.ts, signUpSchema.ts, forgotPasswordSchema.ts,
                 completeProfileSchema.ts
   screens/      one folder per screen: PublicHome/, SignIn/, SignUp/, ForgotPassword/,
-                VerifyEmail/, CompleteProfile/, Home/, DeleteAccount/, PrivacyPolicy/,
+                VerifyEmail/, CompleteProfile/, Home/, DeleteAccount/, Profile/, PrivacyPolicy/,
                 TermsAndConditions/, DeleteAccountInfo/, NotFound/, Error/
   styles/       theme.css (design tokens), global.css
-  testUtil/     renderWithProviders.tsx, mockGateway.ts
+  testUtil/     renderWithProviders.tsx, mockGateway.ts, mockProfileGateway.ts
   util/         index.ts (date helpers)
 e2e/            Playwright tests (the two critical flows, accessibility, keyboard)
-scripts/        build output checks (check-*.mjs), setup-wif.sh (keyless deploy, run once)
+e2e-emulators/  Playwright tests against the emulators of quadev-backend, and the backend
+                commit they are pinned to
+scripts/        build output checks (check-*.mjs), e2e-emulators.sh, setup-wif.sh (keyless
+                deploy, run once)
 firebase.json   Firebase Hosting: rewrites, cache and security headers, the Hosting emulator
 .firebaserc     project aliases: dev (quadevapp-dev, the default), prod (quadevapp)
 docs/adr/       architecture decisions
@@ -315,7 +395,11 @@ Rules (the same as in `qd-mobile` where they exist there):
 - **Auth:** screens call the auth gateway from `useAuthGateway()`; nothing else knows how users are
   signed in. `src/core/auth/selectAuthGateway.ts` is the only place that chooses the gateway.
 - **Firebase:** only `src/core/firebase/` imports the Firebase SDK (`firebase/*`), and only
-  `selectAuthGateway.ts` loads that folder. Both are lint errors anywhere else.
+  `selectAuthGateway.ts` and `selectProfileGateway.ts` load that folder. Both are lint errors
+  anywhere else.
+- **The profile:** screens call the profile gateway from `useProfileGateway()` and react to the
+  code of a `ProfileError`. The routes of the profile are children of `ProfileRoutes`
+  (`src/screens/Profile/ProfileRoutes.tsx`), which checks the flag and provides the gateway.
 - **Route guards** (`src/app/guards.tsx`) read the session status, like the app's Router. Each
   status has its page: `needsEmailVerification` → `/verify-email`, `needsProfile` →
   `/complete-profile`, `ready` → `/home` and `/account/delete`. While the session is `initializing`
@@ -330,10 +414,10 @@ Rules (the same as in `qd-mobile` where they exist there):
   verify-email screen chooses `/sign-in` as the place to land after signing out, and a deleted
   account is confirmed on the public home until the user opens another page (the app shows a toast).
 - **Feature flags:** `useFlag('key')` from `src/core/flags/FlagsProvider.tsx`. The registry mirrors
-  the app's (and the backend's): never add a flag here that the backend does not have. The website
-  has no remote source yet, so the code defaults apply (all off). On the signed-in home, "Mock
-  interview" and "Live interview" follow `interviewAssistant`; the "CV tool" has no flag yet and is
-  always "Coming soon".
+  the app's (and the backend's): never add a flag here that the backend does not have. The user's
+  overrides are read from the backend after sign-in (see [The interview profile](#the-interview-profile));
+  everything else has its code default (all off). On the signed-in home, "Mock interview" and "Live
+  interview" follow `interviewAssistant`; the "CV tool" has no flag yet and is always "Coming soon".
 - **Focus ring:** one rule for every interactive element (`global.css`). Its colour follows the
   surface: `data-surface="dark"` (brand and indigo backgrounds) uses the sky blue, light surfaces a
   darker blue, so the ring always has enough contrast.
@@ -355,20 +439,21 @@ Rules (the same as in `qd-mobile` where they exist there):
 
 ## Pages
 
-| Path                    | Screen                                                                  |
-| ----------------------- | ----------------------------------------------------------------------- |
-| `/`                     | Public home                                                             |
-| `/privacy-policy`       | Privacy Policy                                                          |
-| `/terms-and-conditions` | Terms and Conditions                                                    |
-| `/delete-account`       | How to delete an account (public; the stores link to it)                |
-| `/sign-in`              | Sign in (only with the account flag on)                                 |
-| `/sign-up`              | Sign up (only with the account flag on)                                 |
-| `/forgot-password`      | Reset password (only with the account flag on)                          |
-| `/verify-email`         | Verify your email (flag on; signed in, email not verified yet)          |
-| `/complete-profile`     | Complete your profile (flag on; signed in, no names in the profile yet) |
-| `/home`                 | Signed-in home (only with the account flag on; needs a session)         |
-| `/account/delete`       | Delete the signed-in account (flag on; needs a session)                 |
-| anything else           | Not found                                                               |
+| Path                    | Screen                                                                    |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `/`                     | Public home                                                               |
+| `/privacy-policy`       | Privacy Policy                                                            |
+| `/terms-and-conditions` | Terms and Conditions                                                      |
+| `/delete-account`       | How to delete an account (public; the stores link to it)                  |
+| `/sign-in`              | Sign in (only with the account flag on)                                   |
+| `/sign-up`              | Sign up (only with the account flag on)                                   |
+| `/forgot-password`      | Reset password (only with the account flag on)                            |
+| `/verify-email`         | Verify your email (flag on; signed in, email not verified yet)            |
+| `/complete-profile`     | Complete your profile (flag on; signed in, no names in the profile yet)   |
+| `/home`                 | Signed-in home (only with the account flag on; needs a session)           |
+| `/account/delete`       | Delete the signed-in account (flag on; needs a session)                   |
+| `/profile`              | The interview profile (flag on; needs a session and `interviewAssistant`) |
+| anything else           | Not found                                                                 |
 
 # Quickstart
 
@@ -388,6 +473,7 @@ yarn hosting:serve   # serve dist/ with the Firebase Hosting emulator: the real 
 yarn typecheck && yarn lint && yarn test
 yarn build && yarn check:well-known && yarn check:bundle
 yarn e2e             # end-to-end tests (first time: yarn playwright install chromium)
+yarn e2e:emulators   # the same site against the backend's emulators (needs a checkout of quadev-backend)
 yarn format          # Prettier, same options as qd-mobile
 ```
 
@@ -425,12 +511,65 @@ yarn e2e --ui                      # interactive runner
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `auth-email-lifecycle.spec.ts` | Sign up → verify email (too early, resend, verified) → complete profile → home → reload → sign out → sign in → delete account (wrong password, then the right one) → confirmation on the public home; the tab that checks by itself; the ways out of the two onboarding screens; deleting with Google |
 | `auth-sign-in-errors.spec.ts`  | Empty and invalid fields, wrong password, forgot password (neutral message), then a successful sign-in                                                                                                                                                                                                |
-| `pages.spec.ts`                | Every page, and every state of the account screens: no serious or critical accessibility violation (axe) and no horizontal scroll                                                                                                                                                                     |
+| `pages.spec.ts`                | Every page, every state of the account screens, and the profile with the interview tools on and off: no serious or critical accessibility violation (axe) and no horizontal scroll                                                                                                                    |
 | `keyboard.spec.ts`             | Keyboard-only sign-in, the account menu with the keyboard, the focus ring colour on light and dark surfaces                                                                                                                                                                                           |
 
 The detailed cases (every validation rule, every error code) are unit tests; the end-to-end tests
 cover the paths that cross screens. They prove the screens, the session and the guards, not the
-backend: running the same flows against the Firebase emulators is a separate suite, still to come.
+backend: that is the suite below.
+
+## End-to-end tests against the backend's emulators
+
+`e2e-emulators/`, run with `playwright.emulators.config.ts`: the site is built with the **Firebase
+gateway** and talks to the emulators of `quadev-backend` (Auth, Firestore, Functions, Storage),
+which run the real functions with a fake model. Nothing reaches a real project, and nothing costs
+money. They prove the contract between the two repositories: sign-in, the flag, App Check, the
+callables, the rules, the upload and the documents the site reads. A state is tested in the fastest
+layer that can prove it, so this suite stays small (ADR 0007): one size (1280), a new account per
+test, and assertions on states and counts, never on the fake model's text.
+
+```bash
+yarn e2e:emulators ../quadev-backend                 # builds the backend, starts the emulators, runs the tests
+yarn e2e:emulators ../quadev-backend -- --ui         # arguments after -- go to Playwright
+```
+
+It needs Node 24, Java 21 and the backend's dependencies (`npm ci` in its folder). With the
+emulators already running (`npm run emulators` in `quadev-backend`),
+`yarn playwright test -c playwright.emulators.config.ts` runs the tests alone.
+
+| File                     | What it proves                                                                                                                                                   |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `profile-access.spec.ts` | The flag is read from the backend's document through its rules: an account without it, and one with it off, see "Not available"; one with it on gets the profile |
+
+**The backend commit is pinned** in `e2e-emulators/backend-commit`. The pipeline tests against that
+commit, so a change in the backend cannot break an unrelated pull request here. Move it forward on
+purpose, in a pull request of its own: if the backend changed the contract, that pull request is
+where it shows, together with the change to `src/core/profile/contract.ts`.
+
+### One-time setup for the pipeline (owner)
+
+`quadev-backend` is private and this repository is public, so the job reads the backend with a
+deploy key that can only read that one repository. Until the secret exists the job `e2e-emulators`
+reports "skipped". The private half is a secret: it goes from the file into GitHub and is never
+pasted anywhere.
+
+```bash
+dir="$(mktemp -d)"
+ssh-keygen -t ed25519 -N '' -C 'qd-web e2e-emulators (read only)' -f "$dir/key"
+gh repo deploy-key add "$dir/key.pub" -R quadev-ltd/quadev-backend --title 'qd-web e2e-emulators (read only)'
+gh secret set BACKEND_DEPLOY_KEY -R quadev-ltd/qd-web < "$dir/key"
+rm -rf "$dir"
+```
+
+`gh repo deploy-key add` creates a read-only key unless `--allow-write` is given. To revoke it,
+delete the key in `quadev-backend` → Settings → Deploy keys. When the job has been green for a
+while, add `e2e-emulators` to the required checks of `main` (Settings → Rules) and to
+`.github/rulesets/main.json`.
+
+What the job makes public (this repository's logs and artifacts are): the emulators' output, which
+names the backend's functions and shows the events they log for the fictional test accounts; and,
+when a test fails, Playwright's report of this repository's tests. It uploads nothing from the
+backend's folder: no source, no build and no emulator log file.
 
 ## Lint
 
@@ -442,14 +581,15 @@ same, what was adapted, the one addition for the web (`jsx-a11y`) and what does 
 
 Every pull request into `main` runs:
 
-| Check        | Workflow          | What it proves                                                                                                                                                                                                          |
-| ------------ | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `run-checks` | `pr.yml`          | TypeScript, lint, Vitest, the production build, that the app-link files are unchanged in `dist/`, that the preview auth gateway is not in `dist/`, and that no Firebase code is in it while the account screens are off |
-| `e2e`        | `pr.yml`          | The Playwright tests above; the report is uploaded as an artifact when they fail                                                                                                                                        |
-| `gitleaks`   | `secret-scan.yml` | No secrets in the new commits                                                                                                                                                                                           |
+| Check           | Workflow          | What it proves                                                                                                                                                                                                                                                                                      |
+| --------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run-checks`    | `pr.yml`          | TypeScript, lint, Vitest, the production build, that the app-link files are unchanged in `dist/`, that the preview auth gateway is not in `dist/`, and that no Firebase code is in it while the account screens are off                                                                             |
+| `e2e`           | `pr.yml`          | The Playwright tests above; the report is uploaded as an artifact when they fail                                                                                                                                                                                                                    |
+| `e2e-emulators` | `pr.yml`          | The tests against the backend's emulators. It does the work only when the pull request touches what they go through (the gateways, the contract, the profile screens, sign-in, the tests, the pinned commit) and the deploy key is available; otherwise it passes at once. Not a required check yet |
+| `gitleaks`      | `secret-scan.yml` | No secrets in the new commits                                                                                                                                                                                                                                                                       |
 
-`gitleaks` also runs on pull requests into other branches; `run-checks` and `e2e` only on those into
-`main`.
+`gitleaks` also runs on pull requests into other branches; `run-checks`, `e2e` and `e2e-emulators`
+only on those into `main`. On `main` itself, `e2e-emulators` runs after every merge.
 
 A fourth job, `preview` (`pr.yml`), runs after `run-checks` and `e2e` pass and publishes the pull
 request to a temporary address (see [Deploy](#deploy)). It is **not a required check**: it is skipped
@@ -685,7 +825,8 @@ skipped the files under the dot-folder `/.well-known/`, and a regular expression
 default-src 'none'; script-src 'self' https://apis.google.com https://www.google.com/recaptcha/
 https://www.gstatic.com/recaptcha/; style-src 'self'; img-src 'self'; font-src 'self';
 connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com
-https://firestore.googleapis.com https://content-firebaseappcheck.googleapis.com
+https://firestore.googleapis.com https://firebasestorage.googleapis.com
+https://content-firebaseappcheck.googleapis.com
 https://europe-west1-quadevapp-dev.cloudfunctions.net
 https://europe-west1-quadevapp.cloudfunctions.net;
 frame-src https://quadevapp-dev.firebaseapp.com https://quadevapp.firebaseapp.com
@@ -702,13 +843,14 @@ screens are off:
 | ------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `connect-src` | `identitytoolkit.googleapis.com`                                                             | Firebase Authentication: sign in, sign up, emails, deleting the account                                     |
 | `connect-src` | `securetoken.googleapis.com`                                                                 | Renewing the session token                                                                                  |
-| `connect-src` | `firestore.googleapis.com`                                                                   | The profile document                                                                                        |
+| `connect-src` | `firestore.googleapis.com`                                                                   | The profile document, the feature flags and the interview profile                                           |
+| `connect-src` | `firebasestorage.googleapis.com`                                                             | Uploading a file of the interview profile, and asking for its download address                              |
 | `script-src`  | `apis.google.com`                                                                            | Google's loader for the helper frame below; the Firebase SDK adds it when the Google sign-in window is used |
 | `frame-src`   | `quadevapp-dev.firebaseapp.com`, `quadevapp.firebaseapp.com`                                 | A hidden helper frame through which the Google sign-in window hands back its result                         |
-| `connect-src` | `content-firebaseappcheck.googleapis.com`                                                    | App Check: exchanging the proof for a token (not checked on the live site yet)                              |
-| `connect-src` | `europe-west1-quadevapp-dev.cloudfunctions.net`, `europe-west1-quadevapp.cloudfunctions.net` | The backend's callable functions (not used by any page yet)                                                 |
-| `script-src`  | `www.google.com/recaptcha/`, `www.gstatic.com/recaptcha/`                                    | reCAPTCHA Enterprise, loaded by App Check (from Google's guidance; not checked on the live site yet)        |
-| `frame-src`   | `www.google.com/recaptcha/`, `recaptcha.google.com/recaptcha/`                               | The hidden reCAPTCHA frame (same)                                                                           |
+| `connect-src` | `content-firebaseappcheck.googleapis.com`                                                    | App Check: exchanging the proof for a token                                                                 |
+| `connect-src` | `europe-west1-quadevapp-dev.cloudfunctions.net`, `europe-west1-quadevapp.cloudfunctions.net` | The backend's callable functions (the interview profile)                                                    |
+| `script-src`  | `www.google.com/recaptcha/`, `www.gstatic.com/recaptcha/`                                    | reCAPTCHA Enterprise, loaded by App Check                                                                   |
+| `frame-src`   | `www.google.com/recaptcha/`, `recaptcha.google.com/recaptcha/`                               | The hidden reCAPTCHA frame                                                                                  |
 
 One file serves both sites, so each lists both projects' sign-in domains. The Google sign-in window
 itself is a separate window and is not governed by this policy. Nothing was added for the local
@@ -729,8 +871,10 @@ To enforce it:
 
 Before enforcing it with the account screens on, repeat step 1 while signing in with email and with
 Google on the dev site: the token renewal and the profile read only happen with a real account.
-The App Check, reCAPTCHA and functions origins were added before any page used them: repeat step 1
-on the first page that calls a function, on dev.quadev.net, where reCAPTCHA really runs.
+The App Check, reCAPTCHA, functions and Storage origins are the ones a browser asked for when the
+profile's calls were tried from the development server on 13 Oct 2026 (ADR 0007). That server sends
+no policy, so repeat step 1 on dev.quadev.net once a page there calls a function, where reCAPTCHA
+really runs.
 
 ## The Hosting emulator
 

@@ -18,11 +18,14 @@ yarn-error.log*
 # build output
 /dist
 /dist-e2e
+/dist-e2e-emulators
 
 # testing
 /coverage
 /playwright-report
 /test-results
+/playwright-report-emulators
+/test-results-emulators
 
 # Firebase CLI (Hosting emulator log, deploy cache)
 /.firebase

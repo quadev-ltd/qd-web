@@ -66,3 +66,8 @@ That token is a secret, and Vite copies every `VITE_*` variable into the JavaScr
   own key (`quadev.net`), and App Check's minimum score (0.5 by default) decides who gets refused.
 - A leaked debug token is revoked by deleting it in the Firebase console (App Check → Apps →
   Manage debug tokens).
+- **Update, 13 Oct 2026:** the first debug token was exchanged and the first call accepted by the
+  deployed functions; the profile gateway is what loads these two files now; and a build for the
+  local emulators uses a provider of its own, because neither reCAPTCHA nor a debug token can work
+  there. All three are in [ADR 0007](0007-interview-profile.md). reCAPTCHA itself is still to be
+  seen on dev.quadev.net.

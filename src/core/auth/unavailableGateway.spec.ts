@@ -40,6 +40,12 @@ describe('unavailableGateway', () => {
     });
   });
 
+  it('has no feature flag set for anyone', async () => {
+    await expect(unavailableGateway.getFlagOverrides('uid-1')).resolves.toEqual(
+      {},
+    );
+  });
+
   it.each([
     ['signInWithEmail', () => unavailableGateway.signInWithEmail('a@b.c', 'x')],
     [

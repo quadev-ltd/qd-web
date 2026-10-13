@@ -1,5 +1,6 @@
 import * as authModule from './auth';
 import * as claimsModule from './claims';
+import * as flagsModule from './flags';
 import { createFirebaseGateway } from './gateway';
 import * as profileModule from './profile';
 
@@ -20,6 +21,7 @@ vi.mock('./auth', () => ({
   subscribeToAuthState: vi.fn(),
 }));
 vi.mock('./claims', () => ({ getClaims: vi.fn() }));
+vi.mock('./flags', () => ({ getFlagOverrides: vi.fn() }));
 vi.mock('./profile', () => ({
   createProfileIfMissing: vi.fn(),
   saveProfile: vi.fn(),
@@ -44,6 +46,7 @@ describe('the Firebase gateway', () => {
     expect(gateway.watchProfile).toBe(profileModule.watchProfile);
     expect(gateway.saveProfile).toBe(profileModule.saveProfile);
     expect(gateway.getClaims).toBe(claimsModule.getClaims);
+    expect(gateway.getFlagOverrides).toBe(flagsModule.getFlagOverrides);
   });
 
   it('chooses how to confirm a deletion with the rule every gateway shares', () => {

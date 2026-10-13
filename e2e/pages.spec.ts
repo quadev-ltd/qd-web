@@ -79,6 +79,49 @@ test('signed-in home: accessible and no horizontal scroll, also with the account
   await expectNoHorizontalScroll(page);
 });
 
+test('profile: accessible and no horizontal scroll', async ({ page }) => {
+  // The sample account has the interview tools on.
+  await signIn(page);
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'Profile' })
+    .click();
+  await expect(page).toHaveURL('/profile');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Profile' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('What you have done, read once and reused for every job.'),
+  ).toBeVisible();
+
+  await expectNoSeriousAccessibilityViolations(page);
+  await expectNoHorizontalScroll(page);
+});
+
+test('profile, not available for the account yet: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  // A new account has no feature flag set, as on the backend.
+  await signUp(page);
+  await openVerificationLink(page);
+  await page.getByRole('button', { name: "I've verified my email" }).click();
+  await expect(page).toHaveURL('/home');
+
+  await page.goto('/profile');
+  await expect(
+    page.getByText('Not available for your account yet'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Profile' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('What you have done, read once and reused for every job.'),
+  ).toBeHidden();
+
+  await expectNoSeriousAccessibilityViolations(page);
+  await expectNoHorizontalScroll(page);
+});
+
 test('sign up with validation errors: accessible and no horizontal scroll', async ({
   page,
 }) => {

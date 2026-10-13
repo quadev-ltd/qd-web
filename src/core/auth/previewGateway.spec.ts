@@ -302,6 +302,72 @@ describe('previewGateway', () => {
       ).resolves.toBe(false);
     });
 
+    it('has the interview tools on for the sample account, and no flag for a new one', async () => {
+      const gateway = createPreviewGateway(memoryStorage());
+      const sample = await gateway.signInWithEmail(
+        PREVIEW_USER.email,
+        PREVIEW_USER.password,
+      );
+      const created = await gateway.signUpWithEmail(
+        'grace@example.com',
+        'Passw0rd!x',
+        newProfile,
+      );
+
+      await expect(gateway.getFlagOverrides(sample.uid)).resolves.toEqual({
+        interviewAssistant: true,
+      });
+      await expect(gateway.getFlagOverrides(created.uid)).resolves.toEqual({});
+      await expect(gateway.getFlagOverrides('nobody')).resolves.toEqual({});
+    });
+
+    it('can set a flag for the signed-in account, and keeps it across a reload', async () => {
+      const storage = memoryStorage();
+      const gateway = createPreviewGateway(storage);
+      const created = await gateway.signUpWithEmail(
+        'grace@example.com',
+        'Passw0rd!x',
+        newProfile,
+      );
+
+      gateway.controls.setFlag('interviewAssistant', true);
+
+      const reloaded = createPreviewGateway(storage);
+      await expect(reloaded.getFlagOverrides(created.uid)).resolves.toEqual({
+        interviewAssistant: true,
+      });
+    });
+
+    it('can turn the interview tools off for the sample account, across a reload', async () => {
+      const storage = memoryStorage();
+      const gateway = createPreviewGateway(storage);
+      const sample = await gateway.signInWithEmail(
+        PREVIEW_USER.email,
+        PREVIEW_USER.password,
+      );
+
+      gateway.controls.setFlag('interviewAssistant', false);
+
+      await expect(gateway.getFlagOverrides(sample.uid)).resolves.toEqual({
+        interviewAssistant: false,
+      });
+      await expect(
+        createPreviewGateway(storage).getFlagOverrides(sample.uid),
+      ).resolves.toEqual({ interviewAssistant: false });
+      // Another tab still has the sample account as it comes.
+      await expect(
+        createPreviewGateway(memoryStorage()).getFlagOverrides(sample.uid),
+      ).resolves.toEqual({ interviewAssistant: true });
+    });
+
+    it('cannot set a flag when nobody is signed in', () => {
+      const gateway = createPreviewGateway(memoryStorage());
+
+      expect(() =>
+        gateway.controls.setFlag('interviewAssistant', true),
+      ).toThrow();
+    });
+
     it('puts the controls on window.qdPreview', async () => {
       const gateway = createPreviewGateway(memoryStorage());
 

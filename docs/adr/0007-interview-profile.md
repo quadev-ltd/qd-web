@@ -1,11 +1,12 @@
 # ADR 0007: The interview profile on the website
 
-- **Status:** accepted for the build (October 2026). Nothing described here is in a build yet: this
-  record was written with the checks of 13 Oct 2026 ("slice 0"), before any screen. Each slice that
-  follows updates it.
-- **Scope:** `src/core/profile/` (to come), `src/core/firebase/` (the callables, the reads, the
-  upload), `src/core/flags/`, the Content-Security-Policy in `firebase.json`, the `e2e-emulators`
-  job (to come)
+- **Status:** accepted (October 2026), and built slice by slice. Done: the checks of 13 Oct 2026
+  ("slice 0", before any screen) and the foundation ("slice 1": the flags, the gateway, `/profile`
+  behind the flag, the tests against the emulators). The screens follow; each slice updates this
+  record.
+- **Scope:** `src/core/profile/`, `src/core/firebase/` (the callables, the reads, the upload),
+  `src/core/flags/`, `src/screens/Profile/`, the Content-Security-Policy in `firebase.json`,
+  `e2e-emulators/` and the `e2e-emulators` job
 
 ## Context
 
@@ -42,7 +43,9 @@ The build follows the patterns the repository already has.
    policy forbids the `style` attribute.
 5. **The original file is downloaded through a link**, not read by the page (see the checks).
 6. **The flag is read for real:** `featureFlags/{uid}`, then Remote Config, then the code default,
-   the order the backend uses.
+   the order the backend uses. The override is read first (it is enough to open the feature for
+   chosen accounts); Remote Config comes with the last slice, before the flag is turned on for
+   everyone.
 7. **An action shows that it is working until the backend answers.** Nothing is shown as done
    before the call returns (see "Cold starts" below).
 8. **Production stays clean.** The new code loads behind the same dynamic import as the Firebase
@@ -130,13 +133,54 @@ adds it.
 - **On a developer's machine the Firebase SDK writes the debug token to the browser console.** It
   is the SDK's own line and cannot be turned off; it never happens in a build, which has no token.
 
+## The foundation (slice 1)
+
+What exists after it, and the choices made while building it:
+
+- **The flags come through the auth gateway** (`getFlagOverrides(uid)`), not through the profile
+  gateway: they belong to the account, every signed-in page may need them, and the auth gateway
+  and Firestore Lite are already loaded everywhere. `FlagsProvider` reads them once per user and
+  says when they have arrived (`useFlagsReady`), so `/profile` waits instead of showing "Not
+  available" for a moment to an account that has the flag.
+- **The profile gateway is loaded by the profile's routes**, not by the application.
+  `ProfileRoutes` (a layout route) checks the flag, shows "Not available for your account yet" at
+  every address of the profile when it is off, and otherwise provides the gateway to the page. In
+  a dev build the gateway and the Functions, App Check and Storage parts of the SDK are one file
+  of 59 kB (19 kB gzip) that only a profile page requests. The main file of the production build
+  grew by 0.6 kB gzip (the flags, the route, the texts).
+- **A `ProfileError` with a code in the screens' words** is what every gateway rejects with. The
+  Firebase gateway maps the callable, Firestore and Storage errors to it in one function
+  (`toProfileError`). The Functions SDK reports a request that never left the browser as
+  `internal`: it is read as a network failure when the browser says it is offline.
+- **A document the page does not understand is left out, not fatal.** The reads check each
+  document against the contract; one that fails is skipped and counted in the log (a count, never
+  its content). A failure reason this version does not know is shown as a fault on our side.
+- **The preview gateway behaves like the backend's fake model** (a reading that takes a moment, a
+  `.invalid` link that fails, no item added twice, the same limits), with controls for what a test
+  cannot wait for (`window.qdPreviewProfile`). Flags have their control on the auth side
+  (`qdPreview.setFlag`): the sample account has the interview tools on, a new account does not.
+- **"Not available" is not drawn for the profile.** The artboard shows the CV tool; the profile
+  uses the same card with a description put together from the designs' own sentences.
+- **The header on a phone.** With a third link the navigation no longer fitted next to the brand:
+  it now takes a row of its own under the brand and the account button, as the artboards at 390
+  show.
+- **Tests against the emulators:** `e2e-emulators/`, three tests so far (who gets the profile),
+  44 seconds on a developer's machine including the backend build and the start of the
+  emulators. The pipeline job checks out the backend at the commit pinned in
+  `e2e-emulators/backend-commit` with a read-only deploy key, and is skipped until that key
+  exists. Its time in the pipeline is not known yet.
+
+Left as it was: on the signed-in home, "Mock interview" and "Live interview" say "Available" for
+an account with the flag, although neither exists on the website. The home is redrawn in the last
+slice of this delivery.
+
 ## Consequences
 
 - The plan holds: nothing found here changes a screen or needs a change in the backend.
-- **Two additions for the Firebase folder**, both proven here and added with the first slice that
-  needs them: a `storage()` service with its emulator connection, and the App Check provider for
+- **Two additions for the Firebase folder**, both proven in the checks and added with the
+  foundation: a `storage()` service with its emulator connection, and the App Check provider for
   emulator builds.
-- **The end-to-end suite against the emulators can use the Firebase gateway as it is**, with the
+- **The end-to-end suite against the emulators uses the Firebase gateway as it is**, with the
   backend at a pinned commit.
 - **Every action needs its waiting state.** The designs have them ("uploading", "saving",
   "removing"); none may be skipped as "too quick to matter".
