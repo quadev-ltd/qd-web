@@ -21,6 +21,8 @@ interface Options {
   /** The profile as already read; left out, the page reads it through the gateway. */
   interviewProfile?: Partial<InterviewProfileState>;
   route?: string;
+  /** Router state at that URL (what a <Link state> passes). */
+  routeState?: unknown;
 }
 
 /**
@@ -33,6 +35,7 @@ export const renderProfilePage = (
     gateway = createMockProfileGateway(),
     interviewProfile,
     route = '/profile',
+    routeState,
   }: Options = {},
 ) => ({
   gateway,
@@ -40,6 +43,7 @@ export const renderProfilePage = (
     <InterviewProfileProvider>{ui}</InterviewProfileProvider>,
     {
       route,
+      routeState,
       profileGateway: gateway,
       flags: { interviewAssistant: true },
       interviewProfile,

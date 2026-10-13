@@ -163,6 +163,36 @@ describe('ProfileScreen', () => {
     });
   });
 
+  describe('opened by "Add your CV" from another page', () => {
+    it('opens the CV panel at once, and only once', async () => {
+      renderProfilePage(<ProfileScreen />, {
+        interviewProfile: loaded({ resources: [] }),
+        routeState: { add: 'cv' },
+      });
+
+      expect(
+        screen.getByRole('dialog', { name: 'addResource.cvChoiceTitle' }),
+      ).toBeInTheDocument();
+
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: 'sidePanel.closeAccessibilityLabel',
+        }),
+      );
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('opens nothing for a link that asks for something else', () => {
+      renderProfilePage(<ProfileScreen />, {
+        interviewProfile: loaded(),
+        routeState: { add: 'everything' },
+      });
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
   describe('a profile with resources', () => {
     it('reads the profile through the gateway and lists it with the skill map', async () => {
       const gateway = createMockProfileGateway();
@@ -214,6 +244,9 @@ describe('ProfileScreen', () => {
       expect(
         screen.getByRole('heading', { name: 'profile.skillMapTitle' }),
       ).toBeInTheDocument();
+      expect(
+        screen.getByRole('link', { name: 'profile.openSkillMapButton' }),
+      ).toHaveAttribute('href', '/profile/skill-map');
       expect(addButton()).toBeEnabled();
       expect(screen.queryByText('profile.emptyTitle')).not.toBeInTheDocument();
       expect(screen.queryByRole('status', { name: /spinner/ })).toBeNull();

@@ -157,6 +157,60 @@ test('a resource, ready, being read and failed, and the remove dialog: accessibl
   await expectAccessibleAndNotTooWide(page);
 });
 
+test('the skill map and an item, in their states: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openProfile(page);
+
+  // Empty
+  await page.goto('/profile/skill-map');
+  await expect(
+    page.getByRole('heading', { name: 'Your skill map is empty' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // Everything, by kind
+  await page.goto('/profile');
+  await expect(
+    page.getByRole('heading', { name: 'Start with your CV' }),
+  ).toBeVisible();
+  await seedProfile(page);
+  await page.getByRole('link', { name: 'Open the skill map' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Achievements', exact: true }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // Filtered, and nothing found
+  await page.getByRole('button', { name: 'Edited' }).click();
+  await page.getByRole('searchbox').fill('kubernetes');
+  await expect(
+    page.getByRole('heading', { name: 'No items match' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await page
+    .getByRole('button', { name: 'Clear the search and filters' })
+    .click();
+
+  // An item, being edited, then its remove dialog
+  await page.getByRole('link', { name: /Cut payment incidents/ }).click();
+  const item = page.getByRole('complementary', { name: 'Selected item' });
+  await expect(
+    item.getByRole('switch', { name: 'Use this first' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await item.getByRole('button', { name: 'Edit', exact: true }).click();
+  await item.getByLabel('Text').fill('a'.repeat(601));
+  await expect(item.getByText('601 / 600')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await item.getByRole('button', { name: 'Cancel' }).click();
+  await item.getByRole('button', { name: 'Remove this item' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Remove this item?' });
+  await expect(dialog).toBeVisible();
+  await expectInsideViewport(page, dialog);
+  await expectAccessibleAndNotTooWide(page);
+});
+
 test('add a resource, in its three forms and with their messages: accessible and no horizontal scroll', async ({
   page,
 }) => {

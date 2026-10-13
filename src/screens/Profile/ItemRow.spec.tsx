@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 
 import { ItemRow } from './ItemRow';
 
@@ -72,5 +73,44 @@ describe('ItemRow', () => {
     render(<ItemRow item={itemFixture({ kind: 'story' })} source="CV" />);
 
     expect(screen.queryByText('resource.kindStory')).not.toBeInTheDocument();
+  });
+
+  it('is not a link by default', () => {
+    render(<ItemRow item={itemFixture()} source="CV" />);
+
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('leads to the page of the item when it is given one', () => {
+    render(
+      <MemoryRouter>
+        <ItemRow
+          item={itemFixture({ text: 'Go in production' })}
+          source="CV"
+          to="/profile/skill-map/i1"
+        />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole('link', { name: /Go in production/ });
+    expect(link).toHaveAttribute('href', '/profile/skill-map/i1');
+    expect(link).not.toHaveAttribute('aria-current');
+  });
+
+  it('marks the item that is shown beside the list', () => {
+    render(
+      <MemoryRouter>
+        <ItemRow
+          item={itemFixture()}
+          source="CV"
+          to="/profile/skill-map/i1"
+          selected
+        />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole('link');
+    expect(link).toHaveAttribute('aria-current', 'true');
+    expect(link).toHaveClass('bg-tint');
   });
 });

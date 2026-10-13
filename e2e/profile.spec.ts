@@ -222,3 +222,144 @@ test('removing a resource takes its items out of the skill map', async ({
   await expect(page).toHaveURL('/profile');
   await expect(skillMap).toContainText('6 items');
 });
+
+test('the skill map: filter, open an item, edit it, star it, hide it', async ({
+  page,
+}, testInfo) => {
+  const narrow = testInfo.project.name === 'phone';
+  await openProfile(page);
+  await seedProfile(page);
+  await page.getByRole('link', { name: 'Open the skill map' }).click();
+  await expect(page).toHaveURL('/profile/skill-map');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Skill map' }),
+  ).toBeVisible();
+  await expect(page.getByText('9 items from 6 resources')).toBeVisible();
+  const kinds = page.getByRole('group', { name: 'Kind' });
+  const rows = page.getByRole('listitem');
+
+  // Filter by kind, then search inside it
+  await kinds.getByRole('button', { name: /Achievements/ }).click();
+  await expect(page.getByText('3 items', { exact: true })).toBeVisible();
+  await expect(rows).toHaveCount(3);
+  await page
+    .getByRole('searchbox', { name: 'Search your skill map' })
+    .fill('on-call');
+  await expect(rows).toHaveCount(1);
+  await page.getByRole('searchbox').fill('kubernetes');
+  await expect(
+    page.getByRole('heading', { name: 'No items match' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'Nothing in your skill map matches “kubernetes” with these filters.',
+    ),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Clear the search and filters' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Skills', exact: true }),
+  ).toBeVisible();
+
+  // Open an item: beside the list on a wide screen, in its place on a narrow one
+  await page
+    .getByRole('link', { name: /Go and PostgreSQL in production/ })
+    .click();
+  await expect(page).toHaveURL(/\/profile\/skill-map\/.+/);
+  const item = page.getByRole('complementary', { name: 'Selected item' });
+  await expect(item).toContainText(
+    'Go and PostgreSQL in production for six years.',
+  );
+  await expect(
+    item.getByText('Go, PostgreSQL (six years in production).'),
+  ).toBeVisible();
+  if (narrow) {
+    await expect(page.getByRole('searchbox')).toBeHidden();
+    await expect(
+      page.getByRole('link', { name: 'Skill map', exact: true }),
+    ).toBeVisible();
+  } else {
+    await expect(page.getByRole('searchbox')).toBeVisible();
+  }
+
+  // Edit it
+  await item.getByRole('button', { name: 'Edit', exact: true }).click();
+  const text = item.getByLabel('Text');
+  await text.fill('a'.repeat(601));
+  await expect(
+    item.getByText('Shorten the text to 600 characters'),
+  ).toBeVisible();
+  await expect(item.getByRole('button', { name: 'Save' })).toBeDisabled();
+  await text.fill('Go and PostgreSQL in production for seven years.');
+  await item.getByRole('button', { name: 'Save' }).click();
+  await expect(
+    item.getByRole('button', { name: 'Edit', exact: true }),
+  ).toBeVisible();
+  await expect(item).toContainText(
+    'Go and PostgreSQL in production for seven years.',
+  );
+  await expect(item.getByText('Edited', { exact: true })).toBeVisible();
+
+  // Star it
+  const star = item.getByRole('switch', { name: 'Use this first' });
+  await star.click();
+  await expect(star).toHaveAttribute('aria-checked', 'true');
+
+  // Hide it: out of the map, and found again under "Hidden"
+  const hide = item.getByRole('switch', { name: 'Never use this' });
+  await hide.click();
+  await expect(hide).toHaveAttribute('aria-checked', 'true');
+  if (narrow) {
+    await page.getByRole('link', { name: 'Skill map', exact: true }).click();
+  }
+  await expect(
+    page.getByRole('listitem').filter({ hasText: 'seven years' }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'Hidden' }).click();
+  await expect(
+    page.getByText('1 hidden item · never used in briefs, key points or CVs'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('listitem').filter({ hasText: 'seven years' }),
+  ).toContainText('Edited');
+
+  // The changes are kept: still there after a reload
+  await page.reload();
+  await page.getByRole('button', { name: 'Hidden' }).click();
+  await expect(
+    page.getByRole('listitem').filter({ hasText: 'seven years' }),
+  ).toHaveCount(1);
+});
+
+test('remove an item from the skill map: asked first, then gone, and its resource counts one less', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await seedProfile(page);
+  await page.getByRole('link', { name: 'Open the skill map' }).click();
+  await page
+    .getByRole('link', { name: /Mentored two junior engineers/ })
+    .click();
+  const item = page.getByRole('complementary', { name: 'Selected item' });
+
+  await item.getByRole('button', { name: 'Remove this item' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Remove this item?' });
+  await expect(dialog).toContainText(
+    'The resource it came from stays in your profile.',
+  );
+  await dialog.getByRole('button', { name: 'Remove the item' }).click();
+
+  await expect(page).toHaveURL('/profile/skill-map');
+  await expect(page.getByText('8 items from 6 resources')).toBeVisible();
+  await expect(page.getByText(/Mentored two junior engineers/)).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Profile', exact: true }).last().click();
+  await expect(page).toHaveURL('/profile');
+  await expect(
+    page.getByRole('heading', { name: 'Resources · 6 of 20' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('listitem').filter({ hasText: 'Performance review 2025' }),
+  ).toContainText('Ready · 2 items');
+});

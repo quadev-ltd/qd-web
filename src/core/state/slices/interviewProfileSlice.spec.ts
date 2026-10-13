@@ -3,6 +3,8 @@ import reducer, {
   extractionCounted,
   initialInterviewProfileState,
   type InterviewProfileState,
+  itemChanged,
+  itemRemoved,
   itemsLoaded,
   profileLoaded,
   profileLoadFailed,
@@ -188,6 +190,57 @@ describe('interviewProfileSlice', () => {
     const items = [itemFixture({ id: 'i9' })];
 
     expect(reducer(loaded(), itemsLoaded(items)).items).toEqual(items);
+  });
+
+  it('makes the change the backend accepted to one item, and leaves the others', () => {
+    const before = loaded({
+      items: [itemFixture({ id: 'i1' }), itemFixture({ id: 'i2' })],
+    });
+
+    const state = reducer(
+      before,
+      itemChanged({ id: 'i1', text: 'New text', edited: true, starred: true }),
+    );
+
+    expect(state.items[0]).toMatchObject({
+      id: 'i1',
+      text: 'New text',
+      edited: true,
+      starred: true,
+      hidden: false,
+    });
+    expect(state.items[1]).toEqual(itemFixture({ id: 'i2' }));
+    expect(reducer(before, itemChanged({ id: 'nope', hidden: true }))).toEqual(
+      before,
+    );
+  });
+
+  it('removes one item, and its resource counts one less', () => {
+    const before = loaded({
+      resources: [
+        resourceFixture({ id: 'r1', itemCount: 2 }),
+        resourceFixture({ id: 'r2', itemCount: 5 }),
+      ],
+      items: [
+        itemFixture({ id: 'i1', resourceId: 'r1' }),
+        itemFixture({ id: 'i2', resourceId: 'r1' }),
+      ],
+    });
+
+    const state = reducer(before, itemRemoved('i1'));
+
+    expect(state.items.map(({ id }) => id)).toEqual(['i2']);
+    expect(state.resources.map(({ itemCount }) => itemCount)).toEqual([1, 5]);
+    expect(reducer(before, itemRemoved('nope'))).toEqual(before);
+  });
+
+  it('never counts a resource below zero', () => {
+    const before = loaded({
+      resources: [resourceFixture({ id: 'r1', itemCount: 0 })],
+      items: [itemFixture({ id: 'i1', resourceId: 'r1' })],
+    });
+
+    expect(reducer(before, itemRemoved('i1')).resources[0].itemCount).toBe(0);
   });
 
   it('counts one more resource read today', () => {

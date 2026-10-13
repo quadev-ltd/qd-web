@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
 
+import ButtonLink from '@/components/ui/ButtonLink';
 import Card from '@/components/ui/Card';
 import { SKILL_MAP_KINDS, type SkillMapItem } from '@/core/profile/contract';
+import { SKILL_MAP_PATH } from '@/core/profile/paths';
 
 const KIND_KEYS = {
   skill: 'profile.kindSkills',
@@ -11,7 +13,10 @@ const KIND_KEYS = {
   story: 'profile.kindStories',
 } as const;
 
-/** What the resources added up to so far: how many items of each kind the skill map has. */
+/**
+ * What the resources added up to so far: how many items of each kind the skill map has, and
+ * the way into it.
+ */
 export const SkillMapSummary: React.FC<{ items: SkillMapItem[] }> = ({
   items,
 }) => {
@@ -40,6 +45,13 @@ export const SkillMapSummary: React.FC<{ items: SkillMapItem[] }> = ({
           </div>
         ))}
       </dl>
+      <ButtonLink
+        to={SKILL_MAP_PATH}
+        variant="secondary"
+        size="small"
+        className="text-[15px]">
+        {t('profile.openSkillMapButton')}
+      </ButtonLink>
     </Card>
   );
 };

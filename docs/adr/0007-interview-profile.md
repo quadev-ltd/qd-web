@@ -3,8 +3,9 @@
 - **Status:** accepted (October 2026), and built slice by slice. Done: the checks of 13 Oct 2026
   ("slice 0", before any screen), the foundation ("slice 1": the flags, the gateway, `/profile`
   behind the flag, the tests against the emulators), the profile page with "Add a resource"
-  ("slice 2") and the page of a resource ("slice 3"). The skill map follows; each slice updates
-  this record.
+  ("slice 2"), the page of a resource ("slice 3") and the skill map with the item ("slice 4").
+  The last slice follows (the download, the home's starting card, Remote Config, the walk-through
+  on dev).
 - **Scope:** `src/core/profile/`, `src/core/firebase/` (the callables, the reads, the upload),
   `src/core/flags/`, `src/screens/Profile/`, the Content-Security-Policy in `firebase.json`,
   `e2e-emulators/` and the `e2e-emulators` job
@@ -255,6 +256,36 @@ removes every item that came from it. So a new CV added before the old one is re
 facts both share, with their stars and edits, when the old one goes. The dialog says how many
 items go, as drawn; it does not explain this case. It could not be observed against the emulators
 either: the fake model never gives the same fact twice.
+
+## The skill map and the item (slice 4)
+
+- **One page for the map and for an item** (`/profile/skill-map/:itemId?`). At 1280 the opened
+  item stands beside the list; under 900 pixels it takes the page, with "Skill map" as the way
+  back. Being one page, the search and the filters stay as they are while items are opened.
+- **Searching and filtering happen in the page.** The whole skill map is in the store already (a
+  profile holds 800 items at most), so nothing is read from the backend for them. The search
+  looks at what an item says, not at the passage it came from.
+- **Hidden items are out of every view but their own.** A hidden item is one the candidate never
+  wants used; "Hidden" shows those instead of the others.
+- **A change to an item is shown when the backend has accepted it,** never before (see "Cold
+  starts"): a switch keeps its value and turns a ring while its change is on its way, "Save"
+  becomes "Saving…", and one change waits for the other. The accepted change is then made in the
+  store, as the backend made it (a new text marks the item as edited; a removed item makes its
+  resource count one less), so nothing is read again.
+- **An item that turns out to be gone** (removed from the app, or in another tab) is taken out of
+  the map without an error.
+
+Where the build goes beyond the artboards, or stops short of them:
+
+| Where                                   | What                                                                      | Why                                                                                         |
+| --------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| The order of the kinds                  | Skills, Experience, Projects, Achievements, Stories                       | The order of the filter and of the profile's summary. The artboard lists Achievements first |
+| "Source"                                | A list to choose a resource from, when the items came from more than one  | In the design proposal (D42) and on the artboard at 390; not on the one at 1280             |
+| A kind in the list of everything        | Three items, then "Show all", which narrows to that kind                  | The artboard shows two                                                                      |
+| The filters at 390                      | The kinds are a row that scrolls sideways, in the same card as the search | As on the phone artboard                                                                    |
+| A change that is on its way             | The switch keeps its value and turns a ring                               | Not drawn                                                                                   |
+| An address that is not in the skill map | "This item is not in your skill map", with the way back                   | Not drawn                                                                                   |
+| "Private" and "do not name"             | Not built                                                                 | They belong to CV creation (doc 15, question 7)                                             |
 
 ## Consequences
 

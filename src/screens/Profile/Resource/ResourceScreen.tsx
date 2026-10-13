@@ -30,7 +30,7 @@ import {
   useInterviewProfileActions,
 } from '@/core/profile/InterviewProfileProvider';
 import { itemsOfResource } from '@/core/profile/items';
-import { PROFILE_PATH } from '@/core/profile/paths';
+import { itemPath, PROFILE_PATH } from '@/core/profile/paths';
 
 /** How many items are listed before "Show all". */
 const ITEMS_SHOWN = 5;
@@ -205,7 +205,12 @@ export const ResourceScreen: React.FC = () => {
                     <li
                       key={item.id}
                       className="border-border-faint not-first:border-t">
-                      <ItemRow item={item} source={resource.title} showKind />
+                      <ItemRow
+                        item={item}
+                        source={resource.title}
+                        showKind
+                        to={itemPath(item.id)}
+                      />
                     </li>
                   ))}
                 </ul>

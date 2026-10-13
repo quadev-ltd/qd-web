@@ -55,7 +55,23 @@ test('add a CV as a file: created, uploaded, read by the backend, and in the ski
   await expect(row).toContainText('Ready · 1 item');
   await expect(skillMap).toContainText('1 item');
 
+  // updateSkillMapItem: the item is opened in the skill map and starred
+  await page.getByRole('link', { name: 'Open the skill map' }).click();
+  await expect(page.getByText('1 item from 1 resource')).toBeVisible();
+  await page.getByRole('listitem').getByRole('link').click();
+  const item = page.getByRole('complementary', { name: 'Selected item' });
+  const star = item.getByRole('switch', { name: 'Use this first' });
+  await expect(star).toHaveAttribute('aria-checked', 'false');
+  await star.click();
+  await expect(star).toHaveAttribute('aria-checked', 'true');
+  await page.reload();
+  await expect(star).toHaveAttribute('aria-checked', 'true');
+  await expect(
+    page.getByRole('listitem').getByRole('img', { name: 'Starred' }),
+  ).toBeVisible();
+
   // The page of the resource lists the item; removeProfileResource takes both away
+  await page.goto('/profile');
   await row.getByRole('link').click();
   await expect(
     page.getByRole('heading', { name: 'Items from this resource · 1' }),

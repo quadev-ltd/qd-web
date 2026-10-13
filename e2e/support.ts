@@ -71,8 +71,14 @@ export const openProfile = async (page: Page) => {
   ).toBeVisible();
 };
 
-/** The profile of the designs: six resources, one in each state. The page reads it again. */
+/**
+ * The profile of the designs: six resources, one in each state. The page reads it again.
+ * Call it on a profile page that has finished reading: the controls arrive with the profile
+ * gateway, and they act on the account whose profile was read.
+ */
 export const seedProfile = async (page: Page) => {
+  await expect(page.getByRole('status', { name: 'Loading' })).toHaveCount(0);
+  await page.waitForFunction(() => window.qdPreviewProfile !== undefined);
   await page.evaluate(() => window.qdPreviewProfile?.seed());
   await page.reload();
   await expect(

@@ -110,6 +110,10 @@ describe('ResourceScreen', () => {
       expect(rows[0]).toHaveTextContent('resource.editedChip');
       expect(rows[0]).toHaveTextContent('resource.kindAchievement');
       expect(rows[1]).toHaveTextContent('Go in production');
+      expect(within(rows[0]).getByRole('link')).toHaveAttribute(
+        'href',
+        '/profile/skill-map/i2',
+      );
       expect(
         screen.queryByText('From another resource'),
       ).not.toBeInTheDocument();

@@ -254,9 +254,10 @@ profile.
 
 The first feature that calls the backend: a candidate adds a CV and other resources, the backend
 reads them, and the result is a skill map. Built so far: the profile page (the resources in every
-state, the skill map in numbers, the limits), "Add a resource" (a file, pasted text or a link) and
-the page of one resource (where it is, why it failed, what it added, "Remove"). The skill map comes
-next. The decisions, and what was tried against the backend before any of it was written, are in
+state, the skill map in numbers, the limits), "Add a resource" (a file, pasted text or a link), the
+page of one resource (where it is, why it failed, what it added, "Remove") and the skill map
+(search, filters, and each item to correct, star, hide or remove). The decisions, and what was
+tried against the backend before any of it was written, are in
 [ADR 0007](docs/adr/0007-interview-profile.md).
 
 **Who sees it.** `/profile` is open to every signed-in user and follows the feature flag
@@ -330,7 +331,7 @@ for what a test cannot wait for or cause (the end-to-end tests use it):
 src/
   app/          App.tsx (provider tree), routes.tsx, guards.tsx (route guards)
   components/   ui/ (Button, ButtonLink, Card, Chip, Checkbox, Banner, SidePanel, Dialog,
-                    SegmentedControl, FilePicker, ProgressBar)
+                    SegmentedControl, FilePicker, ProgressBar, Switch, FilterChip, SearchField)
                 layout/ (PageShell, SiteHeader, SiteFooter, BrandLink, Arcs, LegalPage,
                          MainNav, AccountMenu, SignedInShell)
                 FormTextInput, FormTextArea, FieldCounter, PasswordVisibilityToggle, Spinner,
@@ -341,7 +342,8 @@ src/
   core/         env.ts, logger.ts, contact.ts, i18n/ (i18n.ts, translations/en.json)
                 auth/ (types, gateway, errors, profile, reauth, paths, the unavailable and
                        preview gateways, selectAuthGateway, AuthGatewayProvider)
-                profile/ (contract, gateway, errors, paths, files, limits, items, the unavailable
+                profile/ (contract, gateway, errors, paths, files, limits, items, skillMapFilter,
+                          the unavailable
                           and preview gateways, selectProfileGateway, ProfileGatewayProvider,
                           InterviewProfileProvider)
                 firebase/ (app, auth, profile, claims, flags, gateway: the Firebase gateway;
@@ -354,7 +356,7 @@ src/
                 sso/ (GoogleSSOCTA, AppleSSOCTA, useSSOSignIn, providers)
   hooks/        usePasswordValidation.ts
   schemas/      signInSchema.ts, signUpSchema.ts, forgotPasswordSchema.ts,
-                completeProfileSchema.ts, addResourceSchema.ts
+                completeProfileSchema.ts, addResourceSchema.ts, itemTextSchema.ts
   screens/      one folder per screen: PublicHome/, SignIn/, SignUp/, ForgotPassword/,
                 VerifyEmail/, CompleteProfile/, Home/, DeleteAccount/, Profile/, PrivacyPolicy/,
                 TermsAndConditions/, DeleteAccountInfo/, NotFound/, Error/
@@ -466,22 +468,23 @@ Rules (the same as in `qd-mobile` where they exist there):
 
 ## Pages
 
-| Path                     | Screen                                                                    |
-| ------------------------ | ------------------------------------------------------------------------- |
-| `/`                      | Public home                                                               |
-| `/privacy-policy`        | Privacy Policy                                                            |
-| `/terms-and-conditions`  | Terms and Conditions                                                      |
-| `/delete-account`        | How to delete an account (public; the stores link to it)                  |
-| `/sign-in`               | Sign in (only with the account flag on)                                   |
-| `/sign-up`               | Sign up (only with the account flag on)                                   |
-| `/forgot-password`       | Reset password (only with the account flag on)                            |
-| `/verify-email`          | Verify your email (flag on; signed in, email not verified yet)            |
-| `/complete-profile`      | Complete your profile (flag on; signed in, no names in the profile yet)   |
-| `/home`                  | Signed-in home (only with the account flag on; needs a session)           |
-| `/account/delete`        | Delete the signed-in account (flag on; needs a session)                   |
-| `/profile`               | The interview profile (flag on; needs a session and `interviewAssistant`) |
-| `/profile/resources/:id` | One resource of the profile (the same conditions)                         |
-| anything else            | Not found                                                                 |
+| Path                     | Screen                                                                                       |
+| ------------------------ | -------------------------------------------------------------------------------------------- |
+| `/`                      | Public home                                                                                  |
+| `/privacy-policy`        | Privacy Policy                                                                               |
+| `/terms-and-conditions`  | Terms and Conditions                                                                         |
+| `/delete-account`        | How to delete an account (public; the stores link to it)                                     |
+| `/sign-in`               | Sign in (only with the account flag on)                                                      |
+| `/sign-up`               | Sign up (only with the account flag on)                                                      |
+| `/forgot-password`       | Reset password (only with the account flag on)                                               |
+| `/verify-email`          | Verify your email (flag on; signed in, email not verified yet)                               |
+| `/complete-profile`      | Complete your profile (flag on; signed in, no names in the profile yet)                      |
+| `/home`                  | Signed-in home (only with the account flag on; needs a session)                              |
+| `/account/delete`        | Delete the signed-in account (flag on; needs a session)                                      |
+| `/profile`               | The interview profile (flag on; needs a session and `interviewAssistant`)                    |
+| `/profile/resources/:id` | One resource of the profile (the same conditions)                                            |
+| `/profile/skill-map`     | The skill map; `/profile/skill-map/:id` shows one item beside the list (the same conditions) |
+| anything else            | Not found                                                                                    |
 
 # Quickstart
 
@@ -535,13 +538,13 @@ yarn e2e --project=phone           # one size only
 yarn e2e --ui                      # interactive runner
 ```
 
-| File                           | What it proves                                                                                                                                                                                                                                                                                                                                                                            |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth-email-lifecycle.spec.ts` | Sign up → verify email (too early, resend, verified) → complete profile → home → reload → sign out → sign in → delete account (wrong password, then the right one) → confirmation on the public home; the tab that checks by itself; the ways out of the two onboarding screens; deleting with Google                                                                                     |
-| `auth-sign-in-errors.spec.ts`  | Empty and invalid fields, wrong password, forgot password (neutral message), then a successful sign-in                                                                                                                                                                                                                                                                                    |
-| `pages.spec.ts`                | Every page, every state of the account screens, the profile (not available, empty, with resources in every state), "Add a resource" in its three forms with their messages, and a resource (ready, being read, nothing new, failed, the remove dialog): no serious or critical accessibility violation (axe) and no horizontal scroll                                                     |
-| `keyboard.spec.ts`             | Keyboard-only sign-in, the account menu and the add-a-resource panel with the keyboard, the focus ring colour on light and dark surfaces                                                                                                                                                                                                                                                  |
-| `profile.spec.ts`              | The profile: add a CV as a file → "Being read…" → "Ready", with its items in the skill map and on its own page; a pasted text that is too long, shortened and added; a link whose address is not accepted, and one that cannot be read; a failed resource opened, its reason read, removed in the dialog and gone from the list; removing a resource takes its items out of the skill map |
+| File                           | What it proves                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth-email-lifecycle.spec.ts` | Sign up → verify email (too early, resend, verified) → complete profile → home → reload → sign out → sign in → delete account (wrong password, then the right one) → confirmation on the public home; the tab that checks by itself; the ways out of the two onboarding screens; deleting with Google                                                                                                                                                                                                                                                                                                     |
+| `auth-sign-in-errors.spec.ts`  | Empty and invalid fields, wrong password, forgot password (neutral message), then a successful sign-in                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `pages.spec.ts`                | Every page, every state of the account screens, the profile (not available, empty, with resources in every state), "Add a resource" in its three forms with their messages, and a resource (ready, being read, nothing new, failed, the remove dialog), the skill map (empty, by kind, nothing found) and an item (shown, being edited, its remove dialog): no serious or critical accessibility violation (axe) and no horizontal scroll                                                                                                                                                                 |
+| `keyboard.spec.ts`             | Keyboard-only sign-in, the account menu and the add-a-resource panel with the keyboard, the focus ring colour on light and dark surfaces                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `profile.spec.ts`              | The profile: add a CV as a file → "Being read…" → "Ready", with its items in the skill map and on its own page; a pasted text that is too long, shortened and added; a link whose address is not accepted, and one that cannot be read; a failed resource opened, its reason read, removed in the dialog and gone from the list; removing a resource takes its items out of the skill map; the skill map: filter by kind, search, nothing found and cleared, an item opened (beside the list at 1280, in its place at 390), edited, starred, hidden and found again under \"Hidden\", and an item removed |
 
 The detailed cases (every validation rule, every error code) are unit tests; the end-to-end tests
 cover the paths that cross screens. They prove the screens, the session and the guards, not the
@@ -566,10 +569,10 @@ It needs Node 24, Java 21 and the backend's dependencies (`npm ci` in its folder
 emulators already running (`npm run emulators` in `quadev-backend`),
 `yarn playwright test -c playwright.emulators.config.ts` runs the tests alone.
 
-| File                     | What it proves                                                                                                                                                                                                                                                                                                                              |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `profile-access.spec.ts` | The flag is read from the backend's document through its rules: an account without it, and one with it off, see "Not available"; one with it on gets the profile                                                                                                                                                                            |
-| `profile.spec.ts`        | Add a CV as a file: `createProfileResource`, the upload under the Storage rules, the trigger that reads it, the resource followed to "Ready", its item in the skill map, then `removeProfileResource` and an empty profile. Pasted text read; a link to a host ending in `.invalid` fails, says "We couldn't read this page" and is removed |
+| File                     | What it proves                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `profile-access.spec.ts` | The flag is read from the backend's document through its rules: an account without it, and one with it off, see "Not available"; one with it on gets the profile                                                                                                                                                                                                                                                   |
+| `profile.spec.ts`        | Add a CV as a file: `createProfileResource`, the upload under the Storage rules, the trigger that reads it, the resource followed to "Ready", its item in the skill map, `updateSkillMapItem` (the item starred, still starred after a reload), then `removeProfileResource` and an empty profile. Pasted text read; a link to a host ending in `.invalid` fails, says "We couldn't read this page" and is removed |
 
 **The backend commit is pinned** in `e2e-emulators/backend-commit`. The pipeline tests against that
 commit, so a change in the backend cannot break an unrelated pull request here. Move it forward on

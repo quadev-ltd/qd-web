@@ -1,8 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 
 import { SkillMapSummary } from './SkillMapSummary';
 
 import { itemFixture } from '@/testUtil/profileFixtures';
+import { renderWithProviders } from '@/testUtil/renderWithProviders';
+
+const render = (ui: React.ReactElement) => renderWithProviders(ui);
 
 const count = (label: string) =>
   screen.getByText(label).parentElement?.querySelector('dd')?.textContent;
@@ -52,5 +55,13 @@ describe('SkillMapSummary', () => {
       screen.getByRole('heading', { level: 2, name: 'profile.skillMapTitle' }),
     ).toBeInTheDocument();
     expect(screen.getByText('profile.skillMapCount')).toBeInTheDocument();
+  });
+
+  it('leads into the skill map', () => {
+    render(<SkillMapSummary items={[itemFixture()]} />);
+
+    expect(
+      screen.getByRole('link', { name: 'profile.openSkillMapButton' }),
+    ).toHaveAttribute('href', '/profile/skill-map');
   });
 });

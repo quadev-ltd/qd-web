@@ -22,7 +22,11 @@ import {
   VERIFY_EMAIL_PATH,
 } from '@/core/auth/paths';
 import { env } from '@/core/env';
-import { PROFILE_PATH, RESOURCE_PATH } from '@/core/profile/paths';
+import {
+  PROFILE_PATH,
+  RESOURCE_PATH,
+  SKILL_MAP_ITEM_PATH,
+} from '@/core/profile/paths';
 import { useAppDispatch } from '@/core/state/hooks';
 import { accountDeletedNoticeCleared } from '@/core/state/slices/exitSlice';
 import DeleteAccountInfoScreen from '@/screens/DeleteAccountInfo/DeleteAccountInfoScreen';
@@ -116,6 +120,16 @@ const accountRoutes: RouteObject[] = [
               Component: (
                 await import('@/screens/Profile/Resource/ResourceScreen')
               ).ResourceScreen,
+            }),
+          },
+          // The skill map, and one item of it: the same page, so the search and the
+          // filters stay as they are while items are opened.
+          {
+            path: SKILL_MAP_ITEM_PATH,
+            lazy: async () => ({
+              Component: (
+                await import('@/screens/Profile/SkillMap/SkillMapScreen')
+              ).SkillMapScreen,
             }),
           },
         ],

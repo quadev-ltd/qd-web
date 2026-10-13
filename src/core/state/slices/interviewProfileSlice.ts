@@ -96,6 +96,36 @@ export const interviewProfileSlice = createSlice({
     itemsLoaded: (state, { payload }: PayloadAction<SkillMapItem[]>) => {
       state.items = payload;
     },
+    /** The backend accepted a change to one item: the same change is made here. */
+    itemChanged: (
+      state,
+      {
+        payload: { id, ...change },
+      }: PayloadAction<
+        { id: string } & Partial<
+          Pick<SkillMapItem, 'text' | 'starred' | 'hidden' | 'edited'>
+        >
+      >,
+    ) => {
+      const item = state.items.find(candidate => candidate.id === id);
+      if (item) {
+        Object.assign(item, change);
+      }
+    },
+    /** The backend removed one item: its resource counts one less. */
+    itemRemoved: (state, { payload: id }: PayloadAction<string>) => {
+      const item = state.items.find(candidate => candidate.id === id);
+      if (!item) {
+        return;
+      }
+      state.items = state.items.filter(candidate => candidate.id !== id);
+      const resource = state.resources.find(
+        candidate => candidate.id === item.resourceId,
+      );
+      if (resource) {
+        resource.itemCount = Math.max(0, resource.itemCount - 1);
+      }
+    },
     /** The backend accepted one more resource today. */
     extractionCounted: state => {
       state.extractionsToday += 1;
@@ -121,6 +151,8 @@ export const {
   resourceChanged,
   resourceRemoved,
   itemsLoaded,
+  itemChanged,
+  itemRemoved,
   extractionCounted,
   dailyLimitRefused,
 } = interviewProfileSlice.actions;
