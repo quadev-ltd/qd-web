@@ -1,12 +1,13 @@
-// The interview profile: what the candidate added (a CV and other resources) and the way
-// into the skill map. No screen of the app to mirror yet: the website has it first.
+// The interview profile: what the candidate added (a CV and other resources) and what was
+// found in them. No screen of the app to mirror yet: the website has it first.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate } from 'react-router';
 
 import AddResourcePanel from './AddResource/AddResourcePanel';
 import { PROFILE_MAIN } from './ProfileRoutes';
 import ResourceList from './ResourceList';
-import SkillMapSummary from './SkillMapSummary';
+import WhatWeFound from './WhatWeFound';
 
 import Icon from '@/components/Icon';
 import SignedInShell from '@/components/layout/SignedInShell';
@@ -28,12 +29,20 @@ import {
   isProfileFull,
 } from '@/core/profile/limits';
 
+/** What a link to the profile can ask for: "Add your CV" elsewhere opens that panel here. */
+const panelFromState = (state: unknown): 'cv' | undefined =>
+  (state as { add?: unknown } | null)?.add === 'cv' ? 'cv' : undefined;
+
 export const ProfileScreen: React.FC = () => {
   const { t } = useTranslation();
+  const location = useLocation();
+  const navigate = useNavigate();
   const profile = useInterviewProfile();
   const { reload } = useInterviewProfileActions();
   // Which "Add a resource" panel is open: every kind of resource, or a CV only.
-  const [adding, setAdding] = useState<'any' | 'cv'>();
+  const [adding, setAdding] = useState<'any' | 'cv' | undefined>(() =>
+    panelFromState(location.state),
+  );
 
   const { status, resources, items } = profile;
   const isLoaded = status === 'loaded';
@@ -140,14 +149,23 @@ export const ProfileScreen: React.FC = () => {
               <ResourceList resources={resources} />
             </div>
             <div className="min-w-0 flex-[1_1_320px]">
-              <SkillMapSummary items={items} />
+              <WhatWeFound items={items} />
             </div>
           </div>
         )}
       </div>
 
       {adding && (
-        <AddResourcePanel kind={adding} onClose={() => setAdding(undefined)} />
+        <AddResourcePanel
+          kind={adding}
+          onClose={() => {
+            setAdding(undefined);
+            // Asked for by the link that led here: once is enough, also after a reload.
+            if (panelFromState(location.state)) {
+              navigate(location.pathname, { replace: true, state: null });
+            }
+          }}
+        />
       )}
     </SignedInShell>
   );

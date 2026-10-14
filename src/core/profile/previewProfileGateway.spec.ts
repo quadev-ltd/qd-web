@@ -293,13 +293,42 @@ describe('previewProfileGateway', () => {
       await expect(gateway.getResources(UID)).resolves.toEqual([]);
     });
 
-    it('acts for nobody before a profile was read', async () => {
+    it('acts for nobody while nobody is signed in and no profile was read', async () => {
       const gateway = createPreviewProfileGateway({ storage: null });
 
       expect(await codeOf(gateway.createResource(note))).toBe(
         ProfileErrorCode.SignedOut,
       );
       expect(() => gateway.controls.seed()).toThrow();
+    });
+
+    it('acts for whoever the preview auth gateway has signed in, before any read', async () => {
+      const storage = memoryStorage();
+      storage.setItem(
+        PREVIEW_GATEWAY_MARKER,
+        JSON.stringify({ accounts: [], currentUid: UID }),
+      );
+      // A second gateway of the same page: the home read the profile through another.
+      const gateway = createPreviewProfileGateway({ storage });
+
+      const { resourceId } = await gateway.createResource(note);
+
+      expect((await gateway.getResource(UID, resourceId))?.title).toBe(
+        'Stories for interviews',
+      );
+      expect(() => gateway.controls.seed()).not.toThrow();
+      await expect(gateway.getResources('another-user')).resolves.toEqual([]);
+    });
+
+    it('goes by the last profile read when the session cannot be told', async () => {
+      const storage = memoryStorage();
+      storage.setItem(PREVIEW_GATEWAY_MARKER, 'not json');
+      const gateway = createPreviewProfileGateway({ storage });
+      await gateway.getResources(UID);
+
+      await expect(gateway.createResource(note)).resolves.toMatchObject({
+        resourceId: expect.any(String),
+      });
     });
   });
 

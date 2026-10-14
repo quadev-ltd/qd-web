@@ -319,6 +319,8 @@ describe('previewGateway', () => {
       });
       await expect(gateway.getFlagOverrides(created.uid)).resolves.toEqual({});
       await expect(gateway.getFlagOverrides('nobody')).resolves.toEqual({});
+      // Nothing is released to everyone in the preview.
+      await expect(gateway.getRemoteFlags()).resolves.toEqual({});
     });
 
     it('can set a flag for the signed-in account, and keeps it across a reload', async () => {

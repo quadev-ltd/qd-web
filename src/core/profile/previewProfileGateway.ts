@@ -152,9 +152,21 @@ export const createPreviewProfileGateway = ({
 }: PreviewProfileOptions = {}): PreviewProfileGateway => {
   const state = readState(storage);
   // The callables of the backend act on whoever is signed in. The fake has no session of
-  // its own: it acts on the account whose profile was read last, which a page always does
-  // before it changes anything.
-  let currentUid: string | null = null;
+  // its own: it asks the preview auth gateway's record of who is signed in (the same
+  // storage), and without one it acts on the account whose profile was read last.
+  let lastReadUid: string | null = null;
+  const signedInUid = (): string | null => {
+    try {
+      const session = JSON.parse(
+        storage?.getItem(PREVIEW_GATEWAY_MARKER) ?? 'null',
+      ) as { currentUid?: unknown } | null;
+      return typeof session?.currentUid === 'string'
+        ? session.currentUid
+        : null;
+    } catch {
+      return null;
+    }
+  };
   let nextFailure: ProfileResourceFailure | null = null;
   let nextStalls = false;
   const uploaded = new Set<string>();
@@ -237,18 +249,20 @@ export const createPreviewProfileGateway = ({
   };
 
   const read = (uid: string): PreviewProfile => {
-    currentUid = uid;
+    lastReadUid = uid;
     const profile = profileOf(uid);
     settle(profile);
     return profile;
   };
 
-  const currentProfile = (): PreviewProfile => {
-    if (!currentUid) {
+  const currentUid = (): string => {
+    const uid = signedInUid() ?? lastReadUid;
+    if (!uid) {
       throw new ProfileError(ProfileErrorCode.SignedOut);
     }
-    return read(currentUid);
+    return uid;
   };
+  const currentProfile = (): PreviewProfile => read(currentUid());
 
   const startReading = (resource: StoredResource) => {
     resource.status = 'processing';
@@ -313,7 +327,7 @@ export const createPreviewProfileGateway = ({
           settlesAt: null,
           outcome: entry.failure ?? 'ready',
         };
-        resource.storagePath = `users/${currentUid}/interview-docs/${resource.id}/document`;
+        resource.storagePath = `users/${currentUid()}/interview-docs/${resource.id}/document`;
         resource.itemCount = addItems(profile, resource.id, entry.facts, at);
         profile.resources.push(resource);
       });
@@ -370,7 +384,7 @@ export const createPreviewProfileGateway = ({
               ? 'text/uri-list'
               : 'text/plain',
         ...(link ? { url: link } : {}),
-        storagePath: `users/${currentUid}/interview-docs/${id}/document`,
+        storagePath: `users/${currentUid()}/interview-docs/${id}/document`,
         status: 'awaitingUpload',
         itemCount: 0,
         createdAt: at,

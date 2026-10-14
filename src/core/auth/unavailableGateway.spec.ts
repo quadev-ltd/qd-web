@@ -44,6 +44,7 @@ describe('unavailableGateway', () => {
     await expect(unavailableGateway.getFlagOverrides('uid-1')).resolves.toEqual(
       {},
     );
+    await expect(unavailableGateway.getRemoteFlags()).resolves.toEqual({});
   });
 
   it.each([

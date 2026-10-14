@@ -12,7 +12,7 @@ import {
   subscribeToAuthState,
 } from './auth';
 import { getClaims } from './claims';
-import { getFlagOverrides } from './flags';
+import { getFlagOverrides, getRemoteFlags } from './flags';
 import { createProfileIfMissing, saveProfile, watchProfile } from './profile';
 
 import { type AuthGateway } from '@/core/auth/gateway';
@@ -34,6 +34,7 @@ export const createFirebaseGateway = (): AuthGateway => ({
   saveProfile,
   getClaims,
   getFlagOverrides,
+  getRemoteFlags,
   signUpWithEmail,
   signInWithEmail,
   sendVerificationEmail,

@@ -21,6 +21,9 @@ vi.mock(import('@/core/flags/FlagsProvider'), async importOriginal => ({
   useFlag: vi.fn(() => false),
 }));
 
+// The starting card has its own spec: here it only matters whether it is there.
+vi.mock('./StartCard', () => ({ default: () => <p>the starting card</p> }));
+
 const mockUseFlag = vi.mocked(useFlag);
 
 const user: SessionUser = {
@@ -123,32 +126,51 @@ describe('HomeScreen', () => {
       expect(cards()).toHaveLength(3);
     });
 
-    it('says "Coming soon" on every tool while the interviewAssistant flag is off', () => {
+    it('says "Coming soon" on every tool: none of the three is built on the website yet', () => {
       renderHome();
 
-      expect(mockUseFlag).toHaveBeenCalledWith('interviewAssistant');
       for (const card of cards()) {
         expect(card).toHaveTextContent('home.comingSoonChip');
       }
     });
 
-    it('marks the two interview tools as available when the interviewAssistant flag is on; the CV tool has no flag yet', () => {
+    it('says the same to an account with the interview tools on', () => {
       mockUseFlag.mockImplementation(key => key === 'interviewAssistant');
       renderHome();
 
-      const [mockInterview, liveInterview, cvTool] = cards();
-      expect(mockInterview).toHaveTextContent('home.availableChip');
-      expect(liveInterview).toHaveTextContent('home.availableChip');
-      expect(cvTool).toHaveTextContent('home.comingSoonChip');
-      expect(cvTool).not.toHaveTextContent('home.availableChip');
+      for (const card of cards()) {
+        expect(card).toHaveTextContent('home.comingSoonChip');
+        expect(card).not.toHaveTextContent('home.availableChip');
+      }
     });
 
     it('reads no other flag', () => {
       renderHome();
 
+      expect(mockUseFlag).toHaveBeenCalledWith('interviewAssistant');
       expect(
         mockUseFlag.mock.calls.every(([key]) => key === 'interviewAssistant'),
       ).toBe(true);
+    });
+  });
+
+  describe('the starting card', () => {
+    it('is there for an account with the interview tools on, above the tools', () => {
+      mockUseFlag.mockImplementation(key => key === 'interviewAssistant');
+      renderHome();
+
+      const card = screen.getByText('the starting card');
+      expect(card).toBeInTheDocument();
+      expect(
+        card.compareDocumentPosition(cards()[0]) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it('is not there for anyone else, so nothing of the profile is loaded', () => {
+      renderHome();
+
+      expect(screen.queryByText('the starting card')).not.toBeInTheDocument();
     });
   });
 

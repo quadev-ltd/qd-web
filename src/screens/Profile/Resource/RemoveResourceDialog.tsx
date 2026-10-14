@@ -18,10 +18,8 @@ import { resourceRemoved } from '@/core/state/slices/interviewProfileSlice';
 
 export interface RemoveResourceDialogProps {
   resourceId: string;
-  /** How many items of the skill map came from the resource, and go with it. */
+  /** How many items were read from the resource, and go with it. */
   itemCount: number;
-  /** How many of those the candidate edited: work that is lost too. */
-  editedCount: number;
   onCancel: () => void;
   /** The resource is gone, from the backend and from the list. */
   onRemoved: () => void;
@@ -34,7 +32,6 @@ export interface RemoveResourceDialogProps {
 export const RemoveResourceDialog: React.FC<RemoveResourceDialogProps> = ({
   resourceId,
   itemCount,
-  editedCount,
   onCancel,
   onRemoved,
 }) => {
@@ -83,14 +80,10 @@ export const RemoveResourceDialog: React.FC<RemoveResourceDialogProps> = ({
       <p className="text-[16px] leading-normal text-muted">
         {itemCount === 0
           ? t('resource.removeDialogNoItems')
-          : `${
-              editedCount > 0
-                ? t('resource.removeDialogItemsEdited', {
-                    count: itemCount,
-                    edited: editedCount,
-                  })
-                : t('resource.removeDialogItems', { count: itemCount })
-            } ${t('resource.removeDialogBriefs', { count: itemCount })}`}
+          : `${t('resource.removeDialogItems', { count: itemCount })} ${t(
+              'resource.removeDialogBriefs',
+              { count: itemCount },
+            )}`}
       </p>
       {failed && (
         <Banner ref={error} tone="danger" role="alert">

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
 import { DocumentIcon, MicrophoneIcon, SoundWaveIcon } from './icons';
+import StartCard from './StartCard';
 import ToolCard from './ToolCard';
 
 import Arcs from '@/components/layout/Arcs';
@@ -45,8 +46,9 @@ export const HomeScreen: React.FC = () => {
   const user = useSessionUser();
   const profile = useProfile();
   const signOut = useSignOut();
-  // Mock interview and Live interview are the two halves of Interview Assist, so they
-  // share its flag. The CV tool has no flag in the registry yet: it is always "Coming soon".
+  // The interview tools are opened to accounts with this flag. What exists of them on the
+  // website so far is the profile: the home then starts with "Add your CV". The three
+  // tools below are not built here yet, so they say "Coming soon" to everyone.
   const interviewAssistant = useFlag('interviewAssistant');
 
   const firstName = profile?.firstName ?? '';
@@ -80,18 +82,19 @@ export const HomeScreen: React.FC = () => {
 
       <div className="px-gutter pb-16">
         <div className="relative mx-auto -mt-16 flex max-w-[1120px] flex-col gap-10">
+          {interviewAssistant && <StartCard />}
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] gap-5">
             <ToolCard
               icon={<MicrophoneIcon />}
               title={t('home.mockInterviewTitle')}
               description={t('home.mockInterviewDescription')}
-              available={interviewAssistant}
+              available={false}
             />
             <ToolCard
               icon={<SoundWaveIcon />}
               title={t('home.liveInterviewTitle')}
               description={t('home.liveInterviewDescription')}
-              available={interviewAssistant}
+              available={false}
             />
             <ToolCard
               icon={<DocumentIcon />}

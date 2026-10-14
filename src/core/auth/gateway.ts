@@ -56,6 +56,12 @@ export interface AuthGateway {
    * a change made by an admin shows the next time the site is opened.
    */
   getFlagOverrides(uid: string): Promise<FlagValues>;
+  /**
+   * The feature flags set for everyone (Remote Config in the backend): a release, or a
+   * feature switched off again. Only the flags that are set; empty when none is. They decide
+   * where the user has no override of their own.
+   */
+  getRemoteFlags(): Promise<FlagValues>;
 
   // ---------- Email and password ----------
 

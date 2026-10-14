@@ -5,8 +5,7 @@
  * a flag here that the backend does not have.
  *
  * Evaluation order (the same as the app): the per-user override in `featureFlags/{uid}`, then
- * Remote Config, then the code default below. The website reads the override (FlagsProvider);
- * it has no Remote Config client yet, so a flag is on only for the accounts it was set for.
+ * Remote Config, then the code default below (FlagsProvider).
  */
 
 export interface FlagDefinition {

@@ -1,8 +1,12 @@
 import { doc, getDoc } from 'firebase/firestore/lite';
 
-import { getFlagOverrides } from './flags';
+import { getFlagOverrides, getRemoteFlags } from './flags';
+import * as remoteConfigModule from './remoteConfig';
 
 vi.mock('./app', () => ({ db: vi.fn(() => ({ name: 'db' })) }));
+vi.mock('./remoteConfig', () => ({
+  getRemoteFlags: vi.fn(() => Promise.resolve({ interviewAssistant: true })),
+}));
 vi.mock('firebase/firestore/lite', () => ({
   doc: vi.fn((_db: unknown, ...path: string[]) => ({ path: path.join('/') })),
   getDoc: vi.fn(),
@@ -53,5 +57,21 @@ describe('the flag overrides of a user', () => {
     vi.mocked(getDoc).mockRejectedValue(denied);
 
     await expect(getFlagOverrides('uid-1')).rejects.toBe(denied);
+  });
+});
+
+describe('the flags set for everyone', () => {
+  it('come from the Remote Config file, loaded on demand', async () => {
+    await expect(getRemoteFlags()).resolves.toEqual({
+      interviewAssistant: true,
+    });
+    expect(remoteConfigModule.getRemoteFlags).toHaveBeenCalledTimes(1);
+  });
+
+  it('pass a failed read on', async () => {
+    const failure = { code: 'remoteconfig/fetch-timeout' };
+    vi.mocked(remoteConfigModule.getRemoteFlags).mockRejectedValueOnce(failure);
+
+    await expect(getRemoteFlags()).rejects.toBe(failure);
   });
 });

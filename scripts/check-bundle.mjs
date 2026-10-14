@@ -84,6 +84,8 @@ const FIREBASE_ADDRESSES = [
   ['cloudfunctions.net', '@firebase/functions'],
   ['firebaseappcheck.googleapis.com', '@firebase/app-check'],
   ['firebasestorage.googleapis.com', '@firebase/storage'],
+  // The flags from Remote Config (src/core/firebase/remoteConfig.ts).
+  ['firebaseremoteconfig.googleapis.com', '@firebase/remote-config'],
 ];
 // The production configuration, read as the build read it (.env.prod, then the environment).
 const accountEnabled =

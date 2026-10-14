@@ -25,7 +25,6 @@ const setUp = (props: Partial<RemoveResourceDialogProps> = {}) => {
     <RemoveResourceDialog
       resourceId="r1"
       itemCount={31}
-      editedCount={4}
       onCancel={onCancel}
       onRemoved={onRemoved}
       {...props}
@@ -65,22 +64,14 @@ describe('RemoveResourceDialog', () => {
     const dialog = screen.getByRole('dialog', {
       name: 'resource.removeDialogTitle',
     });
-    expect(dialog).toHaveTextContent('resource.removeDialogItemsEdited');
+    expect(dialog).toHaveTextContent('resource.removeDialogItems');
     expect(dialog).toHaveTextContent('resource.removeDialogBriefs');
     expect(confirm()).toHaveTextContent('resource.removeConfirmItemsButton');
     expect(gateway.removeResource).not.toHaveBeenCalled();
   });
 
-  it('does not mention edits when none of the items was edited', () => {
-    setUp({ editedCount: 0 });
-
-    const dialog = screen.getByRole('dialog');
-    expect(dialog).toHaveTextContent('resource.removeDialogItems');
-    expect(dialog).not.toHaveTextContent('resource.removeDialogItemsEdited');
-  });
-
   it('says so when the resource has no items, and names only the resource on the button', () => {
-    setUp({ itemCount: 0, editedCount: 0 });
+    setUp({ itemCount: 0 });
 
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveTextContent('resource.removeDialogNoItems');

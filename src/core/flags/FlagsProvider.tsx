@@ -1,7 +1,6 @@
 // Mirrors qd-mobile src/core/flags/FlagsProvider.tsx: the same context, `useFlag` and
 // `useFlags`, and the same order: the user's overrides, then Remote Config, then the code
-// defaults. The website reads the overrides (through the auth gateway); it has no Remote
-// Config client yet, so that layer is empty.
+// defaults. The website reads the first two through the auth gateway.
 import {
   createContext,
   type ReactNode,
@@ -26,9 +25,9 @@ import { useSessionUser } from '@/core/session/hooks';
 export interface FlagsState {
   flags: EvaluatedFlags;
   /**
-   * False while the signed-in user's overrides are being read. Until then every flag has
-   * its default (off), so a page that depends on a flag waits for this before it says
-   * "not available".
+   * False while the signed-in user's flags are being read. Until then every flag has its
+   * default (off), so a page that depends on a flag waits for this before it says "not
+   * available".
    */
   ready: boolean;
 }
@@ -39,14 +38,15 @@ export const FlagsContext = createContext<FlagsState>({
   ready: true,
 });
 
-const NO_OVERRIDES: FlagValues = {};
-const NO_REMOTE_VALUES: FlagValues = {};
+const NO_VALUES: FlagValues = {};
 
 /**
- * Evaluates the feature flags for whoever is signed in. The overrides are read once per
- * user (Firestore Lite has no listener): a flag an admin changes shows the next time the
- * site is opened. If they cannot be read, the defaults apply. Mount it inside
- * SessionProvider.
+ * Evaluates the feature flags for whoever is signed in: the user's overrides, then what
+ * Remote Config sets for everyone, then the code defaults. Both are read once per user
+ * (Firestore Lite has no listener): a flag an admin changes, or a release, shows the next
+ * time the site is opened. A layer that cannot be read decides nothing, so the next one
+ * does. A visitor who is not signed in gets the defaults, and nothing is read for them.
+ * Mount it inside SessionProvider.
  */
 export const FlagsProvider: React.FC<{ children: ReactNode }> = ({
   children,
@@ -54,38 +54,45 @@ export const FlagsProvider: React.FC<{ children: ReactNode }> = ({
   const gateway = useAuthGateway();
   const uid = useSessionUser()?.uid ?? null;
   // What was read, and for whom: the overrides of a previous user are never applied.
-  const [read, setRead] = useState<{ uid: string; overrides: FlagValues }>();
+  const [read, setRead] = useState<{
+    uid: string;
+    overrides: FlagValues;
+    remote: FlagValues;
+  }>();
 
   useEffect(() => {
     if (!uid) {
       return undefined;
     }
     let active = true;
-    gateway.getFlagOverrides(uid).then(
-      overrides => {
-        if (active) {
-          setRead({ uid, overrides });
-        }
-      },
-      error => {
-        logAuthError('getFlagOverrides', error, uid);
-        if (active) {
-          setRead({ uid, overrides: NO_OVERRIDES });
-        }
-      },
-    );
+    const layer = (operation: string, values: Promise<FlagValues>) =>
+      values.catch(error => {
+        logAuthError(operation, error, uid);
+        return NO_VALUES;
+      });
+    Promise.all([
+      layer('getFlagOverrides', gateway.getFlagOverrides(uid)),
+      layer('getRemoteFlags', gateway.getRemoteFlags()),
+    ]).then(([overrides, remote]) => {
+      if (active) {
+        setRead({ uid, overrides, remote });
+      }
+    });
     return () => {
       active = false;
     };
   }, [gateway, uid]);
 
-  const overrides = uid && read?.uid === uid ? read.overrides : undefined;
+  const current = uid && read?.uid === uid ? read : undefined;
   const state = useMemo<FlagsState>(
     () => ({
-      flags: evaluateAll(overrides ?? NO_OVERRIDES, NO_REMOTE_VALUES),
-      ready: !uid || overrides !== undefined,
+      flags: evaluateAll(
+        current?.overrides ?? NO_VALUES,
+        current?.remote ?? NO_VALUES,
+      ),
+      ready: !uid || current !== undefined,
     }),
-    [overrides, uid],
+    [current, uid],
   );
 
   return (

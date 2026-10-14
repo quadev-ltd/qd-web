@@ -18,6 +18,21 @@ const PATHS = {
       <path d="M12 7v5l3 2" />
     </>
   ),
+  down: <path d="M6 9l6 6 6-6" />,
+  download: (
+    <>
+      <path d="M12 4v12" />
+      <path d="M7 11l5 5 5-5" />
+      <path d="M4 20h16" />
+    </>
+  ),
+  external: (
+    <>
+      <path d="M14 5h5v5" />
+      <path d="M19 5l-8 8" />
+      <path d="M18 14v5H5V6h5" />
+    </>
+  ),
   eyeOff: (
     <>
       <path d="M3 3l18 18" />
@@ -32,6 +47,13 @@ const PATHS = {
       <path d="M14 3v5h5" />
       <path d="M10 13h6" />
       <path d="M10 17h6" />
+    </>
+  ),
+  help: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7" />
+      <path d="M12 16.8v.01" />
     </>
   ),
   left: <path d="M15 6l-6 6 6 6" />,
@@ -67,6 +89,7 @@ const PATHS = {
       <path d="M14 11v6" />
     </>
   ),
+  up: <path d="M6 15l6-6 6 6" />,
   upload: (
     <>
       <path d="M12 16V4" />

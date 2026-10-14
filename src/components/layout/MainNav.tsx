@@ -7,7 +7,7 @@ const LINK =
 export interface MainNavProps {
   /** The signed-in home. */
   homePath: string;
-  /** The interview profile. Its pages (a resource, the skill map) keep it marked. */
+  /** The interview profile. Its pages (a resource) keep it marked. */
   profilePath: string;
   /** The account section of the home. */
   accountPath: string;

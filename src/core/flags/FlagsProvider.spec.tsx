@@ -99,6 +99,109 @@ describe('FlagsProvider', () => {
     expect(gateway.getFlagOverrides).toHaveBeenCalledWith('uid-1');
   });
 
+  describe('with Remote Config', () => {
+    it('reads what is set for everyone, once, next to the overrides', async () => {
+      const { gateway, wrapper } = setUp(user('uid-1'));
+      gateway.getRemoteFlags.mockResolvedValue({ interviewAssistant: true });
+
+      render(<Flags />, { wrapper });
+
+      expect(
+        await screen.findByText('interviewAssistant=true ready=true'),
+      ).toBeInTheDocument();
+      expect(gateway.getRemoteFlags).toHaveBeenCalledTimes(1);
+      expect(gateway.getFlagOverrides).toHaveBeenCalledTimes(1);
+    });
+
+    it('lets the user’s override win in both directions', async () => {
+      const on = setUp(user('uid-1'));
+      on.gateway.getRemoteFlags.mockResolvedValue({
+        interviewAssistant: false,
+      });
+      on.gateway.getFlagOverrides.mockResolvedValue({
+        interviewAssistant: true,
+      });
+      const first = render(<Flags />, { wrapper: on.wrapper });
+      expect(
+        await screen.findByText('interviewAssistant=true ready=true'),
+      ).toBeInTheDocument();
+      first.unmount();
+
+      const off = setUp(user('uid-1'));
+      off.gateway.getRemoteFlags.mockResolvedValue({
+        interviewAssistant: true,
+      });
+      off.gateway.getFlagOverrides.mockResolvedValue({
+        interviewAssistant: false,
+      });
+      render(<Flags />, { wrapper: off.wrapper });
+      expect(
+        await screen.findByText('interviewAssistant=false ready=true'),
+      ).toBeInTheDocument();
+    });
+
+    it('is not ready until both have answered', async () => {
+      const { gateway, wrapper } = setUp(user('uid-1'));
+      let answer: (flags: object) => void = () => undefined;
+      gateway.getRemoteFlags.mockReturnValue(
+        new Promise(resolve => {
+          answer = resolve;
+        }),
+      );
+      render(<Flags />, { wrapper });
+
+      await waitFor(() => expect(gateway.getFlagOverrides).toHaveBeenCalled());
+      expect(
+        screen.getByText('interviewAssistant=false ready=false'),
+      ).toBeInTheDocument();
+
+      answer({ interviewAssistant: true });
+
+      expect(
+        await screen.findByText('interviewAssistant=true ready=true'),
+      ).toBeInTheDocument();
+    });
+
+    it('goes on with the overrides when Remote Config cannot be read, and logs it', async () => {
+      const { gateway, wrapper } = setUp(user('uid-1'));
+      gateway.getRemoteFlags.mockRejectedValue({
+        code: 'remoteconfig/fetch-timeout',
+      });
+      gateway.getFlagOverrides.mockResolvedValue({ interviewAssistant: true });
+
+      render(<Flags />, { wrapper });
+
+      expect(
+        await screen.findByText('interviewAssistant=true ready=true'),
+      ).toBeInTheDocument();
+      expect(mockLogger.logError).toHaveBeenCalledWith(
+        new Error(
+          'getRemoteFlags failed: code=remoteconfig/fetch-timeout uid=uid-1',
+        ),
+      );
+    });
+
+    it('goes on with Remote Config when the overrides cannot be read', async () => {
+      const { gateway, wrapper } = setUp(user('uid-1'));
+      gateway.getFlagOverrides.mockRejectedValue({ code: 'unavailable' });
+      gateway.getRemoteFlags.mockResolvedValue({ interviewAssistant: true });
+
+      render(<Flags />, { wrapper });
+
+      expect(
+        await screen.findByText('interviewAssistant=true ready=true'),
+      ).toBeInTheDocument();
+    });
+
+    it('reads nothing for a visitor who is not signed in', () => {
+      const { gateway, wrapper } = setUp();
+
+      render(<Flags />, { wrapper });
+
+      expect(gateway.getRemoteFlags).not.toHaveBeenCalled();
+    });
+  });
+
   it('lets an override turn a flag off, and leaves the others at their default', async () => {
     const { gateway, wrapper } = setUp(user('uid-1'));
     gateway.getFlagOverrides.mockResolvedValue({ interviewAssistant: false });
