@@ -81,30 +81,50 @@ describe('StartCard', () => {
     expect(gateway.getResources).toHaveBeenCalledExactlyOnceWith('uid-1');
   });
 
-  it('says the CV is in the profile once it is, and leads there', () => {
+  it('says the CV is in the profile once it is, with what was read from it, and leads to its page', () => {
     setUp(
       loaded({
-        resources: [resourceFixture({ type: 'cv' })],
+        resources: [resourceFixture({ id: 'r1', type: 'cv' })],
         items: [itemFixture({ id: '1' }), itemFixture({ id: '2' })],
       }),
     );
 
     const link = screen.getByRole('link', { name: /home\.startDoneTitle/ });
-    expect(link).toHaveAttribute('href', '/profile');
+    expect(link).toHaveAttribute('href', '/profile/resources/r1');
     expect(link).toHaveTextContent('home.startDoneDescription');
     expect(screen.queryByText('home.startTitle')).not.toBeInTheDocument();
   });
 
-  it.each(['awaitingUpload', 'processing'] as const)(
-    'counts a CV that is still %s as added',
-    status => {
+  it('is about the newest CV when there are two', () => {
+    setUp(
+      loaded({
+        resources: [
+          resourceFixture({ id: 'old', type: 'cv', createdAt: 1_000 }),
+          resourceFixture({ id: 'new', type: 'cv', createdAt: 9_000 }),
+        ],
+      }),
+    );
+
+    expect(
+      screen.getByRole('link', { name: /home\.startDoneTitle/ }),
+    ).toHaveAttribute('href', '/profile/resources/new');
+  });
+
+  it.each([
+    ['awaitingUpload', 'profile.statusAwaitingUpload'],
+    ['processing', 'profile.statusProcessing'],
+  ] as const)(
+    'counts a CV that is still %s as added, and says where it is',
+    (status, text) => {
       setUp(
         loaded({
           resources: [resourceFixture({ type: 'cv', status, itemCount: 0 })],
         }),
       );
 
-      expect(screen.getByText('home.startDoneTitle')).toBeInTheDocument();
+      const link = screen.getByRole('link', { name: /home\.startDoneTitle/ });
+      expect(link).toHaveTextContent(text);
+      expect(link).not.toHaveTextContent('home.startDoneDescription');
     },
   );
 

@@ -1,5 +1,6 @@
 // The starting point of the home for an account with the interview tools (D58): "Add your
-// CV", which everything else builds on; once a CV is in the profile, one line that says so.
+// CV", which everything else builds on; once a CV is in the profile, one line that says so
+// and leads to it.
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
@@ -11,7 +12,8 @@ import {
   InterviewProfileProvider,
   useInterviewProfile,
 } from '@/core/profile/InterviewProfileProvider';
-import { PROFILE_PATH } from '@/core/profile/paths';
+import { itemsOfResource } from '@/core/profile/items';
+import { PROFILE_PATH, resourcePath } from '@/core/profile/paths';
 import { ProfileGatewayProvider } from '@/core/profile/ProfileGatewayProvider';
 
 const Content: React.FC = () => {
@@ -23,15 +25,16 @@ const Content: React.FC = () => {
   if (status !== 'loaded') {
     return null;
   }
-  // A CV that could not be read is not in the profile: the invitation stays.
-  const hasCv = resources.some(
-    resource => resource.type === 'cv' && resource.status !== 'failed',
-  );
-  if (hasCv) {
+  // A CV that could not be read is not in the profile: the invitation stays. With more than
+  // one, the line is about the newest.
+  const cv = resources
+    .filter(resource => resource.type === 'cv' && resource.status !== 'failed')
+    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0];
+  if (cv) {
     return (
       <Card elevation="raised" className="p-4">
         <Link
-          to={PROFILE_PATH}
+          to={resourcePath(cv.id)}
           className="flex items-center gap-3 text-text no-underline hover:text-text">
           <span
             aria-hidden="true"
@@ -43,7 +46,15 @@ const Content: React.FC = () => {
               {t('home.startDoneTitle')}
             </span>
             <span className="text-sm leading-normal text-muted">
-              {t('home.startDoneDescription', { count: items.length })}
+              {cv.status === 'ready'
+                ? t('home.startDoneDescription', {
+                    count: itemsOfResource(items, cv.id).length,
+                  })
+                : t(
+                    cv.status === 'processing'
+                      ? 'profile.statusProcessing'
+                      : 'profile.statusAwaitingUpload',
+                  )}
             </span>
           </span>
           <span className="flex text-muted">

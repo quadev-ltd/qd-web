@@ -108,9 +108,7 @@ describe('ProfileScreen', () => {
         screen.getByRole('button', { name: 'profile.addSomethingElseButton' }),
       ).toBeEnabled();
       expect(addButton()).not.toBeInTheDocument();
-      expect(
-        screen.queryByText('profile.skillMapTitle'),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText('profile.foundTitle')).not.toBeInTheDocument();
     });
 
     it('opens "Add your CV": a file or pasted text, no link', async () => {
@@ -163,8 +161,38 @@ describe('ProfileScreen', () => {
     });
   });
 
+  describe('opened by "Add your CV" from another page', () => {
+    it('opens the CV panel at once, and only once', async () => {
+      renderProfilePage(<ProfileScreen />, {
+        interviewProfile: loaded({ resources: [] }),
+        routeState: { add: 'cv' },
+      });
+
+      expect(
+        screen.getByRole('dialog', { name: 'addResource.cvChoiceTitle' }),
+      ).toBeInTheDocument();
+
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: 'sidePanel.closeAccessibilityLabel',
+        }),
+      );
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('opens nothing for a link that asks for something else', () => {
+      renderProfilePage(<ProfileScreen />, {
+        interviewProfile: loaded(),
+        routeState: { add: 'everything' },
+      });
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
   describe('a profile with resources', () => {
-    it('reads the profile through the gateway and lists it with the skill map', async () => {
+    it('reads the profile through the gateway and lists it with what was found', async () => {
       const gateway = createMockProfileGateway();
       gateway.getResources.mockResolvedValue([
         resourceFixture({ id: 'a', title: 'Maya Okafor CV 2026' }),
@@ -212,7 +240,7 @@ describe('ProfileScreen', () => {
         'profile.typeNoteStories for interviewsprofile.failedEmpty',
       ]);
       expect(
-        screen.getByRole('heading', { name: 'profile.skillMapTitle' }),
+        screen.getByRole('heading', { name: 'profile.foundTitle' }),
       ).toBeInTheDocument();
       expect(addButton()).toBeEnabled();
       expect(screen.queryByText('profile.emptyTitle')).not.toBeInTheDocument();

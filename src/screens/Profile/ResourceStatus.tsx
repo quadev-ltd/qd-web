@@ -24,8 +24,8 @@ const FAILURE_KEYS = {
 const LINE = 'flex items-center gap-1.5 text-sm leading-normal';
 
 /**
- * Where a resource is, in one line: waiting for its file, being read, read (with what it
- * added to the skill map) or not read (with why). The line is a live region: when the
+ * Where a resource is, in one line: waiting for its file, being read, read (with how many
+ * items it added) or not read (with why). The line is a live region: when the
  * backend finishes while the page is open, a screen reader says the new state.
  */
 export const ResourceStatus: React.FC<{

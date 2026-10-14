@@ -14,7 +14,8 @@
 ## Context
 
 The first signed-in feature of the website is the interview profile: a candidate adds a CV and other
-resources (a file, pasted text or a link), sees what was read from them, and corrects the skill map.
+resources (a file, pasted text or a link), sees what was read from them, and corrects the skill map
+(the skill map waits since 14 Oct 2026: see the section of that name).
 The backend is built and on the dev project (`quadev-backend`, codebase `interview-profile`): the
 callables `createProfileResource`, `updateSkillMapItem` and `removeProfileResource`, a Storage
 trigger that reads what is uploaded, and documents the owner reads straight from Firestore. Its
@@ -233,8 +234,8 @@ Where the build goes beyond the artboards, or stops short of them:
   message appears by itself.
 - **Every way out of a failure is "Remove".** A resource is read once and never retried, so each
   of the ten reasons has its heading, its sentence and the same button.
-- **Removing asks first,** says how many items go with the resource and how many of those were
-  edited, and cannot be left while the backend is at it. "Already gone" counts as done. The page
+- **Removing asks first,** says how many items go with the resource (and, until 14 Oct 2026, how
+  many of those were edited), and cannot be left while the backend is at it. "Already gone" counts as done. The page
   then replaces itself with the profile, so "Back" does not return to what was removed.
 - **Confirmations are the native `<dialog>` too** (`Dialog`), with the same code as the side panel
   for opening and closing.
@@ -248,7 +249,7 @@ Where the build goes beyond the artboards, or stops short of them:
 | "This resource"                         | "File: PDF", without the size                                                                                     | The backend's document has no size                                |
 | "This resource"                         | No "Download the file" yet                                                                                        | It comes with the last slice                                      |
 | An item in the list                     | Not a link yet                                                                                                    | The page of an item is the next slice                             |
-| The dialog for a resource with no items | "It has no items in your skill map.", and "Remove the resource" on the button                                     | Drawn for a resource with items only                              |
+| The dialog for a resource with no items | "No items were read from it.", and "Remove the resource" on the button                                            | Drawn for a resource with items only                              |
 | An address that is not in the profile   | "This resource is not in your profile", with the way back                                                         | Not drawn                                                         |
 
 **Open, and the owner's to decide: losing shared facts when a CV is replaced** (question 21 of the
@@ -294,6 +295,38 @@ either: the fake model never gives the same fact twice.
   need: the in-memory gateway was created twice and the second one did not know who was signed in.
 - **The pipeline caches the packages and the browser** in `run-checks` and `e2e` too (they were
   only in the new emulator job), to keep the run inside the plan's budget.
+
+## The skill map waits (14 Oct 2026)
+
+The owner took the skill map and the page of an item out of this delivery, for now: "Can we delete
+the skills map section, maybe I can add them later, but not now" (D68 in the research notes). Slice 4
+(#25) is not merged and its branch is kept. The artboards were redrawn the same day, and the finish
+follows them:
+
+- **The profile's summary is "What we found":** how many items of each kind, and where to see them.
+  It is not a link.
+- **The page of a resource shows "What we read",** by kind and read only: the skills as tags, the
+  other kinds as rows that open on the passage they were read from ("Where it says this").
+  "Something not right?" says how to correct an item while items cannot be changed: remove the
+  resource, then add a corrected one. Nothing on the page is starred, edited or linked to an item.
+- **A link that was read has "The page":** its address, read once when it was added, and "Open the
+  page". The address is then not repeated beside it, and the button says "Remove this link".
+- **No "skill map" in the wording** while there is no page of that name. The home's line leads to
+  the page of the CV and counts what was read from it. The remove dialog no longer counts edited
+  items: nothing on the website edits them now.
+- **The backend does not change.** Every resource is still read into items, and `updateSkillMapItem`
+  stays in the contract, unused.
+
+Where the build goes beyond the redrawn artboards, or stops short of them:
+
+| Where                                | What                                                                   | Why                                                                                                       |
+| ------------------------------------ | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| "Show all"                           | Three items of a kind, then "Show all"                                 | The artboards show two or three, and put "Show all" after two of three as well as after two of six        |
+| The skills                           | Every one as a tag; a long one wraps inside its tag                    | The model writes skills as short sentences ("Go and PostgreSQL in production for six years."), not words  |
+| An item without a passage            | Plain text, with nothing to open                                       | Not drawn; the backend can leave the passage empty                                                        |
+| A link that was read, on the website | "The page" above "What we read"; "Remove this link" in "This resource" | Drawn on the phone only                                                                                   |
+| The home's line while the CV is read | "Being read…" or "Waiting for the upload…" in place of the count       | Not drawn                                                                                                 |
+| "Your profile" on the home           | Not built ("6 resources · 42 items read from them")                    | It is part of the home with applications (delivery 2a). The home of this delivery has the first card only |
 
 ## Consequences
 

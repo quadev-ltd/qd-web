@@ -15,7 +15,7 @@ const CV_FILE = {
   ),
 };
 
-test('add a CV as a file: created, uploaded, read by the backend, and in the skill map', async ({
+test('add a CV as a file: created, uploaded, read by the backend, and what was read is on its page', async ({
   page,
 }) => {
   const account = await createAccount({ interviewAssistant: true });
@@ -44,22 +44,20 @@ test('add a CV as a file: created, uploaded, read by the backend, and in the ski
     page.getByRole('heading', { name: 'Resources · 1 of 20' }),
   ).toBeVisible();
 
-  // The item the backend wrote is read into the skill map
-  const skillMap = page
-    .getByRole('heading', { name: 'Skill map' })
-    .locator('xpath=ancestor::section');
-  await expect(skillMap).toContainText('1 item');
+  // The item the backend wrote is read, and counted on the profile
+  const found = page.getByRole('region', { name: 'What we found' });
+  await expect(found).toContainText('1 item');
 
   // Read again from the backend's documents after a reload
   await page.reload();
   await expect(row).toContainText('Ready · 1 item');
-  await expect(skillMap).toContainText('1 item');
+  await expect(found).toContainText('1 item');
 
-  // The page of the resource lists the item; removeProfileResource takes both away
+  // The page of the resource shows the item; removeProfileResource takes both away
   await row.getByRole('link').click();
   await expect(
-    page.getByRole('heading', { name: 'Items from this resource · 1' }),
-  ).toBeVisible();
+    page.getByRole('region', { name: 'What we read' }),
+  ).toContainText('1 item');
   // The address that downloads the stored file comes from the file store, for a normal link
   await expect(
     page.getByRole('link', { name: 'Download the file' }),

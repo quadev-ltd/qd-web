@@ -104,12 +104,14 @@ test('profile, empty and with resources in every state: accessible and no horizo
   // Ready, being read, waiting for the upload, nothing new found, failed.
   await seedProfile(page);
   await expect(page.getByText('Could not read this page')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Skill map' })).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'What we found' }),
+  ).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
   await expectNoHorizontalScroll(page);
 });
 
-test('a resource, ready, being read and failed, and the remove dialog: accessible and no horizontal scroll', async ({
+test('a resource, ready, being read and failed, a link that was read, and the remove dialog: accessible and no horizontal scroll', async ({
   page,
 }) => {
   await openProfile(page);
@@ -122,10 +124,19 @@ test('a resource, ready, being read and failed, and the remove dialog: accessibl
     ).toBeVisible();
   };
 
-  // Ready, with its items
+  // Ready, with what was read, one item open on its passage
   await open('Maya Okafor CV 2026');
   await expect(
-    page.getByRole('heading', { name: 'Items from this resource · 6' }),
+    page.getByRole('region', { name: 'What we read' }),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: /Cut payment incidents by 40%/ })
+    .click();
+  await expect(
+    page.getByText('Where it says this').filter({ visible: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Something not right?' }),
   ).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
 
@@ -154,6 +165,26 @@ test('a resource, ready, being read and failed, and the remove dialog: accessibl
   await expect(page.getByRole('status')).toContainText(
     'We couldn’t read this page',
   );
+  await expectAccessibleAndNotTooWide(page);
+
+  // A link that was read: its page in a card of its own
+  await page.goto('/profile');
+  await page.getByRole('button', { name: 'Add a resource' }).click();
+  await page.getByRole('button', { name: /Add a link/ }).click();
+  const form = page.getByRole('dialog', { name: 'Add a link' });
+  await form
+    .getByLabel('Title')
+    .fill('Blog post: Moving a ledger to event sourcing');
+  await form
+    .getByLabel('Address')
+    .fill('https://engineering.fenwickpay.example/blog/ledger-event-sourcing');
+  await form.getByRole('button', { name: 'Add to profile' }).click();
+  await expect(form).toBeHidden();
+  await expect(
+    page.getByRole('listitem').filter({ hasText: 'Blog post' }),
+  ).toContainText('Ready · 2 items');
+  await open('Blog post: Moving a ledger to event sourcing');
+  await expect(page.getByRole('region', { name: 'The page' })).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
 });
 
