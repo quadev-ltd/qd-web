@@ -10,7 +10,7 @@ import {
 import { PROFILE_MAIN } from '../ProfileRoutes';
 
 import RemoveResourceDialog from './RemoveResourceDialog';
-import { addedAt, contentOf, formatDay } from './resourceMeta';
+import { addedAt, contentOf, formatDay, shortAddress } from './resourceMeta';
 import ResourceStatusPanel from './ResourceStatusPanel';
 import { useFileUrl } from './useFileUrl';
 
@@ -105,9 +105,11 @@ export const ResourceScreen: React.FC = () => {
     <SignedInShell
       title={t('resource.documentTitle')}
       mainClassName={PROFILE_MAIN}>
-      <div className="mx-auto flex max-w-[760px] flex-col gap-6">
-        <BackLink />
-        {children}
+      <div className="mx-auto max-w-[1120px]">
+        <div className="flex max-w-[760px] flex-col gap-6">
+          <BackLink />
+          {children}
+        </div>
       </div>
     </SignedInShell>
   );
@@ -172,103 +174,108 @@ export const ResourceScreen: React.FC = () => {
     <SignedInShell
       title={t('resource.documentTitle')}
       mainClassName={PROFILE_MAIN}>
-      <div className="mx-auto flex max-w-[760px] flex-col gap-6">
-        <BackLink />
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
-            <Chip tone="brand" icon={RESOURCE_TYPE_ICONS[resource.type]}>
-              {t(RESOURCE_TYPE_KEYS[resource.type])}
-            </Chip>
-            <StatusChip resource={resource} />
+      <div className="mx-auto max-w-[1120px]">
+        <div className="flex max-w-[760px] flex-col gap-6">
+          <BackLink />
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Chip tone="brand" icon={RESOURCE_TYPE_ICONS[resource.type]}>
+                {t(RESOURCE_TYPE_KEYS[resource.type])}
+              </Chip>
+              <StatusChip resource={resource} />
+            </div>
+            <h1 className="font-display text-[22px] leading-tight font-semibold wrap-anywhere">
+              {resource.title}
+            </h1>
+            <p className="text-sm leading-normal text-muted wrap-anywhere">
+              {[addedText, contentText].filter(Boolean).join(' · ')}
+            </p>
           </div>
-          <h1 className="font-display text-[22px] leading-tight font-semibold wrap-anywhere">
-            {resource.title}
-          </h1>
-          <p className="text-sm leading-normal text-muted wrap-anywhere">
-            {[addedText, contentText].filter(Boolean).join(' · ')}
-          </p>
-        </div>
 
-        <ResourceStatusPanel
-          resource={resource}
-          stuck={stuck}
-          onRemove={() => setRemoving(true)}
-        />
+          <ResourceStatusPanel
+            resource={resource}
+            stuck={stuck}
+            onRemove={() => setRemoving(true)}
+          />
 
-        <Card
-          as="section"
-          elevation="raised"
-          aria-labelledby="resource-details"
-          className="gap-3 p-5">
-          <h2
-            id="resource-details"
-            className="font-display text-[18px] leading-tight font-semibold">
-            {t('resource.detailsTitle')}
-          </h2>
-          <dl className="grid grid-cols-[minmax(0,110px)_minmax(0,1fr)] gap-x-4 gap-y-3">
-            <dt className="text-sm leading-normal text-muted">
-              {t('resource.typeLabel')}
-            </dt>
-            <dd className="text-base leading-normal">
-              {t(RESOURCE_TYPE_KEYS[resource.type])}
-            </dd>
-            {resource.createdAt !== null && (
-              <>
-                <dt className="text-sm leading-normal text-muted">
-                  {t('resource.addedLabel')}
-                </dt>
-                <dd className="text-base leading-normal">
-                  {formatDay(resource.createdAt)}
-                </dd>
-              </>
+          <Card
+            as="section"
+            elevation="raised"
+            aria-labelledby="resource-details"
+            className="gap-3 p-4">
+            <h2
+              id="resource-details"
+              className="font-display text-[18px] leading-tight font-semibold">
+              {t('resource.detailsTitle')}
+            </h2>
+            <dl className="grid grid-cols-[minmax(0,110px)_minmax(0,1fr)] gap-x-4 gap-y-3">
+              <dt className="text-sm leading-normal text-muted">
+                {t('resource.typeLabel')}
+              </dt>
+              <dd className="text-base leading-normal">
+                {t(RESOURCE_TYPE_KEYS[resource.type])}
+              </dd>
+              {resource.createdAt !== null && (
+                <>
+                  <dt className="text-sm leading-normal text-muted">
+                    {t('resource.addedLabel')}
+                  </dt>
+                  <dd className="text-base leading-normal">
+                    {formatDay(resource.createdAt)}
+                  </dd>
+                </>
+              )}
+              <dt className="text-sm leading-normal text-muted">
+                {t(
+                  resource.source === 'link'
+                    ? 'resource.addressLabel'
+                    : resource.source === 'file'
+                      ? 'resource.fileLabel'
+                      : 'resource.contentLabel',
+                )}
+              </dt>
+              <dd className="text-base leading-normal wrap-anywhere">
+                {address ? (
+                  <a
+                    href={address}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium no-underline hover:underline">
+                    {shortAddress(address)}
+                    <span className="ml-1 inline-flex align-[-3px]">
+                      <Icon name="external" size={16} />
+                    </span>
+                  </a>
+                ) : (
+                  contentText
+                )}
+              </dd>
+            </dl>
+            {fileUrl && (
+              // A normal link: the browser fetches the file, the page never reads it.
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonClassName({
+                  variant: 'secondary',
+                  size: 'small',
+                  className: 'gap-2 self-start text-[15px]',
+                })}>
+                <Icon name="download" size={18} />
+                {t('resource.downloadLink')}
+              </a>
             )}
-            <dt className="text-sm leading-normal text-muted">
-              {t(
-                resource.source === 'link'
-                  ? 'resource.addressLabel'
-                  : resource.source === 'file'
-                    ? 'resource.fileLabel'
-                    : 'resource.contentLabel',
-              )}
-            </dt>
-            <dd className="text-base leading-normal wrap-anywhere">
-              {address ? (
-                <a
-                  href={address}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium no-underline hover:underline">
-                  {address}
-                </a>
-              ) : (
-                contentText
-              )}
-            </dd>
-          </dl>
-          {fileUrl && (
-            // A normal link: the browser fetches the file, the page never reads it.
-            <a
-              href={fileUrl}
-              target="_blank"
-              rel="noreferrer"
-              className={buttonClassName({
-                variant: 'secondary',
-                size: 'small',
-                className: 'gap-2 text-[15px]',
-              })}>
-              <Icon name="download" size={18} />
-              {t('resource.downloadLink')}
-            </a>
-          )}
-          <Button
-            variant="quietDanger"
-            size="small"
-            onClick={() => setRemoving(true)}
-            className="gap-2 self-start text-[15px]">
-            <Icon name="trash" size={18} />
-            {t(isLink ? 'resource.removeThisLink' : 'resource.removeLink')}
-          </Button>
-        </Card>
+            <Button
+              variant="quietDanger"
+              size="small"
+              onClick={() => setRemoving(true)}
+              className="gap-2 self-start text-[15px]">
+              <Icon name="trash" size={18} />
+              {t(isLink ? 'resource.removeThisLink' : 'resource.removeLink')}
+            </Button>
+          </Card>
+        </div>
       </div>
 
       {removing && (

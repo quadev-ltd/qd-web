@@ -163,7 +163,7 @@ test('a link that is read: its address to open, and "Remove this link"', async (
   const details = page.getByRole('region', { name: 'This resource' });
   await expect(
     details.getByRole('link', {
-      name: 'https://talks.example/ledgers-without-tears',
+      name: 'talks.example/ledgers-without-tears',
     }),
   ).toHaveAttribute('target', '_blank');
   await expect(page.getByText(/What we read|items/)).toHaveCount(0);

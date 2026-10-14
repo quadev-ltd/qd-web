@@ -126,7 +126,7 @@ describe('ResourceScreen', () => {
         );
 
         const link = within(details()).getByRole('link', {
-          name: 'https://talks.example/ledgers',
+          name: 'talks.example/ledgers',
         });
         expect(link).toHaveAttribute('href', 'https://talks.example/ledgers');
         expect(link).toHaveAttribute('target', '_blank');

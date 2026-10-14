@@ -172,7 +172,7 @@ test('a resource, ready, being read and failed, a link that was read, and the re
   await open('Blog post: Moving a ledger to event sourcing');
   await expect(
     page.getByRole('link', {
-      name: 'https://engineering.fenwickpay.example/blog/ledger-event-sourcing',
+      name: 'engineering.fenwickpay.example/blog/ledger-event-sourcing',
     }),
   ).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
