@@ -2,7 +2,7 @@
 // in a browser. The same use case against the real backend code is in e2e-emulators/.
 import { expect, test } from '@playwright/test';
 
-import { CV_FILE, openProfile } from './support';
+import { CV_FILE, openProfile, seedProfile } from './support';
 
 test('add a CV as a file: it is uploaded, read, and its items reach the skill map', async ({
   page,
@@ -58,6 +58,24 @@ test('add a CV as a file: it is uploaded, read, and its items reach the skill ma
   // Still there after a reload.
   await page.reload();
   await expect(row).toContainText('Ready · 6 items');
+
+  // Its own page lists what it added.
+  await row.getByRole('link').click();
+  await expect(page).toHaveURL(/\/profile\/resources\/.+/);
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Maya Okafor CV 2026' }),
+  ).toBeVisible();
+  await expect(page.getByText('Ready · 6 items')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Items from this resource · 6' }),
+  ).toBeVisible();
+  await expect(page.getByText(/Go and PostgreSQL in production/)).toBeVisible();
+  await page.getByRole('button', { name: 'Show all 6' }).click();
+  await expect(page.getByText(/From: Maya Okafor CV 2026/)).toHaveCount(6);
+
+  // And the way back.
+  await page.getByRole('link', { name: 'Profile', exact: true }).last().click();
+  await expect(page).toHaveURL('/profile');
 });
 
 test('paste a text that is too long: the message, then shorten it and add it', async ({
@@ -128,4 +146,79 @@ test('a link that cannot be read fails, and the list says why', async ({
   await expect(
     page.getByRole('listitem').filter({ hasText: 'Team wiki page' }),
   ).toContainText('Could not read this page');
+});
+
+test('open a failed resource, read why, and remove it in the dialog: it is gone from the list', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await seedProfile(page);
+
+  await page
+    .getByRole('link', { name: /Conference talk: Ledgers without tears/ })
+    .click();
+  await expect(
+    page.getByRole('heading', {
+      level: 1,
+      name: 'Conference talk: Ledgers without tears',
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('Failed', { exact: true })).toBeVisible();
+  const address = page.url();
+  const reason = page.getByRole('status');
+  await expect(reason).toContainText('We couldn’t read this page');
+  await expect(reason).toContainText(
+    'It may be private or need a sign-in. For LinkedIn, save your profile as a PDF and add the file.',
+  );
+
+  // Asked first; Cancel changes nothing.
+  await reason.getByRole('button', { name: 'Remove' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Remove this resource?' });
+  await expect(dialog).toContainText('It has no items in your skill map.');
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(reason).toBeVisible();
+
+  // Removed: back on the profile, without it.
+  await page.getByRole('button', { name: 'Remove this resource' }).click();
+  await dialog.getByRole('button', { name: 'Remove the resource' }).click();
+  await expect(page).toHaveURL('/profile');
+  await expect(
+    page.getByRole('heading', { name: 'Resources · 5 of 20' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Conference talk: Ledgers without tears'),
+  ).toHaveCount(0);
+
+  // "Back" does not return to the page of what was removed, and its address leads nowhere.
+  await page.goBack();
+  await expect(page).not.toHaveURL(address);
+  await page.goto(address);
+  await expect(
+    page.getByRole('heading', { name: 'This resource is not in your profile' }),
+  ).toBeVisible();
+});
+
+test('removing a resource takes its items out of the skill map', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await seedProfile(page);
+  const skillMap = page
+    .getByRole('heading', { name: 'Skill map' })
+    .locator('xpath=ancestor::section');
+  await expect(skillMap).toContainText('9 items');
+
+  await page.getByRole('link', { name: /Performance review 2025/ }).click();
+  await page.getByRole('button', { name: 'Remove this resource' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Remove this resource?' });
+  await expect(dialog).toContainText(
+    'This also removes the 3 items that came from it. Briefs that used them will show as out of date.',
+  );
+  await dialog
+    .getByRole('button', { name: 'Remove the resource and 3 items' })
+    .click();
+
+  await expect(page).toHaveURL('/profile');
+  await expect(skillMap).toContainText('6 items');
 });

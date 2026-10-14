@@ -75,6 +75,7 @@ describe('routes', () => {
       '/complete-profile',
       '/account/delete',
       '/profile',
+      '/profile/resources/r1',
     ])('shows the not found page at %s', async path => {
       await renderRoute(path, signedOut);
 
@@ -107,6 +108,7 @@ describe('routes', () => {
       '/complete-profile',
       '/account/delete',
       '/profile',
+      '/profile/resources/r1',
     ])(
       'guards %s: a signed-out visitor is sent to the sign-in screen',
       async path => {
@@ -138,6 +140,14 @@ describe('routes', () => {
         ).toBeInTheDocument();
         expect(
           screen.getByRole('heading', { level: 1, name: 'profile.title' }),
+        ).toBeInTheDocument();
+      });
+
+      it('says the same at the address of a resource', async () => {
+        await renderRoute('/profile/resources/r1', signedIn);
+
+        expect(
+          await screen.findByText('access.notAvailableChip'),
         ).toBeInTheDocument();
       });
 

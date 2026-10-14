@@ -2,8 +2,9 @@
 
 - **Status:** accepted (October 2026), and built slice by slice. Done: the checks of 13 Oct 2026
   ("slice 0", before any screen), the foundation ("slice 1": the flags, the gateway, `/profile`
-  behind the flag, the tests against the emulators) and the profile page with "Add a resource"
-  ("slice 2"). The page of a resource and the skill map follow; each slice updates this record.
+  behind the flag, the tests against the emulators), the profile page with "Add a resource"
+  ("slice 2") and the page of a resource ("slice 3"). The skill map follows; each slice updates
+  this record.
 - **Scope:** `src/core/profile/`, `src/core/firebase/` (the callables, the reads, the upload),
   `src/core/flags/`, `src/screens/Profile/`, the Content-Security-Policy in `firebase.json`,
   `e2e-emulators/` and the `e2e-emulators` job
@@ -219,6 +220,41 @@ Where the build goes beyond the artboards, or stops short of them:
 | A file of another type        | "This file can't be read. Choose a PDF, a Word document (.docx) or a text file." | Not drawn                                                                                       |
 | A failed upload               | "The file didn't upload. Check your connection and try again.", with "Try again" | Not drawn: the artboard has "could not start" only                                              |
 | The empty profile             | A card in the middle of the page, with no button in the heading                  | Drawn for the phone only                                                                        |
+
+## The page of a resource (slice 3)
+
+- **It reads nothing of its own.** The resource and its items come from the store the profile page
+  filled; opened by its address, it waits for that same read. The polling of the profile keeps it
+  current while the backend is reading the resource.
+- **"Taking longer than usual" after 3 minutes** without a change, by the backend's time on the
+  resource. The page looks at the clock every 15 seconds while a resource is unfinished, so the
+  message appears by itself.
+- **Every way out of a failure is "Remove".** A resource is read once and never retried, so each
+  of the ten reasons has its heading, its sentence and the same button.
+- **Removing asks first,** says how many items go with the resource and how many of those were
+  edited, and cannot be left while the backend is at it. "Already gone" counts as done. The page
+  then replaces itself with the profile, so "Back" does not return to what was removed.
+- **Confirmations are the native `<dialog>` too** (`Dialog`), with the same code as the side panel
+  for opening and closing.
+
+Where the build goes beyond the artboards, or stops short of them:
+
+| Where                                   | What                                                                                                              | Why                                                               |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| A failed resource                       | Eight of the ten headings and sentences are put together from the table of messages in the design proposal (§7.3) | Two are drawn: the page that could not be read, and today's limit |
+| A resource stuck while being read       | "Reading it did not finish. A resource is read once, so remove it and add it again."                              | The artboard has the stuck upload only                            |
+| "This resource"                         | "File: PDF", without the size                                                                                     | The backend's document has no size                                |
+| "This resource"                         | No "Download the file" yet                                                                                        | It comes with the last slice                                      |
+| An item in the list                     | Not a link yet                                                                                                    | The page of an item is the next slice                             |
+| The dialog for a resource with no items | "It has no items in your skill map.", and "Remove the resource" on the button                                     | Drawn for a resource with items only                              |
+| An address that is not in the profile   | "This resource is not in your profile", with the way back                                                         | Not drawn                                                         |
+
+**Open, and the owner's to decide: losing shared facts when a CV is replaced** (question 21 of the
+design proposal). The backend does not add a fact the profile already has, and removing a resource
+removes every item that came from it. So a new CV added before the old one is removed loses the
+facts both share, with their stars and edits, when the old one goes. The dialog says how many
+items go, as drawn; it does not explain this case. It could not be observed against the emulators
+either: the fake model never gives the same fact twice.
 
 ## Consequences
 

@@ -1,8 +1,11 @@
 import { type ComponentProps } from 'react';
 
 export interface CardProps extends ComponentProps<'div'> {
-  /** The element to render: a card that stands on its own is an article or a section. */
-  as?: 'div' | 'article' | 'section';
+  /**
+   * The element to render: a card that stands on its own is an article or a section, and
+   * one beside the main content an aside.
+   */
+  as?: 'div' | 'article' | 'section' | 'aside';
   /** glass: translucent, on the brand background. surface: white, on light pages. */
   tone?: 'glass' | 'surface';
   /** Only for the surface tone. */

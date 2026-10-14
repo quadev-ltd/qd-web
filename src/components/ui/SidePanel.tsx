@@ -1,11 +1,7 @@
-import {
-  type ReactNode,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-} from 'react';
+import { type ReactNode, useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { useModalDialog } from './useModalDialog';
 
 import Icon from '@/components/Icon';
 
@@ -49,17 +45,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
     }
   }, [title]);
 
-  // A layout effect, so the dialog is closed (and the focus returned) while it is still
-  // in the page.
-  useLayoutEffect(() => {
-    const element = dialog.current;
-    if (element && !element.open) {
-      element.showModal();
-    }
-    return () => {
-      element?.close();
-    };
-  }, []);
+  useModalDialog(dialog);
 
   return (
     <dialog

@@ -31,4 +31,15 @@ describe('Icon', () => {
     );
     expect(container.querySelectorAll('svg > *').length).toBeGreaterThan(0);
   });
+
+  it('is drawn as an outline, or as a solid shape when it is filled', () => {
+    const { container, rerender } = render(<Icon name="star" />);
+    expect(container.querySelector('svg')).toHaveAttribute('fill', 'none');
+
+    rerender(<Icon name="star" filled />);
+    expect(container.querySelector('svg')).toHaveAttribute(
+      'fill',
+      'currentColor',
+    );
+  });
 });

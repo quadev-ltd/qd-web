@@ -71,4 +71,12 @@ describe('Button', () => {
     expect(button).toHaveClass('text-link', 'px-1.5');
     expect(button).not.toHaveClass('bg-primary');
   });
+
+  it('can be a quiet red button for the way into something that cannot be undone', () => {
+    render(<Button variant="quietDanger">Remove this resource</Button>);
+
+    const button = screen.getByRole('button', { name: 'Remove this resource' });
+    expect(button).toHaveClass('text-danger', 'px-1.5');
+    expect(button).not.toHaveClass('text-link');
+  });
 });

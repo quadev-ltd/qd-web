@@ -15,6 +15,12 @@ describe('Card', () => {
     expect(screen.getByRole('article')).toHaveTextContent('Content');
   });
 
+  it('can stand beside the main content, as an aside', () => {
+    render(<Card as="aside">Details</Card>);
+
+    expect(screen.getByRole('complementary')).toHaveTextContent('Details');
+  });
+
   it('is a white surface by default and translucent with the glass tone', () => {
     render(
       <>

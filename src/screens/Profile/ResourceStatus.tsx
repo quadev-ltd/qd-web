@@ -35,24 +35,24 @@ export const ResourceStatus: React.FC<{
 
   if (status === 'ready') {
     return (
-      <p aria-live="polite" className={`${LINE} font-medium text-success`}>
+      <span aria-live="polite" className={`${LINE} font-medium text-success`}>
         <Icon name="check" size={16} />
         {itemCount > 0
           ? t('profile.statusReady', { count: itemCount })
           : t('profile.statusReadyNothingNew')}
-      </p>
+      </span>
     );
   }
   if (status === 'failed') {
     return (
-      <p aria-live="polite" className={`${LINE} font-medium text-danger`}>
+      <span aria-live="polite" className={`${LINE} font-medium text-danger`}>
         <Icon name="alert" size={16} />
         {t(FAILURE_KEYS[failure ?? 'internal'])}
-      </p>
+      </span>
     );
   }
   return (
-    <p aria-live="polite" className={`${LINE} gap-2 text-muted`}>
+    <span aria-live="polite" className={`${LINE} gap-2 text-muted`}>
       <span className="flex text-primary">
         <Spinner size="tiny" decorative />
       </span>
@@ -61,7 +61,7 @@ export const ResourceStatus: React.FC<{
           ? 'profile.statusProcessing'
           : 'profile.statusAwaitingUpload',
       )}
-    </p>
+    </span>
   );
 };
 
