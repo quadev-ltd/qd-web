@@ -8,7 +8,7 @@ import {
 
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
-import { itemFixture, resourceFixture } from '@/testUtil/profileFixtures';
+import { resourceFixture } from '@/testUtil/profileFixtures';
 import { renderProfilePage } from '@/testUtil/renderProfilePage';
 
 const mockLogger = vi.hoisted(() => ({
@@ -24,7 +24,6 @@ const setUp = (props: Partial<RemoveResourceDialogProps> = {}) => {
   const utils = renderProfilePage(
     <RemoveResourceDialog
       resourceId="r1"
-      itemCount={31}
       onCancel={onCancel}
       onRemoved={onRemoved}
       {...props}
@@ -37,10 +36,6 @@ const setUp = (props: Partial<RemoveResourceDialogProps> = {}) => {
         resources: [
           resourceFixture({ id: 'r1' }),
           resourceFixture({ id: 'r2' }),
-        ],
-        items: [
-          itemFixture({ id: 'i1', resourceId: 'r1' }),
-          itemFixture({ id: 'i2', resourceId: 'r2' }),
         ],
       },
     },
@@ -58,28 +53,16 @@ beforeEach(() => {
 });
 
 describe('RemoveResourceDialog', () => {
-  it('asks first, and says what goes with the resource', () => {
+  it('asks first, says briefs that used the resource go out of date, and gives no count', () => {
     const { gateway } = setUp();
 
     const dialog = screen.getByRole('dialog', {
       name: 'resource.removeDialogTitle',
     });
-    expect(dialog).toHaveTextContent('resource.removeDialogItems');
     expect(dialog).toHaveTextContent('resource.removeDialogBriefs');
-    expect(confirm()).toHaveTextContent('resource.removeConfirmItemsButton');
-    expect(gateway.removeResource).not.toHaveBeenCalled();
-  });
-
-  it('says so when the resource has no items, and names only the resource on the button', () => {
-    setUp({ itemCount: 0 });
-
-    const dialog = screen.getByRole('dialog');
-    expect(dialog).toHaveTextContent('resource.removeDialogNoItems');
-    expect(dialog).not.toHaveTextContent('resource.removeDialogBriefs');
+    expect(dialog).not.toHaveTextContent(/\d/);
     expect(confirm()).toHaveTextContent('resource.removeConfirmButton');
-    expect(confirm()).not.toHaveTextContent(
-      'resource.removeConfirmItemsButton',
-    );
+    expect(gateway.removeResource).not.toHaveBeenCalled();
   });
 
   it('removes nothing on Cancel or Escape', async () => {
@@ -95,7 +78,7 @@ describe('RemoveResourceDialog', () => {
     expect(gateway.removeResource).not.toHaveBeenCalled();
   });
 
-  it('removes the resource, takes it and its items out of the profile, and says it is done', async () => {
+  it('removes the resource, takes it out of the profile, and says it is done', async () => {
     const { gateway, onRemoved, store } = setUp();
     gateway.removeResource.mockResolvedValue({ itemsRemoved: 1 });
 
@@ -103,9 +86,8 @@ describe('RemoveResourceDialog', () => {
 
     await waitFor(() => expect(onRemoved).toHaveBeenCalledTimes(1));
     expect(gateway.removeResource).toHaveBeenCalledExactlyOnceWith('r1');
-    const { resources, items } = store.getState().interviewProfile;
+    const { resources } = store.getState().interviewProfile;
     expect(resources.map(({ id }) => id)).toEqual(['r2']);
-    expect(items.map(({ id }) => id)).toEqual(['i2']);
   });
 
   it('cannot be left or sent twice while the backend is removing', async () => {

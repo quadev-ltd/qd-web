@@ -28,7 +28,7 @@ const removeButton = () =>
 
 describe('ResourceStatusPanel', () => {
   it('says a resource is being read, and that the page can be left', () => {
-    renderPanel({ status: 'processing', itemCount: 0 });
+    renderPanel({ status: 'processing' });
 
     const panel = screen.getByRole('status');
     expect(panel).toHaveTextContent('resource.readingTitle');
@@ -38,7 +38,7 @@ describe('ResourceStatusPanel', () => {
   });
 
   it('says the same while a file is on its way', () => {
-    renderPanel({ status: 'awaitingUpload', itemCount: 0 });
+    renderPanel({ status: 'awaitingUpload' });
 
     expect(screen.getByRole('status')).toHaveTextContent(
       'resource.readingTitle',
@@ -51,7 +51,7 @@ describe('ResourceStatusPanel', () => {
   ] as const)(
     'says a resource stuck in %s is taking too long, and offers to remove it',
     async (status, description) => {
-      const { onRemove } = renderPanel({ status, itemCount: 0 }, true);
+      const { onRemove } = renderPanel({ status }, true);
 
       const panel = screen.getByRole('status');
       expect(panel).toHaveTextContent('resource.stuckTitle');
@@ -63,25 +63,16 @@ describe('ResourceStatusPanel', () => {
     },
   );
 
-  it('has nothing to add for a resource that was read and gave items', () => {
-    const { container } = renderPanel({ status: 'ready', itemCount: 31 });
+  it('has nothing to add for a resource that was read: its chip says it', () => {
+    const { container } = renderPanel({ status: 'ready' });
 
     expect(container).toBeEmptyDOMElement();
   });
 
   it('says nothing is stuck about a resource that was read, whatever the clock says', () => {
-    const { container } = renderPanel({ status: 'ready', itemCount: 3 }, true);
+    const { container } = renderPanel({ status: 'ready' }, true);
 
     expect(container).toBeEmptyDOMElement();
-  });
-
-  it('explains a resource that was read and added nothing new', () => {
-    renderPanel({ status: 'ready', itemCount: 0 });
-
-    const panel = screen.getByRole('status');
-    expect(panel).toHaveTextContent('resource.nothingNewTitle');
-    expect(panel).toHaveTextContent('resource.nothingNewDescription');
-    expect(removeButton()).not.toBeInTheDocument();
   });
 
   it.each([
@@ -101,7 +92,6 @@ describe('ResourceStatusPanel', () => {
       const { onRemove } = renderPanel({
         status: 'failed',
         failure,
-        itemCount: 0,
       });
 
       const panel = screen.getByRole('status');
@@ -115,7 +105,7 @@ describe('ResourceStatusPanel', () => {
   );
 
   it('takes a failure with no reason as a fault on our side', () => {
-    renderPanel({ status: 'failed', itemCount: 0 });
+    renderPanel({ status: 'failed' });
 
     expect(screen.getByRole('status')).toHaveTextContent(
       'resource.failedInternalTitle',

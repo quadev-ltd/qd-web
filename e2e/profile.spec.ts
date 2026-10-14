@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 
 import { CV_FILE, openProfile, seedProfile, signIn } from './support';
 
-test('add a CV as a file: it is uploaded, read, and what was read is on its page', async ({
+test('add a CV as a file: it is uploaded, read, and its page shows it, with nothing read from it', async ({
   page,
 }) => {
   await openProfile(page);
@@ -41,63 +41,28 @@ test('add a CV as a file: it is uploaded, read, and what was read is on its page
     .filter({ hasText: 'Maya Okafor CV 2026' });
   await expect(row).toContainText('CV');
   await expect(row).toContainText('Being read…');
-  await expect(row).toContainText('Ready · 6 items');
+  await expect(row.getByText('Ready', { exact: true })).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'Resources · 1 of 20' }),
   ).toBeVisible();
-
-  // The profile counts what was found, by kind.
-  const found = page.getByRole('region', { name: 'What we found' });
-  await expect(found).toContainText('6 items');
-  await expect(found.getByText('Achievements').locator('..')).toContainText(
-    '2',
-  );
-  await expect(found.getByRole('link')).toHaveCount(0);
+  // The profile shows the resources only (D70).
+  await expect(page.getByText(/What we found|items/)).toHaveCount(0);
 
   // Still there after a reload.
   await page.reload();
-  await expect(row).toContainText('Ready · 6 items');
+  await expect(row.getByText('Ready', { exact: true })).toBeVisible();
 
-  // Its own page shows what was read, by kind, read only.
+  // Its own page: what it is, and nothing read from it.
   await row.getByRole('link').click();
   await expect(page).toHaveURL(/\/profile\/resources\/.+/);
   await expect(
     page.getByRole('heading', { level: 1, name: 'Maya Okafor CV 2026' }),
   ).toBeVisible();
-  await expect(page.getByText('Ready · 6 items')).toBeVisible();
-  const read = page.getByRole('region', { name: 'What we read' });
-  await expect(read).toContainText('6 items');
-  await expect(
-    read
-      .getByRole('region', { name: 'Skills' })
-      .getByRole('listitem')
-      .filter({ hasText: 'Go and PostgreSQL in production for six years.' }),
-  ).toBeVisible();
-  await expect(read.getByRole('link')).toHaveCount(0);
-
-  // An item opens to show where the resource says it.
-  const passage = read.getByText(
-    'Reduced Sev-1 and Sev-2 payment incidents 40% across Q3 and Q4',
-    { exact: false },
+  await expect(page.getByText('Ready', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Go and PostgreSQL in production/)).toHaveCount(
+    0,
   );
-  await expect(passage).toBeHidden();
-  const item = read.getByRole('button', {
-    name: /Cut payment incidents by 40%/,
-  });
-  await item.click();
-  await expect(item).toHaveAttribute('aria-expanded', 'true');
-  // Only the opened item shows its passage.
-  await expect(
-    read.getByText('Where it says this').filter({ visible: true }),
-  ).toHaveCount(1);
-  await expect(passage).toBeVisible();
-
-  // How to correct it, until items can be changed one by one.
-  await expect(
-    page.getByRole('region', { name: 'Something not right?' }),
-  ).toContainText(
-    'Items can’t be changed one by one. Remove this resource first, then add the corrected document.',
-  );
+  await expect(page.getByText(/What we read|items/)).toHaveCount(0);
   await expect(
     page.getByRole('link', { name: 'Download the file' }),
   ).toHaveAttribute('target', '_blank');
@@ -144,7 +109,7 @@ test('paste a text that is too long: the message, then shorten it and add it', a
     .getByRole('listitem')
     .filter({ hasText: 'Stories for interviews' });
   await expect(row).toContainText('Note');
-  await expect(row).toContainText('Ready · 2 items');
+  await expect(row.getByText('Ready', { exact: true })).toBeVisible();
 });
 
 test('a link that cannot be read fails, and the list says why', async ({
@@ -177,7 +142,7 @@ test('a link that cannot be read fails, and the list says why', async ({
   ).toContainText('Could not read this page');
 });
 
-test('a link that is read: its page, what was found on it, and how to correct it', async ({
+test('a link that is read: its address to open, and "Remove this link"', async ({
   page,
 }) => {
   await openProfile(page);
@@ -192,32 +157,23 @@ test('a link that is read: its page, what was found on it, and how to correct it
   await expect(form).toBeHidden();
 
   const row = page.getByRole('listitem').filter({ hasText: 'Conference talk' });
-  await expect(row).toContainText('Ready · 2 items');
+  await expect(row.getByText('Ready', { exact: true })).toBeVisible();
   await row.getByRole('link').click();
 
-  const card = page.getByRole('region', { name: 'The page' });
-  await expect(card).toContainText('talks.example');
-  await expect(card).toContainText('/ledgers-without-tears');
-  await expect(card).toContainText(
-    'We keep the address and what we found on the page, not the page itself.',
-  );
+  const details = page.getByRole('region', { name: 'This resource' });
   await expect(
-    card.getByRole('link', { name: 'Open the page' }),
-  ).toHaveAttribute('href', 'https://talks.example/ledgers-without-tears');
-  await expect(
-    page.getByRole('region', { name: 'What we read' }),
-  ).toContainText('Conference talk on running a payments ledger');
-  await expect(
-    page.getByRole('region', { name: 'Something not right?' }),
-  ).toContainText(
-    'Remove this link first, then add a corrected page or a note.',
-  );
+    details.getByRole('link', {
+      name: 'https://talks.example/ledgers-without-tears',
+    }),
+  ).toHaveAttribute('target', '_blank');
+  await expect(page.getByText(/What we read|items/)).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Remove this link' }).click();
-  await page
-    .getByRole('dialog', { name: 'Remove this resource?' })
-    .getByRole('button', { name: 'Remove the resource and 2 items' })
-    .click();
+  await details.getByRole('button', { name: 'Remove this link' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Remove this resource?' });
+  await expect(dialog).toContainText(
+    'Briefs that used it will show as out of date.',
+  );
+  await dialog.getByRole('button', { name: 'Remove the resource' }).click();
   await expect(page).toHaveURL('/profile');
   await expect(
     page.getByRole('heading', { name: 'Start with your CV' }),
@@ -250,7 +206,9 @@ test('open a failed resource, read why, and remove it in the dialog: it is gone 
   // Asked first; Cancel changes nothing.
   await reason.getByRole('button', { name: 'Remove' }).click();
   const dialog = page.getByRole('dialog', { name: 'Remove this resource?' });
-  await expect(dialog).toContainText('No items were read from it.');
+  await expect(dialog).toContainText(
+    'Briefs that used it will show as out of date.',
+  );
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(dialog).toBeHidden();
   await expect(reason).toBeVisible();
@@ -275,28 +233,6 @@ test('open a failed resource, read why, and remove it in the dialog: it is gone 
   ).toBeVisible();
 });
 
-test('removing a resource takes its items out of what was found', async ({
-  page,
-}) => {
-  await openProfile(page);
-  await seedProfile(page);
-  const found = page.getByRole('region', { name: 'What we found' });
-  await expect(found).toContainText('9 items');
-
-  await page.getByRole('link', { name: /Performance review 2025/ }).click();
-  await page.getByRole('button', { name: 'Remove this resource' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Remove this resource?' });
-  await expect(dialog).toContainText(
-    'This also removes the 3 items read from it. Briefs that used them will show as out of date.',
-  );
-  await dialog
-    .getByRole('button', { name: 'Remove the resource and 3 items' })
-    .click();
-
-  await expect(page).toHaveURL('/profile');
-  await expect(found).toContainText('6 items');
-});
-
 test('the home starts with "Add your CV", and leads to it once it is in the profile', async ({
   page,
 }) => {
@@ -306,7 +242,7 @@ test('the home starts with "Add your CV", and leads to it once it is in the prof
   await expect(page.getByText('Start here')).toBeVisible();
   await expect(
     page.getByText(
-      'Everything else builds on it. We read it once and pick out your skills, experience, projects and achievements.',
+      'Everything else builds on it. We read it once and use it for every job you apply for.',
     ),
   ).toBeVisible();
   // The tools that are not built yet do not claim to be available.
@@ -325,7 +261,7 @@ test('the home starts with "Add your CV", and leads to it once it is in the prof
   await expect(form).toBeHidden();
   await expect(
     page.getByRole('listitem').filter({ hasText: 'maya-okafor-cv' }),
-  ).toContainText('Ready · 6 items');
+  ).toContainText('Ready');
 
   // A reload of the profile does not open the panel again
   await page.reload();
@@ -341,7 +277,7 @@ test('the home starts with "Add your CV", and leads to it once it is in the prof
     .click();
   await expect(page).toHaveURL('/home');
   const done = page.getByRole('link', { name: /Your CV is in your profile/ });
-  await expect(done).toContainText('6 items read from it');
+  await expect(done).toContainText('maya-okafor-cv');
   await expect(page.getByText('Start here')).toHaveCount(0);
   await done.click();
   await expect(page).toHaveURL(/\/profile\/resources\/.+/);

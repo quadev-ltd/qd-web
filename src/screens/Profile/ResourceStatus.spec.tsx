@@ -10,30 +10,24 @@ const status = (resource: Parameters<typeof ResourceStatus>[0]['resource']) => {
 };
 
 describe('ResourceStatus', () => {
-  it('says a resource is ready, with what it added', () => {
-    const line = status({ status: 'ready', itemCount: 31 });
+  it('says a resource is ready, with no count of what was read from it', () => {
+    const line = status({ status: 'ready' });
 
-    expect(line).toHaveTextContent('profile.statusReady');
+    expect(line).toHaveTextContent(/^profile\.statusReady$/);
     expect(line).toHaveClass('text-success');
   });
 
-  it('says so when a resource added nothing new', () => {
-    expect(status({ status: 'ready', itemCount: 0 })).toHaveTextContent(
-      'profile.statusReadyNothingNew',
-    );
-  });
-
   it('says a resource is being read, with a turning ring', () => {
-    const line = status({ status: 'processing', itemCount: 0 });
+    const line = status({ status: 'processing' });
 
     expect(line).toHaveTextContent('profile.statusProcessing');
     expect(screen.getByTestId('spinner')).toBeInTheDocument();
   });
 
   it('says a resource is waiting for its file', () => {
-    expect(
-      status({ status: 'awaitingUpload', itemCount: 0 }),
-    ).toHaveTextContent('profile.statusAwaitingUpload');
+    expect(status({ status: 'awaitingUpload' })).toHaveTextContent(
+      'profile.statusAwaitingUpload',
+    );
   });
 
   it.each([
@@ -50,7 +44,7 @@ describe('ResourceStatus', () => {
   ] as [ProfileResourceFailure, string][])(
     'says why a resource failed: %s',
     (failure, key) => {
-      const line = status({ status: 'failed', failure, itemCount: 0 });
+      const line = status({ status: 'failed', failure });
 
       expect(line).toHaveTextContent(key);
       expect(line).toHaveClass('text-danger');
@@ -58,16 +52,16 @@ describe('ResourceStatus', () => {
   );
 
   it('takes a failure with no reason as a fault on our side', () => {
-    expect(status({ status: 'failed', itemCount: 0 })).toHaveTextContent(
+    expect(status({ status: 'failed' })).toHaveTextContent(
       'profile.failedInternal',
     );
   });
 
   it('is a live region, so a change of state is read out', () => {
     for (const resource of [
-      { status: 'ready', itemCount: 1 },
-      { status: 'processing', itemCount: 0 },
-      { status: 'failed', itemCount: 0 },
+      { status: 'ready' },
+      { status: 'processing' },
+      { status: 'failed' },
     ] as const) {
       expect(status(resource)).toHaveAttribute('aria-live', 'polite');
     }

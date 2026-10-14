@@ -6,7 +6,7 @@ import { ProfileScreen } from './ProfileScreen';
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import { type InterviewProfileState } from '@/core/state/slices/interviewProfileSlice';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
-import { itemFixture, resourceFixture } from '@/testUtil/profileFixtures';
+import { resourceFixture } from '@/testUtil/profileFixtures';
 import { renderProfilePage } from '@/testUtil/renderProfilePage';
 
 vi.mock('@/core/logger', () => ({
@@ -108,7 +108,7 @@ describe('ProfileScreen', () => {
         screen.getByRole('button', { name: 'profile.addSomethingElseButton' }),
       ).toBeEnabled();
       expect(addButton()).not.toBeInTheDocument();
-      expect(screen.queryByText('profile.foundTitle')).not.toBeInTheDocument();
+      expect(screen.queryByRole('list')).not.toBeInTheDocument();
     });
 
     it('opens "Add your CV": a file or pasted text, no link', async () => {
@@ -192,28 +192,21 @@ describe('ProfileScreen', () => {
   });
 
   describe('a profile with resources', () => {
-    it('reads the profile through the gateway and lists it with what was found', async () => {
+    it('reads the resources through the gateway, and not the items read from them', async () => {
       const gateway = createMockProfileGateway();
       gateway.getResources.mockResolvedValue([
         resourceFixture({ id: 'a', title: 'Maya Okafor CV 2026' }),
-      ]);
-      gateway.getItems.mockResolvedValue([
-        itemFixture({ id: '1', kind: 'skill' }),
-        itemFixture({ id: '2', kind: 'skill' }),
       ]);
       renderProfilePage(<ProfileScreen />, { gateway });
 
       expect(
         await screen.findByText('Maya Okafor CV 2026'),
       ).toBeInTheDocument();
-      expect(
-        screen.getByText('profile.kindSkills').parentElement,
-      ).toHaveTextContent('2');
       expect(gateway.getResources).toHaveBeenCalledExactlyOnceWith('uid-1');
-      expect(gateway.getItems).toHaveBeenCalledExactlyOnceWith('uid-1');
+      expect(gateway.getItems).not.toHaveBeenCalled();
     });
 
-    it('shows the list, the skill map and "Add a resource"', () => {
+    it('shows the list and "Add a resource", and nothing else', () => {
       renderProfilePage(<ProfileScreen />, {
         interviewProfile: loaded({
           resources: [
@@ -226,10 +219,6 @@ describe('ProfileScreen', () => {
               failure: 'empty',
             }),
           ],
-          items: [
-            itemFixture({ id: '1', kind: 'skill' }),
-            itemFixture({ id: '2', kind: 'story' }),
-          ],
         }),
       });
 
@@ -240,8 +229,8 @@ describe('ProfileScreen', () => {
         'profile.typeNoteStories for interviewsprofile.failedEmpty',
       ]);
       expect(
-        screen.getByRole('heading', { name: 'profile.foundTitle' }),
-      ).toBeInTheDocument();
+        screen.getAllByRole('heading').map(heading => heading.textContent),
+      ).toEqual(['profile.title', 'profile.resourcesTitle']);
       expect(addButton()).toBeEnabled();
       expect(screen.queryByText('profile.emptyTitle')).not.toBeInTheDocument();
       expect(screen.queryByRole('status', { name: /spinner/ })).toBeNull();

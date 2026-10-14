@@ -26,7 +26,7 @@ import {
 } from '@/core/state/slices/sessionSlice';
 import { createStore } from '@/core/state/store';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
-import { itemFixture, resourceFixture } from '@/testUtil/profileFixtures';
+import { resourceFixture } from '@/testUtil/profileFixtures';
 
 const mockLogger = vi.hoisted(() => ({
   logError: vi.fn(),
@@ -44,14 +44,14 @@ const user = (uid: string): SessionUser => ({
 
 let actions: InterviewProfileActions;
 const Probe = () => {
-  const { status, resources, items } = useInterviewProfile();
+  const { status, resources } = useInterviewProfile();
   const current = useInterviewProfileActions();
   // What a page would call, kept for the spec to call.
   useEffect(() => {
     actions = current;
   }, [current]);
   return (
-    <p>{`${status}: [${resources.map(r => `${r.id}=${r.status}`).join(' ')}] ${items.length} items`}</p>
+    <p>{`${status}: [${resources.map(r => `${r.id}=${r.status}`).join(' ')}]`}</p>
   );
 };
 
@@ -115,24 +115,21 @@ describe('isPending', () => {
 
 describe('InterviewProfileProvider', () => {
   describe('the first profile page of the session', () => {
-    it('reads the resources, the skill map and today’s count, once', async () => {
+    it('reads the resources and today’s count, once, and never the items read from them', async () => {
       const { gateway, store, mount } = setUp();
       gateway.getResources.mockResolvedValue([resourceFixture()]);
-      gateway.getItems.mockResolvedValue([itemFixture()]);
       gateway.getExtractionsToday.mockResolvedValue(3);
 
       mount();
 
       expect(screen.getByText(/^loading:/)).toBeInTheDocument();
-      expect(
-        await screen.findByText('loaded: [r1=ready] 1 items'),
-      ).toBeInTheDocument();
+      expect(await screen.findByText('loaded: [r1=ready]')).toBeInTheDocument();
       expect(store.getState().interviewProfile).toMatchObject({
         uid: 'uid-1',
         extractionsToday: 3,
       });
       expect(gateway.getResources).toHaveBeenCalledExactlyOnceWith('uid-1');
-      expect(gateway.getItems).toHaveBeenCalledExactlyOnceWith('uid-1');
+      expect(gateway.getItems).not.toHaveBeenCalled();
       expect(gateway.getExtractionsToday).toHaveBeenCalledExactlyOnceWith(
         'uid-1',
       );
@@ -189,9 +186,7 @@ describe('InterviewProfileProvider', () => {
         store.dispatch(authStateChanged(user('uid-2')));
       });
 
-      expect(
-        await screen.findByText('loaded: [r9=ready] 0 items'),
-      ).toBeInTheDocument();
+      expect(await screen.findByText('loaded: [r9=ready]')).toBeInTheDocument();
       expect(gateway.getResources).toHaveBeenCalledExactlyOnceWith('uid-2');
     });
   });
@@ -203,21 +198,18 @@ describe('InterviewProfileProvider', () => {
           uid: 'uid-1',
           status: 'loaded',
           resources: [resourceFixture()],
-          items: [itemFixture()],
         },
       });
 
       mount();
 
-      expect(
-        screen.getByText('loaded: [r1=ready] 1 items'),
-      ).toBeInTheDocument();
+      expect(screen.getByText('loaded: [r1=ready]')).toBeInTheDocument();
       await waitFor(() => expect(gateway.getResources).not.toHaveBeenCalled());
       expect(gateway.getResource).not.toHaveBeenCalled();
       expect(gateway.getItems).not.toHaveBeenCalled();
     });
 
-    it('reads again only what was unfinished, and the skill map when that was read meanwhile', async () => {
+    it('reads again only what was unfinished', async () => {
       const { gateway, mount } = setUp({
         interviewProfile: {
           uid: 'uid-1',
@@ -232,12 +224,11 @@ describe('InterviewProfileProvider', () => {
       gateway.getResource.mockResolvedValue(
         resourceFixture({ id: 'r1', status: 'ready', itemCount: 2 }),
       );
-      gateway.getItems.mockResolvedValue([itemFixture(), itemFixture()]);
 
       mount();
 
       expect(
-        await screen.findByText('loaded: [done=ready r1=ready] 2 items'),
+        await screen.findByText('loaded: [done=ready r1=ready]'),
       ).toBeInTheDocument();
       expect(gateway.getResource).toHaveBeenCalledExactlyOnceWith(
         'uid-1',
@@ -257,7 +248,7 @@ describe('InterviewProfileProvider', () => {
         },
       });
 
-    it('reads it again every 2 seconds until it is ready, then the skill map once', async () => {
+    it('reads it again every 2 seconds until it is ready, and never the items', async () => {
       vi.useFakeTimers();
       const { gateway, mount } = withProcessing();
       gateway.getResource.mockResolvedValue(processing());
@@ -275,13 +266,10 @@ describe('InterviewProfileProvider', () => {
       gateway.getResource.mockResolvedValue(
         resourceFixture({ id: 'r1', status: 'ready', itemCount: 4 }),
       );
-      gateway.getItems.mockResolvedValue([itemFixture()]);
       await round();
 
-      expect(
-        screen.getByText('loaded: [r1=ready] 1 items'),
-      ).toBeInTheDocument();
-      expect(gateway.getItems).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('loaded: [r1=ready]')).toBeInTheDocument();
+      expect(gateway.getItems).not.toHaveBeenCalled();
 
       // Nothing is left to follow.
       gateway.getResource.mockClear();
@@ -290,7 +278,7 @@ describe('InterviewProfileProvider', () => {
       expect(gateway.getResource).not.toHaveBeenCalled();
     });
 
-    it('does not read the skill map for a resource that failed, or that added nothing', async () => {
+    it('stops at a resource that failed', async () => {
       vi.useFakeTimers();
       const { gateway, mount } = withProcessing();
       gateway.getResource.mockResolvedValue(
@@ -315,7 +303,7 @@ describe('InterviewProfileProvider', () => {
       mount();
       await round();
 
-      expect(screen.getByText('loaded: [] 0 items')).toBeInTheDocument();
+      expect(screen.getByText('loaded: []')).toBeInTheDocument();
     });
 
     it('tries again at the next round after a failed read', async () => {
@@ -457,9 +445,7 @@ describe('InterviewProfileProvider', () => {
       });
 
       expect(answer).toEqual(resourceFixture({ id: 'r7' }));
-      expect(
-        screen.getByText('loaded: [r7=ready] 0 items'),
-      ).toBeInTheDocument();
+      expect(screen.getByText('loaded: [r7=ready]')).toBeInTheDocument();
     });
 
     it('passes a failed read of one resource on to the page that asked', async () => {
@@ -469,41 +455,6 @@ describe('InterviewProfileProvider', () => {
       gateway.getResource.mockRejectedValue(failure);
 
       await expect(actions.refreshResource('r7')).rejects.toBe(failure);
-    });
-
-    it('reads the skill map again', async () => {
-      const { gateway, mount } = loaded();
-      mount();
-      gateway.getItems.mockResolvedValue([itemFixture(), itemFixture()]);
-
-      await act(async () => {
-        await actions.refreshItems();
-      });
-
-      expect(screen.getByText('loaded: [] 2 items')).toBeInTheDocument();
-    });
-
-    it('keeps the skill map it has when it cannot be read again', async () => {
-      const { gateway, mount } = setUp({
-        interviewProfile: {
-          uid: 'uid-1',
-          status: 'loaded',
-          items: [itemFixture()],
-        },
-      });
-      mount();
-      gateway.getItems.mockRejectedValue(
-        new ProfileError(ProfileErrorCode.Unknown),
-      );
-
-      await act(async () => {
-        await actions.refreshItems();
-      });
-
-      expect(screen.getByText('loaded: [] 1 items')).toBeInTheDocument();
-      expect(mockLogger.logError).toHaveBeenCalledWith(
-        new Error('getItems failed: code=profile/unknown uid=uid-1'),
-      );
     });
 
     it('reads everything again after a failed load', async () => {
@@ -519,9 +470,7 @@ describe('InterviewProfileProvider', () => {
         await actions.reload();
       });
 
-      expect(
-        screen.getByText('loaded: [r1=ready] 0 items'),
-      ).toBeInTheDocument();
+      expect(screen.getByText('loaded: [r1=ready]')).toBeInTheDocument();
     });
 
     it('does nothing without a provider, and says so when asked to read', async () => {

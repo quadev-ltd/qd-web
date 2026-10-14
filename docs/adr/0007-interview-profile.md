@@ -3,10 +3,10 @@
 - **Status:** accepted (October 2026), and built slice by slice. Done: the checks of 13 Oct 2026
   ("slice 0", before any screen), the foundation ("slice 1": the flags, the gateway, `/profile`
   behind the flag, the tests against the emulators), the profile page with "Add a resource"
-  ("slice 2"), the page of a resource ("slice 3") and the finish ("slice 5": what was read, on the
-  page of each resource, the download, the home's starting card, Remote Config). The skill map and
-  the item ("slice 4") wait: the owner took them out of this delivery on 14 Oct 2026 (see "The
-  skill map waits"). Left: the walk-through on the dev site with the real model.
+  ("slice 2"), the page of a resource ("slice 3") and the finish ("slice 5": the download, the
+  home's starting card, Remote Config). The skill map and the item ("slice 4") wait, and since 14
+  Oct 2026 the website shows the resources only, with no items (see "The skill map waits" and
+  "The resources only"). Left: the walk-through on the dev site with the real model.
 - **Scope:** `src/core/profile/`, `src/core/firebase/` (the callables, the reads, the upload),
   `src/core/flags/`, `src/screens/Profile/`, the Content-Security-Policy in `firebase.json`,
   `e2e-emulators/` and the `e2e-emulators` job
@@ -298,6 +298,9 @@ either: the fake model never gives the same fact twice.
 
 ## The skill map waits (14 Oct 2026)
 
+_Partly replaced the same day: see "The resources only" below. "What we found", "What we read",
+"Something not right?" and "The page" were built, deployed to dev and then taken out again._
+
 The owner took the skill map and the page of an item out of this delivery, for now: "Can we delete
 the skills map section, maybe I can add them later, but not now" (D68 in the research notes). Slice 4
 (#25) is not merged and its branch is kept. The artboards were redrawn the same day, and the finish
@@ -327,6 +330,28 @@ Where the build goes beyond the redrawn artboards, or stops short of them:
 | A link that was read, on the website | "The page" above "What we read"; "Remove this link" in "This resource" | Drawn on the phone only                                                                                   |
 | The home's line while the CV is read | "Being read…" or "Waiting for the upload…" in place of the count       | Not drawn                                                                                                 |
 | "Your profile" on the home           | Not built ("6 resources · 42 items read from them")                    | It is part of the home with applications (delivery 2a). The home of this delivery has the first card only |
+
+## The resources only (14 Oct 2026, later)
+
+The owner then took the items off the website altogether: "right now I just want to show the
+resources and the ability to remove them, that is it", with no counts either (D70 in the research
+notes). The skill map may come back later with editing, removing and adding items by hand.
+
+- **The profile is the list of resources** and "Add a resource", in one column 760 pixels wide. A
+  resource says "Ready", without a count; "nothing new found" went with the counts.
+- **The page of a resource** is one column too: what it is, where it is (being read, stuck, failed
+  and why), "This resource" with its file or address, "Download the file", and "Remove". A link's
+  address is a link only when it is one the backend accepts.
+- **The remove dialog gives no number:** "Briefs that used it will show as out of date."
+- **The home's line** names the CV and leads to its page.
+- **The pages no longer read the items.** The profile's provider read every item at the first
+  profile page of a session, and again when a resource was read: up to 800 billed reads for
+  nothing shown. The gateway keeps `getItems` for the brief of delivery 2a.
+- **The backend does not change.** Every resource is still read into items, which briefs and CV
+  versions use.
+
+The design chat redraws P1, P3 and the homes from the same list; anything that differs is adjusted
+when the canvas has them.
 
 ## Consequences
 

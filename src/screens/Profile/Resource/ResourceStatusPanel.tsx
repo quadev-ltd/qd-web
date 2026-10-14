@@ -64,7 +64,6 @@ const SURFACES = {
   danger: 'bg-danger-tint',
 };
 const TILES = {
-  success: 'bg-success-tint text-success',
   warning: 'bg-surface text-warning',
   danger: 'bg-surface text-danger',
 };
@@ -113,7 +112,7 @@ const Tile: React.FC<{ icon: IconName; tone: keyof typeof TILES }> = ({
 );
 
 export interface ResourceStatusPanelProps {
-  resource: Pick<ProfileResource, 'status' | 'failure' | 'itemCount'>;
+  resource: Pick<ProfileResource, 'status' | 'failure'>;
   /** The backend has not finished with it for longer than it ever takes. */
   stuck: boolean;
   onRemove: () => void;
@@ -121,12 +120,11 @@ export interface ResourceStatusPanelProps {
 
 /**
  * What is going on with a resource, when that needs more than a chip: it is being read, it
- * is stuck, it was read and added nothing, or it failed and why. A resource is read once,
- * so every way out of a failure is "Remove". A resource that was read and added items has
- * no panel: its items say it.
+ * is stuck, or it failed and why. A resource is read once, so every way out of a failure is
+ * "Remove". A resource that was read has no panel: its chip says it.
  */
 export const ResourceStatusPanel: React.FC<ResourceStatusPanelProps> = ({
-  resource: { status, failure, itemCount },
+  resource: { status, failure },
   stuck,
   onRemove,
 }) => {
@@ -154,14 +152,7 @@ export const ResourceStatusPanel: React.FC<ResourceStatusPanelProps> = ({
     );
   }
   if (status === 'ready') {
-    return itemCount > 0 ? null : (
-      <Panel
-        tone="plain"
-        lead={<Tile icon="check" tone="success" />}
-        title={t('resource.nothingNewTitle')}
-        description={t('resource.nothingNewDescription')}
-      />
-    );
+    return null;
   }
   if (stuck) {
     return (

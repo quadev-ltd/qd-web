@@ -1,7 +1,8 @@
 // Keeps the `interviewProfile` slice in step with the profile gateway, as SessionProvider
 // does for the session: it reads the profile when the first profile page opens, follows the
 // resources the backend is still reading, and gives the pages the few things they ask for
-// by name (read this resource again, read the skill map again).
+// by name (read this resource again). The items read from the resources are not read: no
+// page shows them (D70), and each one is a billed read.
 import {
   createContext,
   type ReactNode,
@@ -20,7 +21,6 @@ import { useSessionUser } from '@/core/session/hooks';
 import { useAppDispatch, useAppSelector } from '@/core/state/hooks';
 import { selectInterviewProfile } from '@/core/state/selectors/interviewProfile';
 import {
-  itemsLoaded,
   profileLoaded,
   profileLoadFailed,
   profileLoadStarted,
@@ -48,8 +48,6 @@ export interface InterviewProfileActions {
    * it no longer exists. Resolves the resource, or `null`.
    */
   refreshResource(resourceId: string): Promise<ProfileResource | null>;
-  /** Reads the skill map again. */
-  refreshItems(): Promise<void>;
   /** Follows a resource this page just added until it is read, whatever its clock says. */
   watchResource(resourceId: string): void;
 }
@@ -60,7 +58,6 @@ const notMounted = () =>
 const InterviewProfileContext = createContext<InterviewProfileActions>({
   reload: notMounted,
   refreshResource: notMounted,
-  refreshItems: notMounted,
   watchResource: () => undefined,
 });
 
@@ -83,18 +80,6 @@ export const InterviewProfileProvider: React.FC<{ children: ReactNode }> = ({
   // When this page started following a resource it added (its own clock).
   const watchedSince = useRef(new Map<string, number>());
 
-  const refreshItems = useCallback(async () => {
-    if (!uid) {
-      return;
-    }
-    try {
-      dispatch(itemsLoaded(await gateway.getItems(uid)));
-    } catch (error) {
-      // The list on screen is older than it could be; the next change reads it again.
-      logProfileError('getItems', error, uid);
-    }
-  }, [dispatch, gateway, uid]);
-
   const refreshResource = useCallback(
     async (resourceId: string) => {
       if (!uid) {
@@ -115,40 +100,28 @@ export const InterviewProfileProvider: React.FC<{ children: ReactNode }> = ({
     }
     dispatch(profileLoadStarted(uid));
     try {
-      const [loaded, items, extractionsToday] = await Promise.all([
+      const [loaded, extractionsToday] = await Promise.all([
         gateway.getResources(uid),
-        gateway.getItems(uid),
         // Only used to say "today's limit is reached" early: the backend refuses anyway.
         gateway.getExtractionsToday(uid).catch(() => 0),
       ]);
-      dispatch(
-        profileLoaded({ uid, resources: loaded, items, extractionsToday }),
-      );
+      dispatch(profileLoaded({ uid, resources: loaded, extractionsToday }));
     } catch (error) {
       logProfileError('loadProfile', error, uid);
       dispatch(profileLoadFailed(uid));
     }
   }, [dispatch, gateway, uid]);
 
-  /** Reads again the resources given, and the skill map when one of them was just read. */
+  /** Reads again the resources given. A failed read is tried again at the next round. */
   const catchUp = useCallback(
     async (pending: ProfileResource[]) => {
-      const answers = await Promise.all(
+      await Promise.all(
         pending.map(({ id }) =>
           refreshResource(id).catch(() => undefined as undefined),
         ),
       );
-      // A failed read is tried again at the next round. A resource that added nothing
-      // leaves the skill map as it is.
-      if (
-        answers.some(
-          answer => answer?.status === 'ready' && answer.itemCount > 0,
-        )
-      ) {
-        await refreshItems();
-      }
     },
-    [refreshItems, refreshResource],
+    [refreshResource],
   );
 
   // The first profile page of the session reads everything. Coming back to the profile
@@ -168,8 +141,7 @@ export const InterviewProfileProvider: React.FC<{ children: ReactNode }> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
 
-  // While the backend reads a resource, read it again every 2 seconds. The list of items is
-  // not read here: each item is a billed read (see `catchUp`).
+  // While the backend reads a resource, read it again every 2 seconds.
   const pendingIds = profile.resources
     .filter(isPending)
     .map(({ id }) => id)
@@ -211,12 +183,11 @@ export const InterviewProfileProvider: React.FC<{ children: ReactNode }> = ({
     () => ({
       reload,
       refreshResource,
-      refreshItems,
       watchResource: resourceId => {
         watchedSince.current.set(resourceId, Date.now());
       },
     }),
-    [refreshItems, refreshResource, reload],
+    [refreshResource, reload],
   );
 
   return (

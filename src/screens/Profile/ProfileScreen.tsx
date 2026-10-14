@@ -1,5 +1,5 @@
-// The interview profile: what the candidate added (a CV and other resources) and what was
-// found in them. No screen of the app to mirror yet: the website has it first.
+// The interview profile: what the candidate added (a CV and other resources), to open,
+// download or remove. No screen of the app to mirror yet: the website has it first.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router';
@@ -7,7 +7,6 @@ import { useLocation, useNavigate } from 'react-router';
 import AddResourcePanel from './AddResource/AddResourcePanel';
 import { PROFILE_MAIN } from './ProfileRoutes';
 import ResourceList from './ResourceList';
-import WhatWeFound from './WhatWeFound';
 
 import Icon from '@/components/Icon';
 import SignedInShell from '@/components/layout/SignedInShell';
@@ -44,7 +43,7 @@ export const ProfileScreen: React.FC = () => {
     panelFromState(location.state),
   );
 
-  const { status, resources, items } = profile;
+  const { status, resources } = profile;
   const isLoaded = status === 'loaded';
   const isEmpty = isLoaded && resources.length === 0;
   const full = isLoaded && isProfileFull(resources.length);
@@ -57,7 +56,7 @@ export const ProfileScreen: React.FC = () => {
     <SignedInShell
       title={t('profile.documentTitle')}
       mainClassName={PROFILE_MAIN}>
-      <div className="mx-auto flex max-w-[1120px] flex-col gap-6">
+      <div className="mx-auto flex max-w-[760px] flex-col gap-6">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-1">
             <h1 className="font-display text-[28px] leading-tight font-semibold">
@@ -143,16 +142,7 @@ export const ProfileScreen: React.FC = () => {
           </Card>
         )}
 
-        {isLoaded && !isEmpty && (
-          <div className="flex flex-wrap items-start gap-6">
-            <div className="min-w-0 flex-[999_1_520px]">
-              <ResourceList resources={resources} />
-            </div>
-            <div className="min-w-0 flex-[1_1_320px]">
-              <WhatWeFound items={items} />
-            </div>
-          </div>
-        )}
+        {isLoaded && !isEmpty && <ResourceList resources={resources} />}
       </div>
 
       {adding && (

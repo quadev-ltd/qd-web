@@ -1,7 +1,7 @@
 // The profile's use case against the real backend code: the callables, the upload under the
 // Storage rules, the trigger that reads the file, and the documents the site reads back.
-// The model is the backend's fake: one item per document, with random text. So the tests
-// assert on states and counts, never on what an item says.
+// The model is the backend's fake: one item per document, with random text. The website shows
+// the resources only (D70), so the tests assert on their states.
 import { expect, test } from '@playwright/test';
 
 import { createAccount, openProfile, signIn } from './support';
@@ -15,7 +15,7 @@ const CV_FILE = {
   ),
 };
 
-test('add a CV as a file: created, uploaded, read by the backend, and what was read is on its page', async ({
+test('add a CV as a file: created, uploaded, read by the backend, ready on its page, then removed', async ({
   page,
 }) => {
   const account = await createAccount({ interviewAssistant: true });
@@ -39,25 +39,20 @@ test('add a CV as a file: created, uploaded, read by the backend, and what was r
     .getByRole('listitem')
     .filter({ hasText: 'Maya Okafor CV 2026' });
   await expect(row).toContainText('CV');
-  await expect(row).toContainText('Ready · 1 item');
+  await expect(row.getByText('Ready', { exact: true })).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'Resources · 1 of 20' }),
   ).toBeVisible();
 
-  // The item the backend wrote is read, and counted on the profile
-  const found = page.getByRole('region', { name: 'What we found' });
-  await expect(found).toContainText('1 item');
-
   // Read again from the backend's documents after a reload
   await page.reload();
-  await expect(row).toContainText('Ready · 1 item');
-  await expect(found).toContainText('1 item');
+  await expect(row.getByText('Ready', { exact: true })).toBeVisible();
 
-  // The page of the resource shows the item; removeProfileResource takes both away
+  // The page of the resource; removeProfileResource takes it and its items away
   await row.getByRole('link').click();
   await expect(
-    page.getByRole('region', { name: 'What we read' }),
-  ).toContainText('1 item');
+    page.getByRole('heading', { level: 1, name: 'Maya Okafor CV 2026' }),
+  ).toBeVisible();
   // The address that downloads the stored file comes from the file store, for a normal link
   await expect(
     page.getByRole('link', { name: 'Download the file' }),
@@ -65,7 +60,7 @@ test('add a CV as a file: created, uploaded, read by the backend, and what was r
   await page.getByRole('button', { name: 'Remove this resource' }).click();
   await page
     .getByRole('dialog', { name: 'Remove this resource?' })
-    .getByRole('button', { name: 'Remove the resource and 1 item' })
+    .getByRole('button', { name: 'Remove the resource' })
     .click();
   await expect(page).toHaveURL('/profile');
   await expect(
@@ -102,7 +97,7 @@ test('pasted text is read; a link that cannot be read fails, says why, and is re
     .getByRole('listitem')
     .filter({ hasText: 'Stories for interviews' });
   await expect(note).toContainText('Note');
-  await expect(note).toContainText('Ready · 1 item');
+  await expect(note.getByText('Ready', { exact: true })).toBeVisible();
 
   // A link the backend's fake model cannot read (a host ending in .invalid)
   await page.getByRole('button', { name: 'Add a resource' }).click();
@@ -131,5 +126,5 @@ test('pasted text is read; a link that cannot be read fails, says why, and is re
   await expect(
     page.getByRole('heading', { name: 'Resources · 1 of 20' }),
   ).toBeVisible();
-  await expect(note).toContainText('Ready · 1 item');
+  await expect(note.getByText('Ready', { exact: true })).toBeVisible();
 });

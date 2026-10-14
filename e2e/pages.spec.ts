@@ -101,11 +101,11 @@ test('profile, empty and with resources in every state: accessible and no horizo
   await expectNoSeriousAccessibilityViolations(page);
   await expectNoHorizontalScroll(page);
 
-  // Ready, being read, waiting for the upload, nothing new found, failed.
+  // Ready, being read, waiting for the upload, failed.
   await seedProfile(page);
   await expect(page.getByText('Could not read this page')).toBeVisible();
   await expect(
-    page.getByRole('region', { name: 'What we found' }),
+    page.getByRole('heading', { name: 'Resources · 6 of 20' }),
   ).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
   await expectNoHorizontalScroll(page);
@@ -124,19 +124,10 @@ test('a resource, ready, being read and failed, a link that was read, and the re
     ).toBeVisible();
   };
 
-  // Ready, with what was read, one item open on its passage
+  // Ready
   await open('Maya Okafor CV 2026');
   await expect(
-    page.getByRole('region', { name: 'What we read' }),
-  ).toBeVisible();
-  await page
-    .getByRole('button', { name: /Cut payment incidents by 40%/ })
-    .click();
-  await expect(
-    page.getByText('Where it says this').filter({ visible: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('region', { name: 'Something not right?' }),
+    page.getByRole('link', { name: 'Download the file' }),
   ).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
 
@@ -155,11 +146,6 @@ test('a resource, ready, being read and failed, a link that was read, and the re
   );
   await expectAccessibleAndNotTooWide(page);
 
-  // Read, nothing new
-  await open('LinkedIn profile export');
-  await expect(page.getByRole('status')).toContainText('Nothing new was found');
-  await expectAccessibleAndNotTooWide(page);
-
   // Failed
   await open('Conference talk: Ledgers without tears');
   await expect(page.getByRole('status')).toContainText(
@@ -167,7 +153,7 @@ test('a resource, ready, being read and failed, a link that was read, and the re
   );
   await expectAccessibleAndNotTooWide(page);
 
-  // A link that was read: its page in a card of its own
+  // A link that was read: its address beside it
   await page.goto('/profile');
   await page.getByRole('button', { name: 'Add a resource' }).click();
   await page.getByRole('button', { name: /Add a link/ }).click();
@@ -182,9 +168,13 @@ test('a resource, ready, being read and failed, a link that was read, and the re
   await expect(form).toBeHidden();
   await expect(
     page.getByRole('listitem').filter({ hasText: 'Blog post' }),
-  ).toContainText('Ready · 2 items');
+  ).toContainText('Ready');
   await open('Blog post: Moving a ledger to event sourcing');
-  await expect(page.getByRole('region', { name: 'The page' })).toBeVisible();
+  await expect(
+    page.getByRole('link', {
+      name: 'https://engineering.fenwickpay.example/blog/ledger-event-sourcing',
+    }),
+  ).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
 });
 
