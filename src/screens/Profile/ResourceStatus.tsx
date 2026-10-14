@@ -24,22 +24,20 @@ const FAILURE_KEYS = {
 const LINE = 'flex items-center gap-1.5 text-sm leading-normal';
 
 /**
- * Where a resource is, in one line: waiting for its file, being read, read (with how many
- * items it added) or not read (with why). The line is a live region: when the
+ * Where a resource is, in one line: waiting for its file, being read, read, or not read
+ * (with why). The line is a live region: when the
  * backend finishes while the page is open, a screen reader says the new state.
  */
 export const ResourceStatus: React.FC<{
-  resource: Pick<ProfileResource, 'status' | 'failure' | 'itemCount'>;
-}> = ({ resource: { status, failure, itemCount } }) => {
+  resource: Pick<ProfileResource, 'status' | 'failure'>;
+}> = ({ resource: { status, failure } }) => {
   const { t } = useTranslation();
 
   if (status === 'ready') {
     return (
       <span aria-live="polite" className={`${LINE} font-medium text-success`}>
         <Icon name="check" size={16} />
-        {itemCount > 0
-          ? t('profile.statusReady', { count: itemCount })
-          : t('profile.statusReadyNothingNew')}
+        {t('profile.statusReady')}
       </span>
     );
   }

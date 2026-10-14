@@ -9,7 +9,7 @@ import { selectProfileGateway } from '@/core/profile/selectProfileGateway';
 import { type InterviewProfileState } from '@/core/state/slices/interviewProfileSlice';
 import { SessionStatus } from '@/core/state/slices/sessionSlice';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
-import { itemFixture, resourceFixture } from '@/testUtil/profileFixtures';
+import { resourceFixture } from '@/testUtil/profileFixtures';
 import { PROFILE_TEST_USER } from '@/testUtil/renderProfilePage';
 import { renderWithProviders } from '@/testUtil/renderWithProviders';
 
@@ -81,17 +81,18 @@ describe('StartCard', () => {
     expect(gateway.getResources).toHaveBeenCalledExactlyOnceWith('uid-1');
   });
 
-  it('says the CV is in the profile once it is, with what was read from it, and leads to its page', () => {
+  it('says the CV is in the profile once it is, names it, and leads to its page', () => {
     setUp(
       loaded({
-        resources: [resourceFixture({ id: 'r1', type: 'cv' })],
-        items: [itemFixture({ id: '1' }), itemFixture({ id: '2' })],
+        resources: [
+          resourceFixture({ id: 'r1', type: 'cv', title: 'Maya Okafor CV' }),
+        ],
       }),
     );
 
     const link = screen.getByRole('link', { name: /home\.startDoneTitle/ });
     expect(link).toHaveAttribute('href', '/profile/resources/r1');
-    expect(link).toHaveTextContent('home.startDoneDescription');
+    expect(link).toHaveTextContent('home.startDoneTitleMaya Okafor CV');
     expect(screen.queryByText('home.startTitle')).not.toBeInTheDocument();
   });
 
@@ -110,21 +111,18 @@ describe('StartCard', () => {
     ).toHaveAttribute('href', '/profile/resources/new');
   });
 
-  it.each([
-    ['awaitingUpload', 'profile.statusAwaitingUpload'],
-    ['processing', 'profile.statusProcessing'],
-  ] as const)(
-    'counts a CV that is still %s as added, and says where it is',
-    (status, text) => {
+  it.each(['awaitingUpload', 'processing'] as const)(
+    'counts a CV that is still %s as added',
+    status => {
       setUp(
         loaded({
           resources: [resourceFixture({ type: 'cv', status, itemCount: 0 })],
         }),
       );
 
-      const link = screen.getByRole('link', { name: /home\.startDoneTitle/ });
-      expect(link).toHaveTextContent(text);
-      expect(link).not.toHaveTextContent('home.startDoneDescription');
+      expect(
+        screen.getByRole('link', { name: /home\.startDoneTitle/ }),
+      ).toBeInTheDocument();
     },
   );
 

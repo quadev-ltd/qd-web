@@ -35,6 +35,16 @@ export const addedAt = (
   return { key: 'resource.addedOn', date: formatDay(createdAt) };
 };
 
+/** A page's address as the page shows it: no "https://", and no "/" alone at the end. */
+export const shortAddress = (address: string): string => {
+  try {
+    const { host, pathname, search } = new URL(address);
+    return `${host}${pathname === '/' ? '' : pathname}${search}`;
+  } catch {
+    return address;
+  }
+};
+
 /**
  * What the content of a resource is, in a word: the translation key for a file or a text,
  * or the host of a link's address ("talks.example").

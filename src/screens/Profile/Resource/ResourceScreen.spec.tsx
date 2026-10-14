@@ -9,7 +9,7 @@ import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import { RESOURCE_WATCH_MS } from '@/core/profile/InterviewProfileProvider';
 import { type InterviewProfileState } from '@/core/state/slices/interviewProfileSlice';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
-import { itemFixture, resourceFixture } from '@/testUtil/profileFixtures';
+import { resourceFixture } from '@/testUtil/profileFixtures';
 import { renderProfilePage } from '@/testUtil/renderProfilePage';
 
 vi.mock('@/core/logger', () => ({
@@ -69,24 +69,8 @@ afterEach(() => {
 
 describe('ResourceScreen', () => {
   describe('a resource that was read', () => {
-    const items = [
-      itemFixture({ id: 'i1', text: 'Go in production', createdAt: 1 }),
-      itemFixture({
-        id: 'i2',
-        text: 'Cut incidents by 40%',
-        createdAt: 2,
-        starred: true,
-        edited: true,
-      }),
-      itemFixture({
-        id: 'other',
-        text: 'From another resource',
-        resourceId: 'r9',
-      }),
-    ];
-
-    it('shows what it is, that it is ready and when it was added', () => {
-      setUp(ready({ itemCount: 2 }), { items });
+    it('shows what it is, that it is ready and when it was added, and nothing read from it', () => {
+      setUp(ready({ itemCount: 2 }));
 
       expect(
         screen.getByRole('heading', { level: 1, name: 'Maya Okafor CV 2026' }),
@@ -98,43 +82,24 @@ describe('ResourceScreen', () => {
       ).toBeInTheDocument();
       expect(document.title).toBe('resource.documentTitle');
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      // The page shows the resource only: no items, no count of them (D70).
+      expect(screen.getAllByRole('heading').map(h => h.textContent)).toEqual([
+        'Maya Okafor CV 2026',
+        'resource.detailsTitle',
+      ]);
     });
 
-    it('shows what was read from it, and only from it', () => {
-      setUp(ready({ itemCount: 2 }), { items });
-
-      const read = screen.getByRole('region', { name: 'resource.readTitle' });
-      expect(read).toHaveTextContent('resource.readCount');
-      expect(read).toHaveTextContent('Cut incidents by 40%');
-      expect(read).toHaveTextContent('Go in production');
-      expect(
-        screen.queryByText('From another resource'),
-      ).not.toBeInTheDocument();
-      // Read only: nothing leads to an item, and nothing says it was starred or edited.
-      expect(within(read).queryByRole('link')).not.toBeInTheDocument();
-      expect(read).not.toHaveTextContent(/edited|starred/i);
-    });
-
-    it('says how to correct an item: remove the resource, then add it again', () => {
-      setUp(ready({ itemCount: 2 }), { items });
-
-      const fix = screen.getByRole('region', { name: 'resource.fixTitle' });
-      expect(fix).toHaveTextContent('resource.fixDescription');
-    });
-
-    it('explains a resource that added nothing new, and lists nothing', () => {
+    it('says the same "Ready" for a resource that added nothing new', () => {
       setUp(ready({ itemCount: 0 }));
 
-      expect(screen.getByRole('status')).toHaveTextContent(
-        'resource.nothingNewTitle',
-      );
-      expect(screen.queryByText('resource.readTitle')).not.toBeInTheDocument();
-      expect(screen.queryByText('resource.fixTitle')).not.toBeInTheDocument();
+      expect(screen.getByText('profile.statusReady')).toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
   });
 
   describe('the details beside it', () => {
-    const details = () => screen.getByRole('complementary');
+    const details = () =>
+      screen.getByRole('region', { name: 'resource.detailsTitle' });
 
     it('names the type, the day it was added and what the file is', () => {
       setUp(ready());
@@ -147,60 +112,36 @@ describe('ResourceScreen', () => {
       );
     });
 
-    it('gives the address of a link that is not read yet, to open in another tab', () => {
-      setUp(
-        ready({
-          type: 'link',
-          source: 'link',
-          contentType: 'text/uri-list',
-          url: 'https://talks.example/ledgers',
-          status: 'processing',
-        }),
-      );
+    it.each(['processing', 'ready'] as const)(
+      'gives the address of a link (%s), to open in another tab, and names the link on "Remove"',
+      status => {
+        setUp(
+          ready({
+            type: 'link',
+            source: 'link',
+            contentType: 'text/uri-list',
+            url: 'https://talks.example/ledgers',
+            status,
+          }),
+        );
 
-      const link = within(details()).getByRole('link', {
-        name: 'https://talks.example/ledgers',
-      });
-      expect(link).toHaveAttribute('href', 'https://talks.example/ledgers');
-      expect(link).toHaveAttribute('target', '_blank');
-      expect(link).toHaveAttribute('rel', 'noreferrer');
-      expect(details()).toHaveTextContent('resource.addressLabel');
-      expect(
-        screen.getByText('resource.addedOn · talks.example'),
-      ).toBeInTheDocument();
-      expect(screen.queryByText('resource.pageTitle')).not.toBeInTheDocument();
-    });
-
-    it('shows the page of a link that was read in a card of its own, and its own way to correct it', () => {
-      setUp(
-        ready({
-          type: 'link',
-          source: 'link',
-          contentType: 'text/uri-list',
-          url: 'https://talks.example/ledgers?part=2',
-          itemCount: 1,
-        }),
-        { items: [itemFixture({ resourceId: 'r1' })] },
-      );
-
-      const page = screen.getByRole('region', { name: 'resource.pageTitle' });
-      expect(page).toHaveTextContent('talks.example');
-      expect(page).toHaveTextContent('/ledgers?part=2');
-      expect(page).toHaveTextContent('resource.pageReadOn');
-      expect(
-        within(page).getByRole('link', { name: 'resource.openPageLink' }),
-      ).toHaveAttribute('href', 'https://talks.example/ledgers?part=2');
-      // The address is in that card, not again beside it.
-      expect(details()).not.toHaveTextContent('resource.addressLabel');
-      expect(
-        within(details()).getByRole('button', {
-          name: 'resource.removeThisLink',
-        }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole('region', { name: 'resource.fixTitle' }),
-      ).toHaveTextContent('resource.fixLinkDescription');
-    });
+        const link = within(details()).getByRole('link', {
+          name: 'talks.example/ledgers',
+        });
+        expect(link).toHaveAttribute('href', 'https://talks.example/ledgers');
+        expect(link).toHaveAttribute('target', '_blank');
+        expect(link).toHaveAttribute('rel', 'noreferrer');
+        expect(details()).toHaveTextContent('resource.addressLabel');
+        expect(
+          screen.getByText('resource.addedOn · talks.example'),
+        ).toBeInTheDocument();
+        expect(
+          within(details()).getByRole('button', {
+            name: 'resource.removeThisLink',
+          }),
+        ).toBeInTheDocument();
+      },
+    );
 
     it('does not link to an address that is not a public https page', () => {
       setUp(
@@ -212,10 +153,6 @@ describe('ResourceScreen', () => {
         }),
       );
 
-      expect(screen.queryByText('resource.pageTitle')).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole('link', { name: 'resource.openPageLink' }),
-      ).not.toBeInTheDocument();
       expect(within(details()).queryByRole('link')).not.toBeInTheDocument();
     });
 
@@ -414,7 +351,7 @@ describe('ResourceScreen', () => {
       const dialog = screen.getByRole('dialog', {
         name: 'resource.removeDialogTitle',
       });
-      expect(dialog).toHaveTextContent('resource.removeDialogNoItems');
+      expect(dialog).toHaveTextContent('resource.removeDialogBriefs');
       expect(gateway.removeResource).not.toHaveBeenCalled();
 
       await userEvent.click(
@@ -430,24 +367,18 @@ describe('ResourceScreen', () => {
   });
 
   describe('removing from the details', () => {
-    it('says how many items go with it', async () => {
-      setUp(ready({ itemCount: 3 }), {
-        items: [
-          itemFixture({ id: 'i1', edited: true }),
-          itemFixture({ id: 'i2' }),
-          itemFixture({ id: 'i3', edited: true }),
-        ],
-      });
+    it('asks first, with no count of items', async () => {
+      setUp(ready({ itemCount: 3 }));
 
       await userEvent.click(
         screen.getByRole('button', { name: 'resource.removeLink' }),
       );
 
       const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveTextContent('resource.removeDialogItems');
+      expect(dialog).toHaveTextContent('resource.removeDialogBriefs');
       expect(
         within(dialog).getByRole('button', {
-          name: 'resource.removeConfirmItemsButton',
+          name: 'resource.removeConfirmButton',
         }),
       ).toBeInTheDocument();
     });

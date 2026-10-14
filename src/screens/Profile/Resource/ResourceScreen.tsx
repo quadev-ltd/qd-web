@@ -1,4 +1,4 @@
-// One resource of the profile: where it is, what was read from it, and "Remove".
+// One resource of the profile: where it is, what it is, its file to download, and "Remove".
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -9,12 +9,10 @@ import {
 } from '../AddResource/resourceTypes';
 import { PROFILE_MAIN } from '../ProfileRoutes';
 
-import LinkPageCard from './LinkPageCard';
 import RemoveResourceDialog from './RemoveResourceDialog';
-import { addedAt, contentOf, formatDay } from './resourceMeta';
+import { addedAt, contentOf, formatDay, shortAddress } from './resourceMeta';
 import ResourceStatusPanel from './ResourceStatusPanel';
 import { useFileUrl } from './useFileUrl';
-import WhatWeRead from './WhatWeRead';
 
 import Icon from '@/components/Icon';
 import SignedInShell from '@/components/layout/SignedInShell';
@@ -35,7 +33,6 @@ import {
   useInterviewProfile,
   useInterviewProfileActions,
 } from '@/core/profile/InterviewProfileProvider';
-import { itemsOfResource } from '@/core/profile/items';
 import { PROFILE_PATH } from '@/core/profile/paths';
 
 /** How often the page looks at the clock, for "a minute ago" and "taking longer than usual". */
@@ -53,42 +50,14 @@ const BackLink: React.FC = () => {
   );
 };
 
-/** "Something not right?": until items can be changed, the way to correct one (D68). */
-const FixCard: React.FC<{ link: boolean }> = ({ link }) => {
-  const { t } = useTranslation();
-  return (
-    <Card
-      as="section"
-      elevation="raised"
-      aria-labelledby="resource-fix"
-      className="gap-3 p-4">
-      <div className="flex items-center gap-3">
-        <span
-          aria-hidden="true"
-          className="flex size-10 flex-none items-center justify-center rounded-full bg-tint text-primary">
-          <Icon name="help" size={18} />
-        </span>
-        <h2
-          id="resource-fix"
-          className="min-w-0 flex-1 font-display text-[17px] leading-tight font-semibold">
-          {t('resource.fixTitle')}
-        </h2>
-      </div>
-      <p className="text-[15px] leading-normal text-muted">
-        {t(link ? 'resource.fixLinkDescription' : 'resource.fixDescription')}
-      </p>
-    </Card>
-  );
-};
-
 const StatusChip: React.FC<{ resource: ProfileResource }> = ({
-  resource: { status, itemCount },
+  resource: { status },
 }) => {
   const { t } = useTranslation();
   if (status === 'ready') {
     return (
       <Chip tone="success" icon="check">
-        {t('profile.statusReady', { count: itemCount })}
+        {t('profile.statusReady')}
       </Chip>
     );
   }
@@ -115,7 +84,7 @@ export const ResourceScreen: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { resourceId = '' } = useParams();
-  const { status, resources, items } = useInterviewProfile();
+  const { status, resources } = useInterviewProfile();
   const { reload } = useInterviewProfileActions();
   const [removing, setRemoving] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -136,9 +105,11 @@ export const ResourceScreen: React.FC = () => {
     <SignedInShell
       title={t('resource.documentTitle')}
       mainClassName={PROFILE_MAIN}>
-      <div className="mx-auto flex max-w-[1120px] flex-col gap-6">
-        <BackLink />
-        {children}
+      <div className="mx-auto max-w-[1120px]">
+        <div className="flex max-w-[760px] flex-col gap-6">
+          <BackLink />
+          {children}
+        </div>
       </div>
     </SignedInShell>
   );
@@ -182,14 +153,9 @@ export const ResourceScreen: React.FC = () => {
     );
   }
 
-  const ownItems = itemsOfResource(items, resource.id);
   const isLink = resource.source === 'link';
-  const isRead = resource.status === 'ready' && ownItems.length > 0;
   // A link's address, when it is one the backend accepts (it never stores another).
   const address = isLink ? parseProfileLink(resource.url ?? '') : undefined;
-  // A link that was read shows its page in a card of its own.
-  const pageAddress =
-    address && resource.status === 'ready' ? new URL(address) : undefined;
   const added = addedAt(resource.createdAt, now);
   const addedText = added
     ? added.key === 'resource.addedOn'
@@ -208,129 +174,113 @@ export const ResourceScreen: React.FC = () => {
     <SignedInShell
       title={t('resource.documentTitle')}
       mainClassName={PROFILE_MAIN}>
-      <div className="mx-auto flex max-w-[1120px] flex-col gap-6">
-        <BackLink />
-        <div className="flex flex-wrap items-start gap-6">
-          <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-5">
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap gap-2">
-                <Chip tone="brand" icon={RESOURCE_TYPE_ICONS[resource.type]}>
-                  {t(RESOURCE_TYPE_KEYS[resource.type])}
-                </Chip>
-                <StatusChip resource={resource} />
-              </div>
-              <h1 className="font-display text-[22px] leading-tight font-semibold wrap-anywhere">
-                {resource.title}
-              </h1>
-              <p className="text-sm leading-normal text-muted wrap-anywhere">
-                {[addedText, contentText].filter(Boolean).join(' · ')}
-              </p>
+      <div className="mx-auto max-w-[1120px]">
+        <div className="flex max-w-[760px] flex-col gap-6">
+          <BackLink />
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Chip tone="brand" icon={RESOURCE_TYPE_ICONS[resource.type]}>
+                {t(RESOURCE_TYPE_KEYS[resource.type])}
+              </Chip>
+              <StatusChip resource={resource} />
             </div>
-
-            <ResourceStatusPanel
-              resource={resource}
-              stuck={stuck}
-              onRemove={() => setRemoving(true)}
-            />
-
-            {pageAddress && (
-              <LinkPageCard
-                address={pageAddress}
-                createdAt={resource.createdAt}
-              />
-            )}
-
-            {ownItems.length > 0 && <WhatWeRead items={ownItems} />}
+            <h1 className="font-display text-[22px] leading-tight font-semibold wrap-anywhere">
+              {resource.title}
+            </h1>
+            <p className="text-sm leading-normal text-muted wrap-anywhere">
+              {[addedText, contentText].filter(Boolean).join(' · ')}
+            </p>
           </div>
 
-          <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-5">
-            <Card
-              as="aside"
-              elevation="raised"
-              aria-labelledby="resource-details"
-              className="gap-3 p-4">
-              <h2
-                id="resource-details"
-                className="font-display text-[18px] leading-tight font-semibold">
-                {t('resource.detailsTitle')}
-              </h2>
-              <dl className="grid grid-cols-[minmax(0,110px)_minmax(0,1fr)] gap-x-4 gap-y-3">
-                <dt className="text-sm leading-normal text-muted">
-                  {t('resource.typeLabel')}
-                </dt>
-                <dd className="text-base leading-normal">
-                  {t(RESOURCE_TYPE_KEYS[resource.type])}
-                </dd>
-                {resource.createdAt !== null && (
-                  <>
-                    <dt className="text-sm leading-normal text-muted">
-                      {t('resource.addedLabel')}
-                    </dt>
-                    <dd className="text-base leading-normal">
-                      {formatDay(resource.createdAt)}
-                    </dd>
-                  </>
-                )}
-                {!pageAddress && (
-                  <>
-                    <dt className="text-sm leading-normal text-muted">
-                      {t(
-                        resource.source === 'link'
-                          ? 'resource.addressLabel'
-                          : resource.source === 'file'
-                            ? 'resource.fileLabel'
-                            : 'resource.contentLabel',
-                      )}
-                    </dt>
-                    <dd className="text-base leading-normal wrap-anywhere">
-                      {address ? (
-                        <a
-                          href={address}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-medium no-underline hover:underline">
-                          {address}
-                        </a>
-                      ) : (
-                        contentText
-                      )}
-                    </dd>
-                  </>
-                )}
-              </dl>
-              {fileUrl && (
-                // A normal link: the browser fetches the file, the page never reads it.
-                <a
-                  href={fileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={buttonClassName({
-                    variant: 'secondary',
-                    size: 'small',
-                    className: 'gap-2 text-[15px]',
-                  })}>
-                  <Icon name="download" size={18} />
-                  {t('resource.downloadLink')}
-                </a>
+          <ResourceStatusPanel
+            resource={resource}
+            stuck={stuck}
+            onRemove={() => setRemoving(true)}
+          />
+
+          <Card
+            as="section"
+            elevation="raised"
+            aria-labelledby="resource-details"
+            className="gap-3 p-4">
+            <h2
+              id="resource-details"
+              className="font-display text-[18px] leading-tight font-semibold">
+              {t('resource.detailsTitle')}
+            </h2>
+            <dl className="grid grid-cols-[minmax(0,110px)_minmax(0,1fr)] gap-x-4 gap-y-3">
+              <dt className="text-sm leading-normal text-muted">
+                {t('resource.typeLabel')}
+              </dt>
+              <dd className="text-base leading-normal">
+                {t(RESOURCE_TYPE_KEYS[resource.type])}
+              </dd>
+              {resource.createdAt !== null && (
+                <>
+                  <dt className="text-sm leading-normal text-muted">
+                    {t('resource.addedLabel')}
+                  </dt>
+                  <dd className="text-base leading-normal">
+                    {formatDay(resource.createdAt)}
+                  </dd>
+                </>
               )}
-              <Button
-                variant="quietDanger"
-                size="small"
-                onClick={() => setRemoving(true)}
-                className="gap-2 self-start text-[15px]">
-                <Icon name="trash" size={18} />
-                {t(isLink ? 'resource.removeThisLink' : 'resource.removeLink')}
-              </Button>
-            </Card>
-            {isRead && <FixCard link={isLink} />}
-          </div>
+              <dt className="text-sm leading-normal text-muted">
+                {t(
+                  resource.source === 'link'
+                    ? 'resource.addressLabel'
+                    : resource.source === 'file'
+                      ? 'resource.fileLabel'
+                      : 'resource.contentLabel',
+                )}
+              </dt>
+              <dd className="text-base leading-normal wrap-anywhere">
+                {address ? (
+                  <a
+                    href={address}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium no-underline hover:underline">
+                    {shortAddress(address)}
+                    <span className="ml-1 inline-flex align-[-3px]">
+                      <Icon name="external" size={16} />
+                    </span>
+                  </a>
+                ) : (
+                  contentText
+                )}
+              </dd>
+            </dl>
+            {fileUrl && (
+              // A normal link: the browser fetches the file, the page never reads it.
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonClassName({
+                  variant: 'secondary',
+                  size: 'small',
+                  className: 'gap-2 self-start text-[15px]',
+                })}>
+                <Icon name="download" size={18} />
+                {t('resource.downloadLink')}
+              </a>
+            )}
+            <Button
+              variant="quietDanger"
+              size="small"
+              onClick={() => setRemoving(true)}
+              className="gap-2 self-start text-[15px]">
+              <Icon name="trash" size={18} />
+              {t(isLink ? 'resource.removeThisLink' : 'resource.removeLink')}
+            </Button>
+          </Card>
         </div>
       </div>
 
       {removing && (
         <RemoveResourceDialog
           resourceId={resource.id}
-          itemCount={ownItems.length}
           onCancel={() => setRemoving(false)}
           onRemoved={() => navigate(PROFILE_PATH, { replace: true })}
         />

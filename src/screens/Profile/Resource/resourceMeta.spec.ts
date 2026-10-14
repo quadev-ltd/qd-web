@@ -1,4 +1,4 @@
-import { addedAt, contentOf, formatDay } from './resourceMeta';
+import { addedAt, contentOf, formatDay, shortAddress } from './resourceMeta';
 
 const NOW = Date.parse('2026-10-13T12:00:00Z');
 const minutes = (count: number) => count * 60_000;
@@ -70,5 +70,16 @@ describe('what the content of a resource is', () => {
     expect(contentOf({ source: 'link', contentType: '' })).toEqual({
       host: '',
     });
+  });
+});
+
+describe('shortAddress', () => {
+  it.each([
+    ['https://talks.example/ledgers', 'talks.example/ledgers'],
+    ['https://maya.example/', 'maya.example'],
+    ['https://maya.example/posts?page=2', 'maya.example/posts?page=2'],
+    ['not an address', 'not an address'],
+  ])('shows %s as %s', (address, shown) => {
+    expect(shortAddress(address)).toBe(shown);
   });
 });

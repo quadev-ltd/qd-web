@@ -1,14 +1,11 @@
-// The interview profile of the signed-in user, as the pages last read it: the resources and
-// the skill map. No screen of the app to mirror yet. The profile pages keep it in step with
+// The interview profile of the signed-in user, as the pages last read it: the resources. The
+// items read from them are not kept: no page shows them (D70). No screen of the app to mirror yet. The profile pages keep it in step with
 // the profile gateway (src/core/profile/hooks.ts); nothing here calls the backend.
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import { authStateChanged } from './sessionSlice';
 
-import {
-  type ProfileResource,
-  type SkillMapItem,
-} from '@/core/profile/contract';
+import { type ProfileResource } from '@/core/profile/contract';
 
 export type InterviewProfileStatus = 'idle' | 'loading' | 'loaded' | 'error';
 
@@ -18,8 +15,6 @@ export interface InterviewProfileState {
   status: InterviewProfileStatus;
   /** Newest first. */
   resources: ProfileResource[];
-  /** In no particular order: the pages sort them. */
-  items: SkillMapItem[];
   /** How many resources the backend read for this user today (UTC). */
   extractionsToday: number;
   /**
@@ -33,7 +28,6 @@ export const initialInterviewProfileState: InterviewProfileState = {
   uid: null,
   status: 'idle',
   resources: [],
-  items: [],
   extractionsToday: 0,
   dailyLimitRefused: false,
 };
@@ -60,7 +54,6 @@ export const interviewProfileSlice = createSlice({
       }: PayloadAction<{
         uid: string;
         resources: ProfileResource[];
-        items: SkillMapItem[];
         extractionsToday: number;
       }>,
     ) => {
@@ -70,7 +63,6 @@ export const interviewProfileSlice = createSlice({
       }
       state.status = 'loaded';
       state.resources = [...payload.resources].sort(newestFirst);
-      state.items = payload.items;
       state.extractionsToday = payload.extractionsToday;
     },
     profileLoadFailed: (state, { payload: uid }: PayloadAction<string>) => {
@@ -90,11 +82,6 @@ export const interviewProfileSlice = createSlice({
     },
     resourceRemoved: (state, { payload: id }: PayloadAction<string>) => {
       state.resources = state.resources.filter(resource => resource.id !== id);
-      state.items = state.items.filter(item => item.resourceId !== id);
-    },
-    /** The skill map was read again, after a resource was read or an item changed. */
-    itemsLoaded: (state, { payload }: PayloadAction<SkillMapItem[]>) => {
-      state.items = payload;
     },
     /** The backend accepted one more resource today. */
     extractionCounted: state => {
@@ -120,7 +107,6 @@ export const {
   profileLoadFailed,
   resourceChanged,
   resourceRemoved,
-  itemsLoaded,
   extractionCounted,
   dailyLimitRefused,
 } = interviewProfileSlice.actions;

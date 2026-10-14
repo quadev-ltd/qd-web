@@ -37,7 +37,7 @@ const renderRoutes = (
     <Routes>
       <Route element={<ProfileRoutes />}>
         <Route path="/profile" element={<Page />} />
-        <Route path="/profile/skill-map" element={<Page />} />
+        <Route path="/profile/resources/:resourceId" element={<Page />} />
       </Route>
     </Routes>,
     {
@@ -70,7 +70,7 @@ describe('ProfileRoutes', () => {
     expect(document.title).toBe('profile.documentTitle');
   });
 
-  it.each(['/profile', '/profile/skill-map'])(
+  it.each(['/profile', '/profile/resources/r1'])(
     'says "not available for your account yet" at %s while the flag is off',
     route => {
       renderRoutes({ flags: { interviewAssistant: false } }, route);

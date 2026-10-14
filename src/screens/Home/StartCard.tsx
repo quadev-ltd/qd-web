@@ -12,13 +12,12 @@ import {
   InterviewProfileProvider,
   useInterviewProfile,
 } from '@/core/profile/InterviewProfileProvider';
-import { itemsOfResource } from '@/core/profile/items';
 import { PROFILE_PATH, resourcePath } from '@/core/profile/paths';
 import { ProfileGatewayProvider } from '@/core/profile/ProfileGatewayProvider';
 
 const Content: React.FC = () => {
   const { t } = useTranslation();
-  const { status, resources, items } = useInterviewProfile();
+  const { status, resources } = useInterviewProfile();
 
   // Nothing until the profile is known: neither card is shown by mistake for a moment, and
   // a profile that cannot be read leaves the home as it was.
@@ -46,15 +45,7 @@ const Content: React.FC = () => {
               {t('home.startDoneTitle')}
             </span>
             <span className="text-sm leading-normal text-muted">
-              {cv.status === 'ready'
-                ? t('home.startDoneDescription', {
-                    count: itemsOfResource(items, cv.id).length,
-                  })
-                : t(
-                    cv.status === 'processing'
-                      ? 'profile.statusProcessing'
-                      : 'profile.statusAwaitingUpload',
-                  )}
+              {cv.title}
             </span>
           </span>
           <span className="flex text-muted">

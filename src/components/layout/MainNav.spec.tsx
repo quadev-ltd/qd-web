@@ -36,7 +36,7 @@ describe('MainNav', () => {
     expect(account).not.toHaveAttribute('aria-current');
   });
 
-  it.each(['/profile', '/profile/skill-map', '/profile/resources/r1'])(
+  it.each(['/profile', '/profile/resources/r1'])(
     'marks the profile as current at %s',
     route => {
       renderNav(route);

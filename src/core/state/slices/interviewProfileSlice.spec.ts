@@ -3,7 +3,6 @@ import reducer, {
   extractionCounted,
   initialInterviewProfileState,
   type InterviewProfileState,
-  itemsLoaded,
   profileLoaded,
   profileLoadFailed,
   profileLoadStarted,
@@ -12,7 +11,7 @@ import reducer, {
 } from './interviewProfileSlice';
 import { authStateChanged } from './sessionSlice';
 
-import { itemFixture, resourceFixture } from '@/testUtil/profileFixtures';
+import { resourceFixture } from '@/testUtil/profileFixtures';
 
 const user = (uid: string) => ({
   uid,
@@ -37,7 +36,6 @@ describe('interviewProfileSlice', () => {
       uid: null,
       status: 'idle',
       resources: [],
-      items: [],
       extractionsToday: 0,
       dailyLimitRefused: false,
     });
@@ -61,7 +59,6 @@ describe('interviewProfileSlice', () => {
   it('starts from nothing for another user', () => {
     const before = loaded({
       resources: [resourceFixture()],
-      items: [itemFixture()],
       extractionsToday: 7,
       dailyLimitRefused: true,
     });
@@ -83,7 +80,6 @@ describe('interviewProfileSlice', () => {
           resourceFixture({ id: 'new', createdAt: 3 }),
           resourceFixture({ id: 'middle', createdAt: 2 }),
         ],
-        items: [itemFixture()],
         extractionsToday: 4,
       }),
     );
@@ -94,7 +90,6 @@ describe('interviewProfileSlice', () => {
       'middle',
       'old',
     ]);
-    expect(state.items).toEqual([itemFixture()]);
     expect(state.extractionsToday).toBe(4);
   });
 
@@ -110,7 +105,6 @@ describe('interviewProfileSlice', () => {
         profileLoaded({
           uid: 'uid-1',
           resources: [resourceFixture()],
-          items: [],
           extractionsToday: 0,
         }),
       ),
@@ -169,25 +163,14 @@ describe('interviewProfileSlice', () => {
     ]);
   });
 
-  it('removes a resource with the items that came from it', () => {
+  it('removes a resource', () => {
     const before = loaded({
       resources: [resourceFixture({ id: 'a' }), resourceFixture({ id: 'b' })],
-      items: [
-        itemFixture({ id: 'i1', resourceId: 'a' }),
-        itemFixture({ id: 'i2', resourceId: 'b' }),
-      ],
     });
 
     const state = reducer(before, resourceRemoved('a'));
 
     expect(state.resources.map(({ id }) => id)).toEqual(['b']);
-    expect(state.items.map(({ id }) => id)).toEqual(['i2']);
-  });
-
-  it('takes the skill map as it was read again', () => {
-    const items = [itemFixture({ id: 'i9' })];
-
-    expect(reducer(loaded(), itemsLoaded(items)).items).toEqual(items);
   });
 
   it('counts one more resource read today', () => {
@@ -204,7 +187,6 @@ describe('interviewProfileSlice', () => {
   describe('when the session changes', () => {
     const before = loaded({
       resources: [resourceFixture()],
-      items: [itemFixture()],
     });
 
     it('keeps the profile while the same user is signed in', () => {
