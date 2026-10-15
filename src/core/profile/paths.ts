@@ -15,3 +15,9 @@ export const APPLICATION_PATH = `${APPLICATIONS_PREFIX}:applicationId`;
 
 export const applicationPath = (applicationId: string) =>
   `${APPLICATIONS_PREFIX}${encodeURIComponent(applicationId)}`;
+
+/** The details of an application: what it is, the job, "Edit" and "Remove". */
+export const APPLICATION_DETAILS_PATH = `${APPLICATION_PATH}/details`;
+
+export const applicationDetailsPath = (applicationId: string) =>
+  `${applicationPath(applicationId)}/details`;

@@ -26,6 +26,8 @@ export const unavailableProfileGateway: ProfileGateway = {
   createApplication: unavailable,
   updateApplication: unavailable,
   removeApplication: unavailable,
+  prepareBrief: unavailable,
+  getBriefsToday: unavailable,
 };
 
 export default unavailableProfileGateway;

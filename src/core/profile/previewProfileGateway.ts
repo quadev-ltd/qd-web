@@ -3,6 +3,9 @@ import {
   APPLICATION_NOTES_MAX_CHARS,
   APPLICATIONS_MAX,
   type ApplicationBrief,
+  BRIEF_DAILY_LIMIT,
+  type BriefQuestion,
+  type BriefRequirement,
   type CreateJobApplicationRequest,
   JOB_DESCRIPTION_MAX_CHARS,
   type JobApplication,
@@ -72,6 +75,8 @@ interface PreviewProfile {
   applications?: JobApplication[];
   /** Goes up with every change to the resources or the items, as the backend's does. */
   revision?: number;
+  /** How many briefs were prepared today. */
+  briefsToday?: number;
 }
 
 interface PreviewProfileState {
@@ -94,7 +99,22 @@ export interface PreviewProfileControls {
    * the job has changed since, and no brief yet.
    */
   seedApplications(): void;
+  /** The next brief cannot be prepared: the model failed, or today's limit was reached. */
+  failNextBrief(reason: 'model' | 'quota'): void;
+  /** How many briefs were already prepared today. */
+  setBriefsToday(count: number): void;
 }
+
+/** How long the fake takes to prepare a brief; the real one takes 10 to 20 seconds. */
+export const PREVIEW_BRIEF_MS = 1200;
+
+/** Questions the fake asks for any job, with what kind each is. */
+const PREVIEW_QUESTIONS: [string, BriefQuestion['kind']][] = [
+  ['Tell me about an incident you led from alert to fix.', 'behavioural'],
+  ['How would you design the main service of this team?', 'technical'],
+  ['How would you approach your first 90 days in this role?', 'role'],
+  ['Why this company, and why now?', 'motivation'],
+];
 
 export type PreviewProfileGateway = ProfileGateway & {
   controls: PreviewProfileControls;
@@ -202,6 +222,62 @@ export const createPreviewProfileGateway = ({
     const id = `${prefix}-${state.nextId}`;
     state.nextId += 1;
     return id;
+  };
+
+  let nextBriefFailure: 'model' | 'quota' | null = null;
+
+  /**
+   * A brief as the fake prepares it: one requirement for each sentence of the job (six at
+   * most), the first ones shown by the profile's items and the last two left as gaps, and
+   * four questions with notes.
+   */
+  const briefFor = (
+    profile: PreviewProfile,
+    application: JobApplication,
+  ): ApplicationBrief => {
+    const sentences = (application.jobDescription ?? '')
+      .split(/(?<=[.!?])\s+/)
+      .map(sentence => sentence.trim())
+      .filter(Boolean)
+      .slice(0, 6);
+    const items = profile.items;
+    const requirements: BriefRequirement[] = sentences.map(
+      (sentence, index) => ({
+        text: sentence.replace(/[.!?]$/, '').slice(0, 120),
+        importance: index < 4 ? 'required' : 'preferred',
+        evidence: sentence,
+        itemIds:
+          index < sentences.length - 2 && items.length > 0
+            ? [items[index % items.length]!.id]
+            : [],
+      }),
+    );
+    const questions: BriefQuestion[] = PREVIEW_QUESTIONS.map(
+      ([text, kind], index) => ({
+        text,
+        kind,
+        bullets: [
+          ...(items[index]
+            ? [
+                {
+                  text: items[index].text.slice(0, 80),
+                  itemId: items[index].id,
+                },
+              ]
+            : []),
+          {
+            text: 'Say what you changed afterwards, not only how you fixed it.',
+          },
+        ],
+      }),
+    );
+    return {
+      requirements,
+      questions,
+      applicationRevision: application.revision,
+      profileRevision: profile.revision ?? 0,
+      builtAt: now(),
+    };
   };
 
   const profileOf = (uid: string): PreviewProfile => {
@@ -401,6 +477,13 @@ export const createPreviewProfileGateway = ({
     },
     setExtractionsToday: count => {
       currentProfile().extractionsToday = count;
+      save();
+    },
+    failNextBrief: reason => {
+      nextBriefFailure = reason;
+    },
+    setBriefsToday: count => {
+      currentProfile().briefsToday = count;
       save();
     },
     seedApplications: () => {
@@ -698,6 +781,34 @@ export const createPreviewProfileGateway = ({
       save();
       return { revision: application.revision };
     },
+
+    prepareBrief: async applicationId => {
+      const profile = currentProfile();
+      const application = applicationsOf(profile).find(
+        ({ id }) => id === applicationId,
+      );
+      if (!application) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      const failure = nextBriefFailure;
+      nextBriefFailure = null;
+      if (
+        failure === 'quota' ||
+        (profile.briefsToday ?? 0) >= BRIEF_DAILY_LIMIT
+      ) {
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+      }
+      await wait(PREVIEW_BRIEF_MS);
+      profile.briefsToday = (profile.briefsToday ?? 0) + 1;
+      if (failure === 'model') {
+        save();
+        throw new ProfileError(ProfileErrorCode.Unknown);
+      }
+      application.brief = briefFor(profile, application);
+      application.updatedAt = now();
+      save();
+    },
+    getBriefsToday: async uid => read(uid).briefsToday ?? 0,
 
     removeApplication: async applicationId => {
       const profile = currentProfile();

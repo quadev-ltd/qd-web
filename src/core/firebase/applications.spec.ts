@@ -5,7 +5,9 @@ import {
   createApplication,
   getApplication,
   getApplications,
+  getBriefsToday,
   getProfileRevision,
+  prepareBrief,
   removeApplication,
   updateApplication,
 } from './applications';
@@ -191,5 +193,45 @@ describe('changing applications', () => {
     await expect(createApplication({ title: 'Go' })).rejects.toEqual(
       new ProfileError(ProfileErrorCode.MaxApplications),
     );
+  });
+});
+
+describe('the brief', () => {
+  it('prepares it with prepareApplicationBrief', async () => {
+    callable.mockResolvedValue({
+      data: { applicationId: 'a9', requirements: 6, gaps: 2, questions: 4 },
+    });
+
+    await prepareBrief('a9');
+
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'prepareApplicationBrief',
+    );
+    expect(callable).toHaveBeenCalledWith({ applicationId: 'a9' });
+  });
+
+  it('says today’s limit was reached', async () => {
+    callable.mockRejectedValue(
+      Object.assign(new Error('quota'), {
+        code: 'functions/resource-exhausted',
+      }),
+    );
+
+    await expect(prepareBrief('a9')).rejects.toEqual(
+      new ProfileError(ProfileErrorCode.DailyLimit),
+    );
+  });
+
+  it('counts today’s briefs from the usage of the day, 0 when there is none', async () => {
+    vi.mocked(getDoc).mockResolvedValueOnce(
+      document('day', {
+        services: { applicationBrief: { calls: 4 } },
+      }) as never,
+    );
+    await expect(getBriefsToday('uid-1')).resolves.toBe(4);
+
+    vi.mocked(getDoc).mockResolvedValueOnce(document('day') as never);
+    await expect(getBriefsToday('uid-1')).resolves.toBe(0);
   });
 });

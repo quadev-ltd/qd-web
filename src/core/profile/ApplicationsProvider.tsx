@@ -1,6 +1,7 @@
 // Keeps the `applications` slice in step with the profile gateway, as InterviewProfileProvider
 // does for the resources: it reads the applications, with the profile's revision, when the
-// first page that shows them opens, and gives the pages what they ask for by name.
+// first page that shows them opens, reads the revision again on each page after that, and
+// gives the pages what they ask for by name.
 import {
   createContext,
   type ReactNode,
@@ -23,6 +24,7 @@ import {
   applicationsLoaded,
   applicationsLoadFailed,
   applicationsLoadStarted,
+  profileRevisionRead,
 } from '@/core/state/slices/applicationsSlice';
 
 export interface ApplicationsActions {
@@ -33,6 +35,8 @@ export interface ApplicationsActions {
    * longer exists. Resolves the application, or `null`.
    */
   refreshApplication(applicationId: string): Promise<JobApplication | null>;
+  /** Reads the profile's revision again, after the page changed the profile. */
+  refreshProfileRevision(): Promise<void>;
 }
 
 const notMounted = () =>
@@ -41,6 +45,7 @@ const notMounted = () =>
 const ApplicationsContext = createContext<ApplicationsActions>({
   reload: notMounted,
   refreshApplication: notMounted,
+  refreshProfileRevision: notMounted,
 });
 
 /**
@@ -89,17 +94,31 @@ export const ApplicationsProvider: React.FC<{ children: ReactNode }> = ({
     [dispatch, gateway, uid],
   );
 
+  const refreshProfileRevision = useCallback(async () => {
+    if (!uid) {
+      return;
+    }
+    try {
+      dispatch(profileRevisionRead(await gateway.getProfileRevision(uid)));
+    } catch {
+      // The revision on screen stays: a brief is said to be out of date a little later.
+    }
+  }, [dispatch, gateway, uid]);
+
   useEffect(() => {
     if (uid && (loadedFor !== uid || status === 'idle')) {
       reload();
+    } else if (uid && status === 'loaded') {
+      // Coming back from the profile: one read says whether briefs went out of date.
+      refreshProfileRevision();
     }
     // Once per mount and per user: `status` changes while this effect's own work runs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
 
   const actions = useMemo<ApplicationsActions>(
-    () => ({ reload, refreshApplication }),
-    [refreshApplication, reload],
+    () => ({ reload, refreshApplication, refreshProfileRevision }),
+    [refreshApplication, refreshProfileRevision, reload],
   );
 
   return (

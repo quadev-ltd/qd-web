@@ -25,6 +25,8 @@ export const createMockProfileGateway = (): Mocked<ProfileGateway> => ({
   ),
   updateApplication: vi.fn(() => Promise.resolve({ revision: 2 })),
   removeApplication: vi.fn(() => Promise.resolve()),
+  prepareBrief: vi.fn(() => Promise.resolve()),
+  getBriefsToday: vi.fn(() => Promise.resolve(0)),
 });
 
 export default createMockProfileGateway;

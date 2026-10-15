@@ -23,7 +23,7 @@ const setUp = (
     <Routes>
       <Route
         path="/applications/:applicationId"
-        element={<ApplicationScreen />}
+        element={<ApplicationScreen tab="details" />}
       />
       <Route path="*" element={<Location />} />
     </Routes>,
@@ -148,6 +148,21 @@ describe('ApplicationScreen', () => {
     expect(await screen.findByText('at /home')).toBeInTheDocument();
     expect(gateway.removeApplication).toHaveBeenCalledExactlyOnceWith('a1');
     expect(store.getState().applications.applications).toEqual([]);
+  });
+
+  it('has a tab for its brief and one for its details, the open one marked', () => {
+    setUp(loaded());
+
+    const tabs = screen.getByRole('navigation', {
+      name: 'applications.tabsLabel',
+    });
+    expect(
+      within(tabs).getByRole('link', { name: 'applications.briefTab' }),
+    ).toHaveAttribute('href', '/applications/a1');
+    const details = within(tabs).getByRole('link', {
+      name: 'applications.detailsTab',
+    });
+    expect(details).toHaveAttribute('href', '/applications/a1/details');
   });
 
   it('says so when the application is not in the list', () => {

@@ -60,6 +60,17 @@ beforeEach(() => {
 
 describe('AddResourcePanel', () => {
   describe('how to add', () => {
+    it('opens straight on pasted text as a note for "Add a story" (D53)', () => {
+      setUp({ kind: 'note' });
+
+      const form = screen.getByRole('dialog', {
+        name: 'addResource.textTitle',
+      });
+      expect(
+        within(form).getByRole('radio', { name: 'profile.typeNote' }),
+      ).toBeChecked();
+    });
+
     it('offers a file, pasted text or a link', () => {
       setUp();
 

@@ -23,6 +23,7 @@ import {
 } from '@/core/auth/paths';
 import { env } from '@/core/env';
 import {
+  APPLICATION_DETAILS_PATH,
   APPLICATION_PATH,
   PROFILE_PATH,
   RESOURCE_PATH,
@@ -135,7 +136,15 @@ const accountRoutes: RouteObject[] = [
                 lazy: async () => ({
                   Component: (
                     await import('@/screens/Applications/ApplicationScreen')
-                  ).ApplicationScreen,
+                  ).ApplicationBriefScreen,
+                }),
+              },
+              {
+                path: APPLICATION_DETAILS_PATH,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/screens/Applications/ApplicationScreen')
+                  ).ApplicationDetailsScreen,
                 }),
               },
             ],

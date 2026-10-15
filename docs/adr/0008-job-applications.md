@@ -1,8 +1,8 @@
 # ADR 0008: Job applications on the website
 
 - **Status:** accepted (15 October 2026), built slice by slice (research doc 15 §16). Done: the
-  applications foundation, the home that lists them, a new application with the pasted job, and the
-  page of an application (its details, the job, "Edit", "Remove"). Next: the brief (slice 7), then
+  applications foundation, the home that lists them, a new application with the pasted job, the
+  page of an application (its details, the job, "Edit", "Remove"), and its brief (slice 7). Next:
   the job from a file or a link once the backend has it (research doc 17).
 - **Scope:** `src/core/profile/applications.ts`, `src/core/profile/ApplicationsProvider.tsx`, the
   `applications` slice of the store, `src/core/firebase/applications.ts`, `src/screens/Applications/`
@@ -57,9 +57,32 @@ Where the build goes beyond the artboards, or stops short of them:
 | "The job"                  | "Pasted on …" only, with "Show all" for a long job                                        | A copy of a posting and "Read the posting again" come with research doc 17                                                  |
 | "Remove this application"  | "Its brief is removed with it."                                                           | No sessions to mention yet                                                                                                  |
 
+## The brief (slice 7)
+
+- **The page of an application has two tabs,** "Brief" (its own address) and "Details"
+  (`/applications/:id/details`). A new application opens on its brief, not prepared yet.
+- **Preparing is one call of up to a minute.** The page says it is working while it runs and reads
+  the application again when it answers. A failure keeps the brief there was and says so; today's
+  limit (10 briefs) is said when the backend refuses, and the buttons stop offering more. The count
+  of today's briefs is read from the usage of the day, for "3 of 10 left today".
+- **The items behind a requirement are read when there is a brief to show them in,** and again after
+  each new brief: each item is a billed read, so no other page reads them since D70. An item the
+  brief names that was removed since is left out.
+- **"Out of date" has two levels,** as agreed in the design review: the job changed (a banner with
+  "Refresh") or the profile changed (a line beside "Refresh"). The profile's revision is read again
+  each time an application page opens, so a resource added on the profile shows here at once.
+- **"Add a story" on a gap opens "Add a resource" on pasted text, as a note** (D53).
+
+Where the brief goes beyond the artboards, or stops short of them:
+
+| Where             | What                                                                   | Why                                                          |
+| ----------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------ |
+| The requirements  | Every requirement opens in place, the gaps first; six, then "Show all" | The artboard shows some open and others closed, with no rule |
+| A gap             | "Add a story" only                                                     | "Practise this" has no backend yet                           |
+| A likely question | Its notes, with the profile item a note comes from or "Advice"         | "Practise this question" has no backend yet                  |
+| The tabs          | "Brief" and "Details"                                                  | Sessions and CV versions have no backend yet                 |
+
 ## Consequences
 
-- The brief (slice 7) adds a tab to the application's page and reads the profile's items for the
-  requirements a profile shows.
 - When research doc 17 is merged on the backend, "New application" loses its title field, offers
   "Text", "File" and "Link", and the page shows the job's reading states.

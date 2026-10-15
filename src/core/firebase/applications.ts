@@ -15,18 +15,21 @@ import { call, mapped, millis } from './interviewProfile';
 import logger from '@/core/logger';
 import {
   applicationsPath,
+  BRIEF_SERVICE,
   CREATE_JOB_APPLICATION,
   type CreateJobApplicationRequest,
   CreateJobApplicationResponseSchema,
   type JobApplication,
   JobApplicationSchema,
+  PREPARE_APPLICATION_BRIEF,
+  PrepareApplicationBriefResponseSchema,
   REMOVE_JOB_APPLICATION,
   RemoveJobApplicationResponseSchema,
   UPDATE_JOB_APPLICATION,
   type UpdateJobApplicationRequest,
   UpdateJobApplicationResponseSchema,
 } from '@/core/profile/applications';
-import { interviewProfilePath } from '@/core/profile/contract';
+import { interviewProfilePath, usageDayPath } from '@/core/profile/contract';
 
 /** An application as the contract reads it: every Firestore Timestamp in milliseconds. */
 const withDates = (id: string, data: DocumentData) => {
@@ -123,3 +126,17 @@ export const removeApplication = async (
     applicationId,
   });
 };
+
+export const prepareBrief = async (applicationId: string): Promise<void> => {
+  await call(PREPARE_APPLICATION_BRIEF, PrepareApplicationBriefResponseSchema, {
+    applicationId,
+  });
+};
+
+/** How many briefs the backend prepared for this user today (UTC). */
+export const getBriefsToday = (uid: string): Promise<number> =>
+  mapped(async () => {
+    const snapshot = await getDoc(doc(db(), usageDayPath(uid, new Date())));
+    const calls: unknown = snapshot.data()?.services?.[BRIEF_SERVICE]?.calls;
+    return typeof calls === 'number' && calls > 0 ? calls : 0;
+  });
