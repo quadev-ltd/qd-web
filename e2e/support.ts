@@ -124,3 +124,29 @@ export const expectInsideViewport = async (page: Page, locator: Locator) => {
     expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
   }
 };
+
+// Job applications (delivery 2a), with the same preview gateway.
+
+/** Signs in as the sample account and waits for its home, which lists applications. */
+export const openHome = async (page: Page) => {
+  await signIn(page);
+  await expect(page).toHaveURL('/home');
+  await expect(
+    page.getByRole('heading', { name: 'What do you want to do?' }),
+  ).toBeVisible();
+};
+
+/**
+ * The profile and the three applications of the designs: a brief with two gaps, one the job
+ * changed since, none yet. The home reads them again.
+ */
+export const seedApplications = async (page: Page) => {
+  await page.evaluate(() => {
+    window.qdPreviewProfile?.seed();
+    window.qdPreviewProfile?.seedApplications();
+  });
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Your applications' }),
+  ).toBeVisible();
+};

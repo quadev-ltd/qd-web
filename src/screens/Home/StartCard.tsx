@@ -15,7 +15,8 @@ import {
 import { PROFILE_PATH, resourcePath } from '@/core/profile/paths';
 import { ProfileGatewayProvider } from '@/core/profile/ProfileGatewayProvider';
 
-const Content: React.FC = () => {
+/** The card itself, for a page that already provides the gateway and the profile. */
+export const StartCardContent: React.FC = () => {
   const { t } = useTranslation();
   const { status, resources } = useInterviewProfile();
 
@@ -81,7 +82,7 @@ const Content: React.FC = () => {
 export const StartCard: React.FC = () => (
   <ProfileGatewayProvider>
     <InterviewProfileProvider>
-      <Content />
+      <StartCardContent />
     </InterviewProfileProvider>
   </ProfileGatewayProvider>
 );

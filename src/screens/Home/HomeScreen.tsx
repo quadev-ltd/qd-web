@@ -1,11 +1,11 @@
 // The signed-in home. The app's HomeScreen (qd-mobile src/screens/Home/HomeScreen.tsx) is a
 // welcome text and its drawer shows the name, the email, "Delete account" and "Sign out";
 // the web design puts all of it on this page. Everything shown comes from the session.
+import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
 import { DocumentIcon, MicrophoneIcon, SoundWaveIcon } from './icons';
-import StartCard from './StartCard';
 import ToolCard from './ToolCard';
 
 import Arcs from '@/components/layout/Arcs';
@@ -22,6 +22,10 @@ import {
 } from '@/core/auth/types';
 import { useFlag } from '@/core/flags/FlagsProvider';
 import { useProfile, useSessionUser, useSignOut } from '@/core/session/hooks';
+
+// Loaded only for an account with the interview tools: the forms and the applications stay
+// out of the page everyone else downloads.
+const InterviewHome = lazy(() => import('./InterviewHome'));
 
 const CARD_TITLE = 'text-[17px] leading-natural font-bold';
 const DETAILS =
@@ -46,9 +50,8 @@ export const HomeScreen: React.FC = () => {
   const user = useSessionUser();
   const profile = useProfile();
   const signOut = useSignOut();
-  // The interview tools are opened to accounts with this flag. What exists of them on the
-  // website so far is the profile: the home then starts with "Add your CV". The three
-  // tools below are not built here yet, so they say "Coming soon" to everyone.
+  // The interview tools are opened to accounts with this flag: their home is the list of
+  // applications (InterviewHome). Everyone else keeps the three tools, "Coming soon".
   const interviewAssistant = useFlag('interviewAssistant');
 
   const firstName = profile?.firstName ?? '';
@@ -68,7 +71,11 @@ export const HomeScreen: React.FC = () => {
     <SignedInShell title={t('home.documentTitle')}>
       <div
         data-surface="dark"
-        className="relative overflow-hidden bg-primary px-gutter pt-[clamp(36px,7vw,56px)] pb-28 text-white">
+        className={`relative overflow-hidden bg-primary px-gutter pt-[clamp(36px,7vw,56px)] text-white ${
+          // The tools' cards overlap the banner; the applications start below it, where
+          // their headings read on the page's own background.
+          interviewAssistant ? 'pb-[clamp(32px,6vw,48px)]' : 'pb-28'
+        }`}>
         <Arcs variant="welcome" />
         <div className="relative mx-auto flex max-w-[1120px] flex-col gap-3">
           <h1 className="font-display text-[clamp(30px,5vw,40px)] leading-[1.15] font-semibold text-balance">
@@ -81,28 +88,36 @@ export const HomeScreen: React.FC = () => {
       </div>
 
       <div className="px-gutter pb-16">
-        <div className="relative mx-auto -mt-16 flex max-w-[1120px] flex-col gap-10">
-          {interviewAssistant && <StartCard />}
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] gap-5">
-            <ToolCard
-              icon={<MicrophoneIcon />}
-              title={t('home.mockInterviewTitle')}
-              description={t('home.mockInterviewDescription')}
-              available={false}
-            />
-            <ToolCard
-              icon={<SoundWaveIcon />}
-              title={t('home.liveInterviewTitle')}
-              description={t('home.liveInterviewDescription')}
-              available={false}
-            />
-            <ToolCard
-              icon={<DocumentIcon />}
-              title={t('home.cvToolTitle')}
-              description={t('home.cvToolDescription')}
-              available={false}
-            />
-          </div>
+        <div
+          className={`relative mx-auto flex max-w-[1120px] flex-col gap-10 ${
+            interviewAssistant ? 'mt-8' : '-mt-16'
+          }`}>
+          {interviewAssistant ? (
+            <Suspense fallback={null}>
+              <InterviewHome />
+            </Suspense>
+          ) : (
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] gap-5">
+              <ToolCard
+                icon={<MicrophoneIcon />}
+                title={t('home.mockInterviewTitle')}
+                description={t('home.mockInterviewDescription')}
+                available={false}
+              />
+              <ToolCard
+                icon={<SoundWaveIcon />}
+                title={t('home.liveInterviewTitle')}
+                description={t('home.liveInterviewDescription')}
+                available={false}
+              />
+              <ToolCard
+                icon={<DocumentIcon />}
+                title={t('home.cvToolTitle')}
+                description={t('home.cvToolDescription')}
+                available={false}
+              />
+            </div>
+          )}
 
           <section
             id={ACCOUNT_SECTION_ID}

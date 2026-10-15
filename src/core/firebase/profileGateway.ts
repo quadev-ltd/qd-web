@@ -1,4 +1,12 @@
 import {
+  createApplication,
+  getApplication,
+  getApplications,
+  getProfileRevision,
+  removeApplication,
+  updateApplication,
+} from './applications';
+import {
   createResource,
   getExtractionsToday,
   getFileUrl,
@@ -32,6 +40,12 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   removeItem,
   removeResource,
   getFileUrl,
+  getApplications,
+  getApplication,
+  getProfileRevision,
+  createApplication,
+  updateApplication,
+  removeApplication,
 });
 
 export default createFirebaseProfileGateway;

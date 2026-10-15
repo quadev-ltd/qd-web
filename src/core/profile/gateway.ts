@@ -1,4 +1,9 @@
 import {
+  type CreateJobApplicationRequest,
+  type JobApplication,
+  type UpdateJobApplicationRequest,
+} from './applications';
+import {
   type CreateProfileResourceRequest,
   type ProfileResource,
   type ProfileUploadContentType,
@@ -92,4 +97,28 @@ export interface ProfileGateway {
 
   /** An address that downloads the file of a resource, to open as a normal link. */
   getFileUrl(resource: Pick<ProfileResource, 'storagePath'>): Promise<string>;
+
+  // ---------- Job applications (delivery 2a) ----------
+
+  /** The applications, the most recently changed first. */
+  getApplications(uid: string): Promise<JobApplication[]>;
+  /** One application; `null` when it does not exist (any more). */
+  getApplication(
+    uid: string,
+    applicationId: string,
+  ): Promise<JobApplication | null>;
+  /**
+   * The profile's revision, which goes up with every change to its resources and items. A
+   * brief built from an older one is out of date. 0 before anything was added.
+   */
+  getProfileRevision(uid: string): Promise<number>;
+  createApplication(
+    request: CreateJobApplicationRequest,
+  ): Promise<{ applicationId: string }>;
+  /** Resolves the application's revision after the change. */
+  updateApplication(
+    request: UpdateJobApplicationRequest,
+  ): Promise<{ revision: number }>;
+  /** Removes an application and its brief. */
+  removeApplication(applicationId: string): Promise<void>;
 }

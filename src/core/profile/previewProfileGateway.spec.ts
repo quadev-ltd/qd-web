@@ -704,4 +704,154 @@ describe('previewProfileGateway', () => {
       );
     });
   });
+
+  describe('applications', () => {
+    const job = {
+      title: 'Senior Backend Engineer',
+      jobDescription: 'Go services in production.',
+    };
+
+    it('creates an application, and lists the most recently changed first', async () => {
+      const { gateway, pass } = await setUp();
+
+      const { applicationId: first } = await gateway.createApplication(job);
+      pass(1000);
+      const { applicationId: second } = await gateway.createApplication({
+        ...job,
+        title: '  Platform Engineer  ',
+      });
+
+      const applications = await gateway.getApplications(UID);
+      expect(applications.map(({ id }) => id)).toEqual([second, first]);
+      expect(applications[0]).toMatchObject({
+        title: 'Platform Engineer',
+        revision: 1,
+      });
+      await expect(gateway.getApplication(UID, first)).resolves.toMatchObject({
+        id: first,
+      });
+      await expect(gateway.getApplication(UID, 'nope')).resolves.toBeNull();
+    });
+
+    it('refuses what the backend refuses: no title, a long job, a private address', async () => {
+      const { gateway } = await setUp();
+
+      expect(await codeOf(gateway.createApplication({ title: ' ' }))).toBe(
+        ProfileErrorCode.Invalid,
+      );
+      expect(
+        await codeOf(
+          gateway.createApplication({
+            title: 'Go',
+            jobDescription: 'a'.repeat(20_001),
+          }),
+        ),
+      ).toBe(ProfileErrorCode.Invalid);
+      expect(
+        await codeOf(
+          gateway.createApplication({
+            title: 'Go',
+            postingUrl: 'http://intranet.local/job',
+          }),
+        ),
+      ).toBe(ProfileErrorCode.Invalid);
+    });
+
+    it('holds 50 applications at most', async () => {
+      const { gateway } = await setUp();
+      for (let index = 0; index < 50; index += 1) {
+        await gateway.createApplication({ title: `Job ${index}` });
+      }
+
+      expect(await codeOf(gateway.createApplication(job))).toBe(
+        ProfileErrorCode.MaxApplications,
+      );
+    });
+
+    it('changes an application: a change the brief is built from moves its revision, the address does not', async () => {
+      const { gateway } = await setUp();
+      const { applicationId } = await gateway.createApplication(job);
+
+      await expect(
+        gateway.updateApplication({
+          applicationId,
+          postingUrl: 'https://northwind.example/jobs/1',
+        }),
+      ).resolves.toEqual({ revision: 1 });
+      await expect(
+        gateway.updateApplication({ applicationId, company: 'Northwind' }),
+      ).resolves.toEqual({ revision: 2 });
+      await expect(
+        gateway.updateApplication({ applicationId, company: null }),
+      ).resolves.toEqual({ revision: 3 });
+
+      const application = await gateway.getApplication(UID, applicationId);
+      expect(application?.company).toBeUndefined();
+      expect(application?.postingUrl).toBe('https://northwind.example/jobs/1');
+    });
+
+    it('does not empty the job description, and says when an application is gone', async () => {
+      const { gateway } = await setUp();
+      const { applicationId } = await gateway.createApplication(job);
+
+      expect(
+        await codeOf(
+          gateway.updateApplication({ applicationId, jobDescription: ' ' }),
+        ),
+      ).toBe(ProfileErrorCode.Invalid);
+      expect(
+        await codeOf(
+          gateway.updateApplication({ applicationId: 'nope', title: 'Go' }),
+        ),
+      ).toBe(ProfileErrorCode.NotFound);
+    });
+
+    it('removes an application', async () => {
+      const { gateway } = await setUp();
+      const { applicationId } = await gateway.createApplication(job);
+
+      await gateway.removeApplication(applicationId);
+
+      await expect(gateway.getApplications(UID)).resolves.toEqual([]);
+      expect(await codeOf(gateway.removeApplication(applicationId))).toBe(
+        ProfileErrorCode.NotFound,
+      );
+    });
+
+    it('moves the profile’s revision with every change to the resources', async () => {
+      const { gateway, pass } = await setUp();
+      await expect(gateway.getProfileRevision(UID)).resolves.toBe(0);
+
+      const { resourceId } = await gateway.createResource(note);
+      await expect(gateway.getProfileRevision(UID)).resolves.toBe(1);
+      pass(PREVIEW_READ_MS);
+      await expect(gateway.getProfileRevision(UID)).resolves.toBe(2);
+      await gateway.removeResource(resourceId);
+      await expect(gateway.getProfileRevision(UID)).resolves.toBe(3);
+    });
+
+    it('seeds the three applications of the designs: a brief with two gaps, one the job changed since, none', async () => {
+      const { gateway } = await setUp();
+      gateway.controls.seed();
+
+      gateway.controls.seedApplications();
+
+      const applications = await gateway.getApplications(UID);
+      expect(applications.map(({ title }) => title)).toEqual([
+        'Senior Backend Engineer',
+        'Engineering Manager',
+        'Platform Engineer',
+      ]);
+      const [ready, changed, none] = applications;
+      expect(
+        ready?.brief?.requirements.filter(
+          ({ itemIds }) => itemIds.length === 0,
+        ),
+      ).toHaveLength(2);
+      expect(changed?.brief?.applicationRevision).toBeLessThan(
+        changed?.revision ?? 0,
+      );
+      expect(none?.brief).toBeUndefined();
+    });
+  });
 });

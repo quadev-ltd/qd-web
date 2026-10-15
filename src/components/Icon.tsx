@@ -11,6 +11,13 @@ const PATHS = {
       <path d="M12 16.5v.01" />
     </>
   ),
+  case: (
+    <>
+      <rect x="3" y="7" width="18" height="13" rx="2" />
+      <path d="M9 7V4h6v3" />
+      <path d="M3 13h18" />
+    </>
+  ),
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
   clock: (
     <>
@@ -24,6 +31,12 @@ const PATHS = {
       <path d="M12 4v12" />
       <path d="M7 11l5 5 5-5" />
       <path d="M4 20h16" />
+    </>
+  ),
+  edit: (
+    <>
+      <path d="M4 20h4l10-10-4-4L4 16z" />
+      <path d="M13 7l4 4" />
     </>
   ),
   external: (
@@ -61,6 +74,13 @@ const PATHS = {
     <>
       <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
       <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+    </>
+  ),
+  mic: (
+    <>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v3" />
     </>
   ),
   plus: (

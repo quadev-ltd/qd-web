@@ -250,6 +250,8 @@ export const CallableReason = {
   Flag: 'flag',
   /** `failed-precondition`: the profile already holds PROFILE_MAX_RESOURCES resources. */
   MaxResources: 'max-resources',
+  /** `failed-precondition`: the account already holds APPLICATIONS_MAX applications. */
+  MaxApplications: 'max-applications',
 } as const;
 
 // ---------- The documents the owner reads ----------

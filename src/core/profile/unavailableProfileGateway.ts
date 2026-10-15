@@ -20,6 +20,12 @@ export const unavailableProfileGateway: ProfileGateway = {
   removeItem: unavailable,
   removeResource: unavailable,
   getFileUrl: unavailable,
+  getApplications: unavailable,
+  getApplication: unavailable,
+  getProfileRevision: unavailable,
+  createApplication: unavailable,
+  updateApplication: unavailable,
+  removeApplication: unavailable,
 };
 
 export default unavailableProfileGateway;

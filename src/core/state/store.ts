@@ -1,7 +1,8 @@
 // Mirrors qd-mobile src/core/state/store.ts (without the API slice, which the web does not have;
-// the `exit` and `interviewProfile` slices are web only).
+// the `exit`, `interviewProfile` and `applications` slices are web only).
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
 
+import { applicationsSlice } from './slices/applicationsSlice';
 import { exitSlice } from './slices/exitSlice';
 import { interviewProfileSlice } from './slices/interviewProfileSlice';
 import { sessionSlice } from './slices/sessionSlice';
@@ -11,6 +12,7 @@ export const rootReducer = combineReducers({
   [sessionSlice.reducerPath]: sessionSlice.reducer,
   [exitSlice.reducerPath]: exitSlice.reducer,
   [interviewProfileSlice.reducerPath]: interviewProfileSlice.reducer,
+  [applicationsSlice.reducerPath]: applicationsSlice.reducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;

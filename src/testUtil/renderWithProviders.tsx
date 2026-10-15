@@ -13,6 +13,10 @@ import { type ProfileGateway } from '@/core/profile/gateway';
 import { ProfileGatewayProvider } from '@/core/profile/ProfileGatewayProvider';
 import { unavailableProfileGateway } from '@/core/profile/unavailableProfileGateway';
 import {
+  type ApplicationsState,
+  initialApplicationsState,
+} from '@/core/state/slices/applicationsSlice';
+import {
   type ExitState,
   initialExitState,
 } from '@/core/state/slices/exitSlice';
@@ -37,6 +41,8 @@ interface Options {
   exit?: Partial<ExitState>;
   /** The interview profile as already read, on top of the initial state (not read). */
   interviewProfile?: Partial<InterviewProfileState>;
+  /** The job applications as already read, on top of the initial state (not read). */
+  applications?: Partial<ApplicationsState>;
   /** The auth gateway the component calls. By default sign-in is unavailable. */
   gateway?: AuthGateway;
   /** The profile gateway the component calls. By default the profile is unavailable. */
@@ -56,6 +62,7 @@ const createProviders = ({
   session,
   exit,
   interviewProfile,
+  applications,
   gateway = unavailableGateway,
   profileGateway = unavailableProfileGateway,
   flags,
@@ -65,6 +72,7 @@ const createProviders = ({
     session: { ...initialSessionState, ...session },
     exit: { ...initialExitState, ...exit },
     interviewProfile: { ...initialInterviewProfileState, ...interviewProfile },
+    applications: { ...initialApplicationsState, ...applications },
   });
   const flagsState = {
     flags: { ...DEFAULT_FLAGS, ...flags },

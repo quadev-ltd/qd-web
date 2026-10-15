@@ -86,7 +86,9 @@ export const toProfileError = (error: unknown): ProfileError => {
       return new ProfileError(
         reasonOf(error) === CallableReason.MaxResources
           ? ProfileErrorCode.MaxResources
-          : ProfileErrorCode.Unknown,
+          : reasonOf(error) === CallableReason.MaxApplications
+            ? ProfileErrorCode.MaxApplications
+            : ProfileErrorCode.Unknown,
       );
     case 'functions/not-found':
     case 'storage/object-not-found':
@@ -120,7 +122,7 @@ export const toProfileError = (error: unknown): ProfileError => {
   }
 };
 
-const mapped = async <T>(run: () => Promise<T>): Promise<T> => {
+export const mapped = async <T>(run: () => Promise<T>): Promise<T> => {
   try {
     return await run();
   } catch (error) {
@@ -130,7 +132,7 @@ const mapped = async <T>(run: () => Promise<T>): Promise<T> => {
 
 // ---------- Reads ----------
 
-const millis = (value: unknown): number | null =>
+export const millis = (value: unknown): number | null =>
   value instanceof Timestamp ? value.toMillis() : null;
 
 const withDates = (id: string, data: DocumentData) => ({
@@ -212,7 +214,7 @@ export const getExtractionsToday = (uid: string): Promise<number> =>
 // ---------- Callables ----------
 
 /** Calls a callable and checks that its answer is what the contract says. */
-const call = <Request, Response>(
+export const call = <Request, Response>(
   name: string,
   schema: z.ZodType<Response>,
   data: Request,

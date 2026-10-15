@@ -17,6 +17,14 @@ export const createMockProfileGateway = (): Mocked<ProfileGateway> => ({
   removeItem: vi.fn(() => Promise.resolve()),
   removeResource: vi.fn(() => Promise.resolve({ itemsRemoved: 0 })),
   getFileUrl: vi.fn(() => Promise.resolve('https://files.example/document')),
+  getApplications: vi.fn(() => Promise.resolve([])),
+  getApplication: vi.fn(() => Promise.resolve(null)),
+  getProfileRevision: vi.fn(() => Promise.resolve(0)),
+  createApplication: vi.fn(() =>
+    Promise.resolve({ applicationId: 'application-1' }),
+  ),
+  updateApplication: vi.fn(() => Promise.resolve({ revision: 2 })),
+  removeApplication: vi.fn(() => Promise.resolve()),
 });
 
 export default createMockProfileGateway;

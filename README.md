@@ -484,6 +484,20 @@ Rules (the same as in `qd-mobile` where they exist there):
   that origin to the policy in the same pull request. `src/core/env.ts` turns off zod's code
   generation (`jitless`) for this reason.
 
+## Job applications
+
+The second part of the interview tools (delivery 2a): one application for each job the candidate
+applies for, built on the profile. For an account with the `interviewAssistant` flag, the
+signed-in home is its applications: with none yet, "Add your CV" and three paths ("Prepare for a
+job" opens "New application"; practice and the CV tool say "Coming soon"); with some, "Your
+applications", each with where its brief is, and "Your profile". A new application takes a title
+and the pasted job; its page (`/applications/:id`) shows its details and the job, with "Edit" and
+"Remove". The brief comes next. The decisions are in
+[ADR 0008](docs/adr/0008-job-applications.md).
+
+The in-memory gateway has `qdPreviewProfile.seedApplications()`: the three applications of the
+designs (a brief with two gaps, one the job changed since, none yet).
+
 ## Pages
 
 | Path                     | Screen                                                                    |
@@ -501,6 +515,7 @@ Rules (the same as in `qd-mobile` where they exist there):
 | `/account/delete`        | Delete the signed-in account (flag on; needs a session)                   |
 | `/profile`               | The interview profile (flag on; needs a session and `interviewAssistant`) |
 | `/profile/resources/:id` | One resource of the profile (the same conditions)                         |
+| `/applications/:id`      | One job application: its details and the job (flag `interviewAssistant`)  |
 | anything else            | Not found                                                                 |
 
 # Quickstart
@@ -559,9 +574,10 @@ yarn e2e --ui                      # interactive runner
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `auth-email-lifecycle.spec.ts` | Sign up → verify email (too early, resend, verified) → complete profile → home → reload → sign out → sign in → delete account (wrong password, then the right one) → confirmation on the public home; the tab that checks by itself; the ways out of the two onboarding screens; deleting with Google                                                                                                                                                                                                       |
 | `auth-sign-in-errors.spec.ts`  | Empty and invalid fields, wrong password, forgot password (neutral message), then a successful sign-in                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `pages.spec.ts`                | Every page, every state of the account screens, the profile (not available, empty, with resources in every state), "Add a resource" in its three forms with their messages, and a resource (ready, being read, failed, a link that was read, the remove dialog): no serious or critical accessibility violation (axe) and no horizontal scroll                                                                                                                                                              |
+| `pages.spec.ts`                | Every page, every state of the account screens, the profile (not available, empty, with resources in every state), "Add a resource" in its three forms with their messages, and a resource (ready, being read, failed, a link that was read, the remove dialog), the applications (the home without and with them, "New application" with its messages, an application, its edit panel and remove dialog): no serious or critical accessibility violation (axe) and no horizontal scroll                    |
 | `keyboard.spec.ts`             | Keyboard-only sign-in, the account menu and the add-a-resource panel with the keyboard, the focus ring colour on light and dark surfaces                                                                                                                                                                                                                                                                                                                                                                    |
 | `profile.spec.ts`              | The profile: add a CV as a file → "Being read…" → "Ready", and its page with nothing read from it; a pasted text that is too long, shortened and added; a link whose address is not accepted, one that cannot be read, and one that is read, with its address and "Remove this link"; a failed resource opened, its reason read, removed in the dialog and gone from the list; the home's starting card ("Add your CV", then "Your CV is in your profile", which leads to its page) and the home without it |
+| `applications.spec.ts`         | An application added from the home ("Prepare for a job", its messages), its page, edited (a private address refused), still there after a reload and on the home, removed after asking; the home listing applications with every state of a brief                                                                                                                                                                                                                                                           |
 
 The detailed cases (every validation rule, every error code) are unit tests; the end-to-end tests
 cover the paths that cross screens. They prove the screens, the session and the guards, not the
@@ -590,6 +606,7 @@ emulators already running (`npm run emulators` in `quadev-backend`),
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `profile-access.spec.ts` | The flag is read from the backend's document through its rules: an account without it, and one with it off, see "Not available"; one with it on gets the profile                                                                                                                                                              |
 | `profile.spec.ts`        | Add a CV as a file: `createProfileResource`, the upload under the Storage rules, the trigger that reads it, the resource followed to "Ready" and its page, then `removeProfileResource` and an empty profile. Pasted text read; a link to a host ending in `.invalid` fails, says "We couldn't read this page" and is removed |
+| `applications.spec.ts`   | E4: an application created with its job, shown on its page and the home, edited and read back after a reload, removed and gone after a reload (`createJobApplication`, `updateJobApplication`, `removeJobApplication`, the rules)                                                                                             |
 
 **The backend commit is pinned** in `e2e-emulators/backend-commit`. The pipeline tests against that
 commit, so a change in the backend cannot break an unrelated pull request here. Move it forward on

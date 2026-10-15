@@ -22,7 +22,9 @@ vi.mock(import('@/core/flags/FlagsProvider'), async importOriginal => ({
 }));
 
 // The starting card has its own spec: here it only matters whether it is there.
-vi.mock('./StartCard', () => ({ default: () => <p>the starting card</p> }));
+vi.mock('./InterviewHome', () => ({
+  default: () => <p>the interview home</p>,
+}));
 
 const mockUseFlag = vi.mocked(useFlag);
 
@@ -134,14 +136,14 @@ describe('HomeScreen', () => {
       }
     });
 
-    it('says the same to an account with the interview tools on', () => {
+    it('are not shown to an account with the interview tools on: its home is the applications', async () => {
       mockUseFlag.mockImplementation(key => key === 'interviewAssistant');
       renderHome();
 
-      for (const card of cards()) {
-        expect(card).toHaveTextContent('home.comingSoonChip');
-        expect(card).not.toHaveTextContent('home.availableChip');
-      }
+      expect(await screen.findByText('the interview home')).toBeInTheDocument();
+      expect(
+        screen.queryByText('home.mockInterviewTitle'),
+      ).not.toBeInTheDocument();
     });
 
     it('reads no other flag', () => {
@@ -154,23 +156,23 @@ describe('HomeScreen', () => {
     });
   });
 
-  describe('the starting card', () => {
-    it('is there for an account with the interview tools on, above the tools', () => {
+  describe('the interview home', () => {
+    it('is there for an account with the interview tools on, above its account', async () => {
       mockUseFlag.mockImplementation(key => key === 'interviewAssistant');
       renderHome();
 
-      const card = screen.getByText('the starting card');
-      expect(card).toBeInTheDocument();
+      const home = await screen.findByText('the interview home');
       expect(
-        card.compareDocumentPosition(cards()[0]) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        home.compareDocumentPosition(
+          screen.getByRole('region', { name: 'home.accountTitle' }),
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
 
     it('is not there for anyone else, so nothing of the profile is loaded', () => {
       renderHome();
 
-      expect(screen.queryByText('the starting card')).not.toBeInTheDocument();
+      expect(screen.queryByText('the interview home')).not.toBeInTheDocument();
     });
   });
 
