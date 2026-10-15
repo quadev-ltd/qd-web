@@ -77,6 +77,10 @@ export const applicationsSlice = createSlice({
         ...state.applications.filter(({ id }) => id !== payload.id),
       ].sort(latestFirst);
     },
+    /** The profile's revision was read again, after a resource was added or removed. */
+    profileRevisionRead: (state, { payload }: PayloadAction<number>) => {
+      state.profileRevision = payload;
+    },
     applicationRemoved: (state, { payload: id }: PayloadAction<string>) => {
       state.applications = state.applications.filter(
         application => application.id !== id,
@@ -99,6 +103,7 @@ export const {
   applicationsLoadFailed,
   applicationChanged,
   applicationRemoved,
+  profileRevisionRead,
 } = applicationsSlice.actions;
 
 export default applicationsSlice.reducer;

@@ -81,17 +81,20 @@ describe('ApplicationsProvider', () => {
     expect(gateway.getApplications).toHaveBeenCalledExactlyOnceWith('uid-1');
   });
 
-  it('reads nothing again when the store already has them', () => {
+  it('reads only the profile’s revision again when the store already has the applications', async () => {
     const { gateway, mount } = setUp({
       uid: 'uid-1',
       status: 'loaded',
       applications: [applicationFixture()],
       profileRevision: 2,
     });
+    gateway.getProfileRevision.mockResolvedValue(3);
 
     mount();
 
-    expect(screen.getByText('loaded: [a1] revision 2')).toBeInTheDocument();
+    expect(
+      await screen.findByText('loaded: [a1] revision 3'),
+    ).toBeInTheDocument();
     expect(gateway.getApplications).not.toHaveBeenCalled();
   });
 
@@ -150,5 +153,28 @@ describe('ApplicationsProvider', () => {
       await actions.refreshApplication('a1');
     });
     expect(screen.getByText(/^loaded: \[a2\]/)).toBeInTheDocument();
+  });
+
+  it('reads the profile’s revision again when asked, and keeps the one it had when that fails', async () => {
+    const { gateway, mount } = setUp({
+      uid: 'uid-1',
+      status: 'loaded',
+      profileRevision: 2,
+    });
+    mount();
+
+    gateway.getProfileRevision.mockResolvedValueOnce(5);
+    await act(async () => {
+      await actions.refreshProfileRevision();
+    });
+    expect(screen.getByText(/revision 5$/)).toBeInTheDocument();
+
+    gateway.getProfileRevision.mockRejectedValueOnce(
+      new ProfileError(ProfileErrorCode.Network),
+    );
+    await act(async () => {
+      await actions.refreshProfileRevision();
+    });
+    expect(screen.getByText(/revision 5$/)).toBeInTheDocument();
   });
 });

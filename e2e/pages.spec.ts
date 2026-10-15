@@ -118,6 +118,8 @@ test('applications: the home without and with them, a new one, an application, i
   await expect(
     page.getByRole('heading', { level: 1, name: 'Senior Backend Engineer' }),
   ).toBeVisible();
+  await page.getByRole('link', { name: 'Details' }).click();
+  await expect(page.getByRole('region', { name: 'The job' })).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
   await page.getByRole('button', { name: 'Edit' }).click();
   const edit = page.getByRole('dialog', { name: 'Edit the application' });
@@ -130,6 +132,61 @@ test('applications: the home without and with them, a new one, an application, i
   });
   await expect(dialog).toBeVisible();
   await expectInsideViewport(page, dialog);
+  await expectAccessibleAndNotTooWide(page);
+});
+
+test('the brief, not prepared, ready with a requirement and a question open, out of date and failed: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openHome(page);
+  await seedApplications(page);
+  const open = async (title: string) => {
+    await page.goto('/home');
+    await page
+      .getByRole('listitem')
+      .filter({ hasText: title })
+      .getByRole('link')
+      .click();
+    await expect(
+      page.getByRole('heading', { level: 1, name: title }),
+    ).toBeVisible();
+  };
+
+  // Not prepared yet
+  await open('Platform Engineer');
+  await expect(
+    page.getByRole('heading', { name: 'Prepare your brief' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // Failed
+  await page.evaluate(() => window.qdPreviewProfile?.failNextBrief('model'));
+  await page.getByRole('button', { name: 'Prepare the brief' }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // Ready, a requirement and a question open
+  await page
+    .getByRole('alert')
+    .getByRole('button', { name: 'Try again' })
+    .click();
+  const requirements = page.getByRole('region', {
+    name: 'What the job asks for',
+  });
+  await expect(requirements).toBeVisible();
+  await requirements.getByRole('button').first().click();
+  await page
+    .getByRole('region', { name: 'Likely questions' })
+    .getByRole('button')
+    .first()
+    .click();
+  await expectAccessibleAndNotTooWide(page);
+
+  // Out of date: the job changed
+  await open('Engineering Manager');
+  await expect(
+    page.getByText('The job details changed since this brief was prepared.'),
+  ).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
 });
 

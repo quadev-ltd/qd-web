@@ -121,4 +121,11 @@ export interface ProfileGateway {
   ): Promise<{ revision: number }>;
   /** Removes an application and its brief. */
   removeApplication(applicationId: string): Promise<void>;
+  /**
+   * Prepares the brief of an application, replacing the one it had: one model call, up to a
+   * minute. The brief is then on the application (`getApplication`).
+   */
+  prepareBrief(applicationId: string): Promise<void>;
+  /** How many briefs were prepared for this user today (UTC), for the daily limit. */
+  getBriefsToday(uid: string): Promise<number>;
 }

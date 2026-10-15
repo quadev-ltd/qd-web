@@ -2,7 +2,9 @@ import {
   createApplication,
   getApplication,
   getApplications,
+  getBriefsToday,
   getProfileRevision,
+  prepareBrief,
   removeApplication,
   updateApplication,
 } from './applications';
@@ -46,6 +48,8 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   createApplication,
   updateApplication,
   removeApplication,
+  prepareBrief,
+  getBriefsToday,
 });
 
 export default createFirebaseProfileGateway;

@@ -25,11 +25,16 @@ test('an application: added from the home, its page, edited, removed', async ({
   await expect(panel.getByText(`${JOB.length} / 20,000`)).toBeVisible();
   await panel.getByRole('button', { name: 'Add the job' }).click();
 
-  // Its page
+  // Its page opens on the brief; the details are a tab
   await expect(page).toHaveURL(/\/applications\/.+/);
   await expect(
     page.getByRole('heading', { level: 1, name: 'Senior Backend Engineer' }),
   ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Prepare your brief' }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Details' }).click();
+  await expect(page).toHaveURL(/\/applications\/.+\/details$/);
   const job = page.getByRole('region', { name: 'The job' });
   await expect(job).toContainText(/Pasted on/);
   await expect(job).toContainText('two million parcels');
@@ -70,6 +75,7 @@ test('an application: added from the home, its page, edited, removed', async ({
     .filter({ hasText: 'Senior Backend Engineer' });
   await expect(card).toContainText('No brief yet');
   await card.getByRole('link').click();
+  await page.getByRole('link', { name: 'Details' }).click();
 
   // Removed after asking: back on the home, which has no application again
   await page.getByRole('button', { name: 'Remove this application' }).click();
@@ -108,4 +114,92 @@ test('the home lists the applications with where their brief is', async ({
   await expect(
     page.getByRole('heading', { level: 1, name: 'Engineering Manager' }),
   ).toBeVisible();
+});
+
+test('the brief: prepared, opened on a gap and a question, out of date when the job changes, refreshed', async ({
+  page,
+}) => {
+  await openHome(page);
+  await page.evaluate(() => window.qdPreviewProfile?.seed());
+  await page.reload();
+
+  // A new application opens on its brief, not prepared yet
+  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  const panel = page.getByRole('dialog', { name: 'New application' });
+  await panel.getByLabel('Title').fill('Senior Backend Engineer');
+  await panel
+    .getByLabel('Job description')
+    .fill(
+      'You will run Go services in production. You will lead incident response. You will mentor engineers. You know Kafka at scale.',
+    );
+  await panel.getByRole('button', { name: 'Add the job' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Prepare your brief' }),
+  ).toBeVisible();
+
+  // The first attempt fails; the second works
+  await page.evaluate(() => window.qdPreviewProfile?.failNextBrief('model'));
+  await page.getByRole('button', { name: 'Prepare the brief' }).click();
+  await expect(page.getByRole('status')).toContainText('Preparing your brief');
+  await expect(page.getByRole('alert')).toContainText(
+    'We couldn’t prepare the brief this time.',
+  );
+  await page
+    .getByRole('alert')
+    .getByRole('button', { name: 'Try again' })
+    .click();
+  const requirements = page.getByRole('region', {
+    name: 'What the job asks for',
+  });
+  await expect(requirements).toContainText('4 · 2 gaps');
+  await expect(
+    page.getByText(/Prepared .* · 8 of 10 left today/),
+  ).toBeVisible();
+
+  // A gap: the job's words, and "Add a story" as a note
+  await requirements
+    .getByRole('button', { name: /You know Kafka at scale/ })
+    .click();
+  await expect(
+    requirements.getByText('You know Kafka at scale.'),
+  ).toBeVisible();
+  await requirements.getByRole('button', { name: 'Add a story' }).click();
+  const story = page.getByRole('dialog', { name: 'Paste or type text' });
+  await expect(story.getByRole('radio', { name: 'Note' })).toBeChecked();
+  await story.getByRole('button', { name: 'Close' }).click();
+
+  // A requirement the profile shows: the item, with where it came from
+  await requirements
+    .getByRole('button', { name: /You will run Go services in production/ })
+    .click();
+  await expect(
+    requirements
+      .getByText(/^(Skill|Experience|Project|Achievement|Story) · /)
+      .first(),
+  ).toBeVisible();
+
+  // A likely question, with notes
+  const questions = page.getByRole('region', { name: 'Likely questions' });
+  await questions.getByRole('button', { name: /an incident you led/ }).click();
+  await expect(
+    questions.getByText('Notes for your answer').filter({ visible: true }),
+  ).toHaveCount(1);
+
+  // The job changes in Details: the brief says so, and "Refresh" prepares it again
+  await page.getByRole('link', { name: 'Details' }).click();
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const edit = page.getByRole('dialog', { name: 'Edit the application' });
+  await edit
+    .getByLabel('Job description')
+    .fill('You will run Go services in production. You know Terraform.');
+  await edit.getByRole('button', { name: 'Save changes' }).click();
+  await expect(edit).toBeHidden();
+  await page.getByRole('link', { name: 'Brief' }).click();
+  const changed = page.getByText(
+    'The job details changed since this brief was prepared.',
+  );
+  await expect(changed).toBeVisible();
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await expect(changed).toBeHidden();
+  await expect(requirements).toContainText('2 · 2 gaps');
 });

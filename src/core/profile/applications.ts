@@ -13,6 +13,10 @@ export const APPLICATION_NAME_MAX_CHARS = 100;
 export const JOB_DESCRIPTION_MAX_CHARS = 20_000;
 /** Longest notes of the candidate about one job. */
 export const APPLICATION_NOTES_MAX_CHARS = 5_000;
+/** Briefs one user can have prepared in a day (UTC); the backend also caps their cost. */
+export const BRIEF_DAILY_LIMIT = 10;
+/** The service name the backend counts briefs under, in `usage/{uid}/days/{date}`. */
+export const BRIEF_SERVICE = 'applicationBrief';
 
 // ---------- Firestore (the owner reads, only the backend writes) ----------
 
@@ -147,6 +151,13 @@ export const UpdateJobApplicationResponseSchema = z.object({
 });
 export const RemoveJobApplicationResponseSchema = z.object({
   applicationId: documentId,
+});
+/** The brief itself is stored on the application; this is how big it is. */
+export const PrepareApplicationBriefResponseSchema = z.object({
+  applicationId: documentId,
+  requirements: z.number().int().nonnegative(),
+  gaps: z.number().int().nonnegative(),
+  questions: z.number().int().nonnegative(),
 });
 
 // ---------- What the pages work out ----------

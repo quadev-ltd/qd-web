@@ -12,9 +12,10 @@ import SidePanel from '@/components/ui/SidePanel';
 export interface AddResourcePanelProps {
   /**
    * any: every kind of resource. cv: opened by "Add your CV": a file or pasted text, added
-   * as a CV (the backend does not take a link as a CV).
+   * as a CV (the backend does not take a link as a CV). note: opened by "Add a story" on a
+   * gap of a brief: the pasted text form, as a note (D53).
    */
-  kind?: 'any' | 'cv';
+  kind?: 'any' | 'cv' | 'note';
   onClose: () => void;
 }
 
@@ -62,7 +63,7 @@ export const AddResourcePanel: React.FC<AddResourcePanelProps> = ({
   onClose,
 }) => {
   const { t } = useTranslation();
-  const [step, setStep] = useState<Step>('choice');
+  const [step, setStep] = useState<Step>(kind === 'note' ? 'text' : 'choice');
   const adding = useAddResource(onClose);
   const cvOnly = kind === 'cv';
 

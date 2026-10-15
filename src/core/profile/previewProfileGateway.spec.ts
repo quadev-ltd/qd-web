@@ -8,6 +8,7 @@ import { PREVIEW_FACTS } from './previewProfileData';
 import {
   createPreviewProfileGateway,
   exposePreviewProfileControls,
+  PREVIEW_BRIEF_MS,
   PREVIEW_READ_MS,
   type PreviewProfileStorage,
 } from './previewProfileGateway';
@@ -828,6 +829,51 @@ describe('previewProfileGateway', () => {
       await expect(gateway.getProfileRevision(UID)).resolves.toBe(2);
       await gateway.removeResource(resourceId);
       await expect(gateway.getProfileRevision(UID)).resolves.toBe(3);
+    });
+
+    it('prepares a brief: a requirement for each sentence of the job, the last two as gaps, and four questions', async () => {
+      const { gateway } = await setUp();
+      gateway.controls.seed();
+      const { applicationId } = await gateway.createApplication({
+        title: 'Go',
+        jobDescription:
+          'You will run Go services. You will mentor engineers. You will lead incidents. You know Kafka.',
+      });
+
+      await gateway.prepareBrief(applicationId);
+
+      const brief = (await gateway.getApplication(UID, applicationId))?.brief;
+      expect(
+        brief?.requirements.map(({ itemIds }) => itemIds.length > 0),
+      ).toEqual([true, true, false, false]);
+      expect(brief?.requirements[0]?.evidence).toBe(
+        'You will run Go services.',
+      );
+      expect(brief?.questions).toHaveLength(4);
+      expect(brief?.applicationRevision).toBe(1);
+      await expect(gateway.getBriefsToday(UID)).resolves.toBe(1);
+      expect(PREVIEW_BRIEF_MS).toBeGreaterThan(0);
+    });
+
+    it('fails a brief on request, and stops at today’s limit of 10', async () => {
+      const { gateway } = await setUp();
+      const { applicationId } = await gateway.createApplication(job);
+
+      gateway.controls.failNextBrief('model');
+      expect(await codeOf(gateway.prepareBrief(applicationId))).toBe(
+        ProfileErrorCode.Unknown,
+      );
+      gateway.controls.failNextBrief('quota');
+      expect(await codeOf(gateway.prepareBrief(applicationId))).toBe(
+        ProfileErrorCode.DailyLimit,
+      );
+      gateway.controls.setBriefsToday(10);
+      expect(await codeOf(gateway.prepareBrief(applicationId))).toBe(
+        ProfileErrorCode.DailyLimit,
+      );
+      await expect(
+        gateway.getApplication(UID, applicationId),
+      ).resolves.not.toHaveProperty('brief');
     });
 
     it('seeds the three applications of the designs: a brief with two gaps, one the job changed since, none', async () => {
