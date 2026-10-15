@@ -50,6 +50,18 @@ describe('MainNav', () => {
     },
   );
 
+  it('keeps the home marked on the page of an application, which belongs to it', () => {
+    renderNav('/applications/a1');
+
+    const home = screen.getByRole('link', { name: 'drawerMenu.home' });
+    expect(home).toHaveClass('bg-white/14');
+    // Marked to the eye only: the page itself is the application, not the home.
+    expect(home).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'profile.title' })).not.toHaveClass(
+      'bg-white/14',
+    );
+  });
+
   it('marks nothing as current on another page', () => {
     renderNav('/forgot-password');
 

@@ -6,3 +6,12 @@ export const RESOURCE_PATH = `${PROFILE_PATH}/resources/:resourceId`;
 
 export const resourcePath = (resourceId: string) =>
   `${PROFILE_PATH}/resources/${encodeURIComponent(resourceId)}`;
+
+/** The job applications (delivery 2a). Their list is the signed-in home. */
+export const APPLICATIONS_PREFIX = '/applications/';
+
+/** One job application: its details, and later its brief. */
+export const APPLICATION_PATH = `${APPLICATIONS_PREFIX}:applicationId`;
+
+export const applicationPath = (applicationId: string) =>
+  `${APPLICATIONS_PREFIX}${encodeURIComponent(applicationId)}`;

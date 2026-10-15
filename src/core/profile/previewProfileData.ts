@@ -157,3 +157,43 @@ export const PREVIEW_SEED: PreviewSeedResource[] = [
     facts: [],
   },
 ];
+
+export interface PreviewSeedApplication {
+  title: string;
+  company?: string;
+  role?: string;
+  jobDescription: string;
+  postingUrl?: string;
+  notes?: string;
+  /** What its brief is: none yet, ready with this many gaps, or built before the job changed. */
+  brief: 'none' | { gaps: number } | 'jobChanged';
+}
+
+/** The applications of the design artboards ("S1 · Home · applications"), newest first. */
+export const PREVIEW_SEED_APPLICATIONS: PreviewSeedApplication[] = [
+  {
+    title: 'Senior Backend Engineer',
+    company: 'Northwind Logistics',
+    role: 'Backend, parcel tracking',
+    jobDescription:
+      'Northwind Logistics moves two million parcels a day across Europe. We are looking for a Senior Backend Engineer to own the services behind parcel tracking. You will design and run Go services in production, operate Kafka clusters handling billions of events, lead incident response for your area and mentor engineers on the team.',
+    postingUrl: 'https://northwind-logistics.example/careers/1482',
+    notes:
+      'Recruiter call on 8 Oct: two technical rounds, then the hiring manager. They asked about on-call experience.',
+    brief: { gaps: 2 },
+  },
+  {
+    title: 'Engineering Manager',
+    company: 'Harbour Health',
+    jobDescription:
+      'Harbour Health is hiring an Engineering Manager for its patient records platform: a team of seven backend and mobile engineers, delivery across three time zones, and hiring for two open roles.',
+    brief: 'jobChanged',
+  },
+  {
+    title: 'Platform Engineer',
+    company: 'Halvorsen',
+    jobDescription:
+      'Halvorsen builds the platform its product teams deploy on: Kubernetes, Terraform and an internal developer portal. You will run the clusters and the paved road for 40 engineers.',
+    brief: 'none',
+  },
+];

@@ -12,6 +12,8 @@ export const ProfileErrorCode = {
   DailyLimit: 'profile/daily-limit',
   /** The profile already holds as many resources as it can. */
   MaxResources: 'profile/max-resources',
+  /** The account already holds as many applications as it can. */
+  MaxApplications: 'profile/max-applications',
   /** The resource or the item does not exist (any more). */
   NotFound: 'profile/not-found',
   /** The backend did not accept the request as it was sent. */
@@ -50,6 +52,7 @@ const EXPECTED_CODES: ReadonlySet<string> = new Set([
   ProfileErrorCode.FlagOff,
   ProfileErrorCode.DailyLimit,
   ProfileErrorCode.MaxResources,
+  ProfileErrorCode.MaxApplications,
   ProfileErrorCode.NotFound,
   ProfileErrorCode.Network,
   ProfileErrorCode.UploadCancelled,

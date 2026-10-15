@@ -22,7 +22,11 @@ import {
   VERIFY_EMAIL_PATH,
 } from '@/core/auth/paths';
 import { env } from '@/core/env';
-import { PROFILE_PATH, RESOURCE_PATH } from '@/core/profile/paths';
+import {
+  APPLICATION_PATH,
+  PROFILE_PATH,
+  RESOURCE_PATH,
+} from '@/core/profile/paths';
 import { useAppDispatch } from '@/core/state/hooks';
 import { accountDeletedNoticeCleared } from '@/core/state/slices/exitSlice';
 import DeleteAccountInfoScreen from '@/screens/DeleteAccountInfo/DeleteAccountInfoScreen';
@@ -117,6 +121,24 @@ const accountRoutes: RouteObject[] = [
                 await import('@/screens/Profile/Resource/ResourceScreen')
               ).ResourceScreen,
             }),
+          },
+          // The job applications (delivery 2a): behind the same flag, with the applications.
+          {
+            lazy: async () => ({
+              Component: (
+                await import('@/screens/Applications/ApplicationRoutes')
+              ).ApplicationRoutes,
+            }),
+            children: [
+              {
+                path: APPLICATION_PATH,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/screens/Applications/ApplicationScreen')
+                  ).ApplicationScreen,
+                }),
+              },
+            ],
           },
         ],
       },

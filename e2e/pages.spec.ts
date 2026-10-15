@@ -8,9 +8,11 @@ import {
   expectNoHorizontalScroll,
   expectNoSeriousAccessibilityViolations,
   loseProfile,
+  openHome,
   openProfile,
   openVerificationLink,
   PASSWORD,
+  seedApplications,
   seedProfile,
   signIn,
   signUp,
@@ -85,6 +87,50 @@ test('signed-in home: accessible and no horizontal scroll, also with the account
   await expectInsideViewport(page, page.getByRole('menu'));
   await expectNoSeriousAccessibilityViolations(page);
   await expectNoHorizontalScroll(page);
+});
+
+test('applications: the home without and with them, a new one, an application, its edit panel and remove dialog: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  // No application yet: "Add your CV" and the three paths
+  await openHome(page);
+  await expectAccessibleAndNotTooWide(page);
+
+  // "New application", with its messages
+  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  const panel = page.getByRole('dialog', { name: 'New application' });
+  await panel.getByRole('button', { name: 'Add the job' }).click();
+  await expect(panel.getByText('Enter a title')).toBeVisible();
+  await expectInsideViewport(page, panel);
+  await expectAccessibleAndNotTooWide(page);
+  await panel.getByRole('button', { name: 'Close' }).click();
+
+  // The list, with every state of a brief
+  await seedApplications(page);
+  await expectAccessibleAndNotTooWide(page);
+
+  // An application, its edit panel and its remove dialog
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Senior Backend Engineer' })
+    .getByRole('link')
+    .click();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Senior Backend Engineer' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const edit = page.getByRole('dialog', { name: 'Edit the application' });
+  await expect(edit).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await edit.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Remove this application' }).click();
+  const dialog = page.getByRole('dialog', {
+    name: 'Remove this application?',
+  });
+  await expect(dialog).toBeVisible();
+  await expectInsideViewport(page, dialog);
+  await expectAccessibleAndNotTooWide(page);
 });
 
 test('profile, empty and with resources in every state: accessible and no horizontal scroll', async ({

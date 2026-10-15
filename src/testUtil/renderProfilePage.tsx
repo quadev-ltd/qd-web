@@ -4,7 +4,9 @@ import { createMockProfileGateway } from './mockProfileGateway';
 import { renderWithProviders } from './renderWithProviders';
 
 import { type SessionUser } from '@/core/auth/types';
+import { ApplicationsProvider } from '@/core/profile/ApplicationsProvider';
 import { InterviewProfileProvider } from '@/core/profile/InterviewProfileProvider';
+import { type ApplicationsState } from '@/core/state/slices/applicationsSlice';
 import { type InterviewProfileState } from '@/core/state/slices/interviewProfileSlice';
 import { SessionStatus } from '@/core/state/slices/sessionSlice';
 
@@ -20,33 +22,40 @@ interface Options {
   gateway?: ReturnType<typeof createMockProfileGateway>;
   /** The profile as already read; left out, the page reads it through the gateway. */
   interviewProfile?: Partial<InterviewProfileState>;
+  /** The applications as already read; left out, a page that shows them reads them. */
+  applications?: Partial<ApplicationsState>;
   route?: string;
   /** Router state at that URL (what a <Link state> passes). */
   routeState?: unknown;
 }
 
 /**
- * Renders a profile page as ProfileRoutes does for a signed-in user with the interview tools
- * on: inside the real InterviewProfileProvider, which reads through a mock profile gateway.
+ * Renders a profile or application page as ProfileRoutes and ApplicationRoutes do for a
+ * signed-in user with the interview tools on: inside the real InterviewProfileProvider and
+ * ApplicationsProvider, which read through a mock profile gateway.
  */
 export const renderProfilePage = (
   ui: ReactElement,
   {
     gateway = createMockProfileGateway(),
     interviewProfile,
+    applications,
     route = '/profile',
     routeState,
   }: Options = {},
 ) => ({
   gateway,
   ...renderWithProviders(
-    <InterviewProfileProvider>{ui}</InterviewProfileProvider>,
+    <InterviewProfileProvider>
+      <ApplicationsProvider>{ui}</ApplicationsProvider>
+    </InterviewProfileProvider>,
     {
       route,
       routeState,
       profileGateway: gateway,
       flags: { interviewAssistant: true },
       interviewProfile,
+      applications,
       session: {
         status: SessionStatus.Ready,
         authResolved: true,

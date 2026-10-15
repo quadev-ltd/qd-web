@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next';
-import { Link, NavLink } from 'react-router';
+import { Link, NavLink, useLocation } from 'react-router';
+
+import { APPLICATIONS_PREFIX } from '@/core/profile/paths';
 
 const LINK =
   'flex h-11 items-center rounded-[10px] px-3.5 text-white no-underline hover:bg-white/14 hover:text-white';
 
 export interface MainNavProps {
-  /** The signed-in home. */
+  /** The signed-in home. An application's pages belong to it and keep it marked. */
   homePath: string;
   /** The interview profile. Its pages (a resource) keep it marked. */
   profilePath: string;
@@ -20,6 +22,7 @@ export const MainNav: React.FC<MainNavProps> = ({
   accountPath,
 }) => {
   const { t } = useTranslation();
+  const onApplication = useLocation().pathname.startsWith(APPLICATIONS_PREFIX);
   return (
     <nav
       aria-label={t('header.mainNavAccessibilityLabel')}
@@ -27,7 +30,9 @@ export const MainNav: React.FC<MainNavProps> = ({
       <NavLink
         to={homePath}
         end
-        className={({ isActive }) => (isActive ? `${LINK} bg-white/14` : LINK)}>
+        className={({ isActive }) =>
+          isActive || onApplication ? `${LINK} bg-white/14` : LINK
+        }>
         {t('drawerMenu.home')}
       </NavLink>
       <NavLink

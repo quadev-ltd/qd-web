@@ -1,4 +1,13 @@
 import {
+  APPLICATION_NAME_MAX_CHARS,
+  APPLICATION_NOTES_MAX_CHARS,
+  APPLICATIONS_MAX,
+  type ApplicationBrief,
+  type CreateJobApplicationRequest,
+  JOB_DESCRIPTION_MAX_CHARS,
+  type JobApplication,
+} from './applications';
+import {
   type CreateProfileResourceRequest,
   parseProfileLink,
   PROFILE_DAILY_EXTRACTIONS,
@@ -18,6 +27,7 @@ import { type ProfileGateway } from './gateway';
 import {
   PREVIEW_FACTS,
   PREVIEW_SEED,
+  PREVIEW_SEED_APPLICATIONS,
   type PreviewFact,
 } from './previewProfileData';
 
@@ -58,6 +68,10 @@ interface PreviewProfile {
   resources: StoredResource[];
   items: SkillMapItem[];
   extractionsToday: number;
+  /** Absent in what an older version stored. */
+  applications?: JobApplication[];
+  /** Goes up with every change to the resources or the items, as the backend's does. */
+  revision?: number;
 }
 
 interface PreviewProfileState {
@@ -75,6 +89,11 @@ export interface PreviewProfileControls {
   stallNext(): void;
   /** How many resources were already read today. */
   setExtractionsToday(count: number): void;
+  /**
+   * Replaces the applications with the three of the designs: a brief with two gaps, a brief
+   * the job has changed since, and no brief yet.
+   */
+  seedApplications(): void;
 }
 
 export type PreviewProfileGateway = ProfileGateway & {
@@ -187,7 +206,47 @@ export const createPreviewProfileGateway = ({
 
   const profileOf = (uid: string): PreviewProfile => {
     state.profiles[uid] ??= { resources: [], items: [], extractionsToday: 0 };
+    state.profiles[uid].applications ??= [];
+    state.profiles[uid].revision ??= 0;
     return state.profiles[uid];
+  };
+
+  /** A change to the resources or the items: briefs built before it are out of date. */
+  const touch = (profile: PreviewProfile) => {
+    profile.revision = (profile.revision ?? 0) + 1;
+  };
+
+  const applicationsOf = (profile: PreviewProfile): JobApplication[] =>
+    (profile.applications ??= []);
+
+  const name = (value: string | undefined, required = false) => {
+    const trimmed = value?.trim() ?? '';
+    if (
+      (required && trimmed.length === 0) ||
+      trimmed.length > APPLICATION_NAME_MAX_CHARS
+    ) {
+      throw new ProfileError(ProfileErrorCode.Invalid);
+    }
+    return trimmed || undefined;
+  };
+
+  const text = (value: string | undefined, max: number) => {
+    const trimmed = value?.trim() ?? '';
+    if (trimmed.length > max) {
+      throw new ProfileError(ProfileErrorCode.Invalid);
+    }
+    return trimmed || undefined;
+  };
+
+  const posting = (value: string | undefined) => {
+    if (value === undefined || value.trim() === '') {
+      return undefined;
+    }
+    const link = parseProfileLink(value);
+    if (!link) {
+      throw new ProfileError(ProfileErrorCode.Invalid);
+    }
+    return link;
   };
 
   const addItems = (
@@ -229,6 +288,7 @@ export const createPreviewProfileGateway = ({
         continue;
       }
       changed = true;
+      touch(profile);
       resource.updatedAt = resource.settlesAt;
       if (resource.outcome === 'ready') {
         resource.status = 'ready';
@@ -343,6 +403,55 @@ export const createPreviewProfileGateway = ({
       currentProfile().extractionsToday = count;
       save();
     },
+    seedApplications: () => {
+      const profile = currentProfile();
+      const day = 24 * 60 * 60 * 1000;
+      const itemIds = profile.items.map(({ id }) => id);
+      const briefOf = (
+        gaps: number,
+        applicationRevision: number,
+        builtAt: number,
+      ): ApplicationBrief => ({
+        requirements: Array.from({ length: 6 }, (_, index) => ({
+          text: `Requirement ${index + 1}`,
+          importance: index < 4 ? 'required' : 'preferred',
+          itemIds:
+            index < 6 - gaps && itemIds.length > 0
+              ? [itemIds[index % itemIds.length]]
+              : [],
+        })),
+        questions: [],
+        applicationRevision,
+        profileRevision: profile.revision ?? 0,
+        builtAt,
+      });
+      profile.applications = PREVIEW_SEED_APPLICATIONS.map((entry, index) => {
+        const at = now() - (index + 1) * day;
+        const revision = entry.brief === 'jobChanged' ? 2 : 1;
+        return {
+          id: newId('application'),
+          title: entry.title,
+          company: entry.company,
+          role: entry.role,
+          jobDescription: entry.jobDescription,
+          postingUrl: entry.postingUrl,
+          notes: entry.notes,
+          revision,
+          ...(entry.brief === 'none'
+            ? {}
+            : {
+                brief: briefOf(
+                  entry.brief === 'jobChanged' ? 0 : entry.brief.gaps,
+                  1,
+                  at,
+                ),
+              }),
+          createdAt: at - day,
+          updatedAt: at,
+        };
+      });
+      save();
+    },
   };
 
   return {
@@ -397,6 +506,7 @@ export const createPreviewProfileGateway = ({
       nextFailure = null;
       profile.resources.push(resource);
       profile.extractionsToday += 1;
+      touch(profile);
       if (request.source === 'file') {
         save();
         return {
@@ -499,12 +609,106 @@ export const createPreviewProfileGateway = ({
       profile.items = profile.items.filter(
         item => item.resourceId !== resourceId,
       );
+      touch(profile);
       save();
       return { itemsRemoved: before - profile.items.length };
     },
 
     // No file exists here: the address leads nowhere on purpose.
     getFileUrl: async () => '#',
+
+    getApplications: async uid =>
+      structuredClone(applicationsOf(read(uid))).sort(
+        (a, b) =>
+          (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0),
+      ),
+    getApplication: async (uid, applicationId) => {
+      const found = applicationsOf(read(uid)).find(
+        ({ id }) => id === applicationId,
+      );
+      return found ? structuredClone(found) : null;
+    },
+    getProfileRevision: async uid => read(uid).revision ?? 0,
+
+    createApplication: async (request: CreateJobApplicationRequest) => {
+      const profile = currentProfile();
+      const application: JobApplication = {
+        id: '',
+        title: name(request.title, true) ?? '',
+        company: name(request.company),
+        role: name(request.role),
+        jobDescription: text(request.jobDescription, JOB_DESCRIPTION_MAX_CHARS),
+        postingUrl: posting(request.postingUrl),
+        notes: text(request.notes, APPLICATION_NOTES_MAX_CHARS),
+        revision: 1,
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      if (applicationsOf(profile).length >= APPLICATIONS_MAX) {
+        throw new ProfileError(ProfileErrorCode.MaxApplications);
+      }
+      application.id = newId('application');
+      applicationsOf(profile).push(application);
+      save();
+      return { applicationId: application.id };
+    },
+
+    updateApplication: async ({ applicationId, ...changes }) => {
+      const application = applicationsOf(currentProfile()).find(
+        ({ id }) => id === applicationId,
+      );
+      if (!application) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      const before = JSON.stringify(application);
+      if (changes.title !== undefined) {
+        application.title = name(changes.title, true) ?? '';
+      }
+      if (changes.company !== undefined) {
+        application.company = name(changes.company ?? undefined);
+      }
+      if (changes.role !== undefined) {
+        application.role = name(changes.role ?? undefined);
+      }
+      if (changes.jobDescription !== undefined) {
+        const job = text(changes.jobDescription, JOB_DESCRIPTION_MAX_CHARS);
+        if (!job) {
+          throw new ProfileError(ProfileErrorCode.Invalid);
+        }
+        application.jobDescription = job;
+      }
+      if (changes.postingUrl !== undefined) {
+        application.postingUrl = posting(changes.postingUrl ?? undefined);
+      }
+      if (changes.notes !== undefined) {
+        application.notes = text(
+          changes.notes ?? undefined,
+          APPLICATION_NOTES_MAX_CHARS,
+        );
+      }
+      // The posting's address is not something a brief is built from.
+      const { postingUrl: _before, ...was } = JSON.parse(
+        before,
+      ) as JobApplication;
+      const { postingUrl: _after, ...is } = application;
+      if (JSON.stringify(was) !== JSON.stringify(is)) {
+        application.revision += 1;
+      }
+      application.updatedAt = now();
+      save();
+      return { revision: application.revision };
+    },
+
+    removeApplication: async applicationId => {
+      const profile = currentProfile();
+      if (!applicationsOf(profile).some(({ id }) => id === applicationId)) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      profile.applications = applicationsOf(profile).filter(
+        ({ id }) => id !== applicationId,
+      );
+      save();
+    },
   };
 };
 
