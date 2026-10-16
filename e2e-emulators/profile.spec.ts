@@ -129,7 +129,7 @@ test('pasted text is read; a link that cannot be read fails, says why, and is re
   await expect(note.getByText('Ready', { exact: true })).toBeVisible();
 });
 
-test('the text kept of a resource: a note as added, and the text of a text file, read back under the rules', async ({
+test('the text kept of a resource: a note as added, a text file’s text and a link’s page copy, read back under the rules', async ({
   page,
 }) => {
   const account = await createAccount({ interviewAssistant: true });
@@ -173,4 +173,23 @@ test('the text kept of a resource: a note as added, and the text of a text file,
   const fileText = page.getByRole('region', { name: 'The text of the file' });
   await expect(fileText).toContainText(/Read from the text file on/);
   await expect(fileText).toContainText('Led the on-call redesign.');
+
+  // A link: the copy of its page that the model returned (the fake's "fake-…")
+  await page.goto('/profile');
+  await page.getByRole('button', { name: 'Add a resource' }).click();
+  await page.getByRole('button', { name: /Add a link/ }).click();
+  const linkForm = page.getByRole('dialog', { name: 'Add a link' });
+  await linkForm.getByLabel('Title').fill('Conference talk');
+  await linkForm
+    .getByLabel('Address')
+    .fill('https://talks.example/ledgers-without-tears');
+  await linkForm.getByRole('button', { name: 'Add to profile' }).click();
+  const link = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Conference talk' });
+  await expect(link.getByText('Ready', { exact: true })).toBeVisible();
+  await link.getByRole('link').click();
+  const copy = page.getByRole('region', { name: 'Copy of the page' });
+  await expect(copy).toContainText(/Taken on /);
+  await expect(copy).toContainText(/fake-/);
 });

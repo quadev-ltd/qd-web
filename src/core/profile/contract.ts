@@ -289,7 +289,8 @@ export type ProfileResource = z.infer<typeof ProfileResourceSchema>;
 
 /**
  * `users/{uid}/interviewProfile/main/texts/{resourceId}`: the text kept of a resource (D78). A
- * note as added, the text of a file without its layout, or, later, the copy of a page.
+ * note as added, the text of a file without its layout, or the model's copy of a link's page
+ * (plain text: headings as plain lines, list items as "- " lines).
  */
 export const ProfileResourceTextSchema = z.object({
   text: z.string(),
@@ -297,7 +298,7 @@ export const ProfileResourceTextSchema = z.object({
   format: z.enum(['text', 'docx', 'pdf', 'page']).catch('text'),
   takenAt: timestamp,
   chars: z.number().int().nonnegative().catch(0),
-  /** A long PDF's text was cut at the end of a line. */
+  /** A long PDF's text (at 50,000 characters) or a page's copy (at 20,000) was cut. */
   truncated: z.boolean().catch(false),
 });
 export type ProfileResourceText = z.infer<typeof ProfileResourceTextSchema>;
