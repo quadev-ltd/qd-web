@@ -112,9 +112,14 @@ export interface ProfileGateway {
    * brief built from an older one is out of date. 0 before anything was added.
    */
   getProfileRevision(uid: string): Promise<number>;
+  /**
+   * Adds an application from its job. Text and links are read by the backend straight away; a
+   * file is not sent here: the answer says where to upload it (`uploadFile`), and it is read
+   * once it arrives. The application's `job.status` says when its text and names are there.
+   */
   createApplication(
     request: CreateJobApplicationRequest,
-  ): Promise<{ applicationId: string }>;
+  ): Promise<{ applicationId: string; upload?: UploadTarget }>;
   /** Resolves the application's revision after the change. */
   updateApplication(
     request: UpdateJobApplicationRequest,

@@ -177,4 +177,45 @@ describe('ApplicationsProvider', () => {
     });
     expect(screen.getByText(/revision 5$/)).toBeInTheDocument();
   });
+
+  it('reads an application again every 2 seconds while its job is being read, and stops when it is ready', async () => {
+    vi.useFakeTimers();
+    try {
+      const reading = applicationFixture({
+        updatedAt: Date.now(),
+        job: { source: 'text', status: 'reading', edited: false },
+      });
+      const { gateway, mount } = setUp({
+        uid: 'uid-1',
+        status: 'loaded',
+        applications: [reading],
+        profileRevision: 1,
+      });
+      gateway.getApplication.mockResolvedValue(reading);
+      mount();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(gateway.getApplication).toHaveBeenCalledTimes(1);
+
+      gateway.getApplication.mockResolvedValue(
+        applicationFixture({
+          title: 'Senior Backend Engineer',
+          updatedAt: Date.now(),
+          job: { source: 'text', status: 'ready', edited: false },
+        }),
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      gateway.getApplication.mockClear();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6000);
+      });
+      expect(gateway.getApplication).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

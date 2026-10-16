@@ -141,6 +141,8 @@ export const openHome = async (page: Page) => {
  * changed since, none yet. The home reads them again.
  */
 export const seedApplications = async (page: Page) => {
+  // The controls come with the home's gateway, which is loaded on demand.
+  await page.waitForFunction(() => Boolean(window.qdPreviewProfile));
   await page.evaluate(() => {
     window.qdPreviewProfile?.seed();
     window.qdPreviewProfile?.seedApplications();

@@ -708,8 +708,22 @@ describe('previewProfileGateway', () => {
 
   describe('applications', () => {
     const job = {
-      title: 'Senior Backend Engineer',
-      jobDescription: 'Go services in production.',
+      job: {
+        source: 'text',
+        text: 'Senior Backend Engineer\nNorthwind Logistics\nGo services in production.',
+      },
+    } as const;
+
+    /** Adds an application and lets the fake read its job. */
+    const added = async (
+      gateway: Awaited<ReturnType<typeof setUp>>['gateway'],
+      pass: (milliseconds: number) => void,
+      request: Parameters<typeof gateway.createApplication>[0] = job,
+    ) => {
+      const { applicationId } = await gateway.createApplication(request);
+      pass(PREVIEW_READ_MS);
+      await gateway.getApplications(UID);
+      return applicationId;
     };
 
     it('creates an application, and lists the most recently changed first', async () => {
@@ -734,35 +748,163 @@ describe('previewProfileGateway', () => {
       await expect(gateway.getApplication(UID, 'nope')).resolves.toBeNull();
     });
 
-    it('refuses what the backend refuses: no title, a long job, a private address', async () => {
+    it('refuses what the backend refuses: no text, a long job, a private address, another kind of file', async () => {
       const { gateway } = await setUp();
+      const refused = (
+        request: Parameters<typeof gateway.createApplication>[0],
+      ) => codeOf(gateway.createApplication(request));
 
-      expect(await codeOf(gateway.createApplication({ title: ' ' }))).toBe(
+      expect(await refused({ job: { source: 'text', text: ' ' } })).toBe(
         ProfileErrorCode.Invalid,
       );
       expect(
-        await codeOf(
-          gateway.createApplication({
-            title: 'Go',
-            jobDescription: 'a'.repeat(20_001),
-          }),
-        ),
+        await refused({ job: { source: 'text', text: 'a'.repeat(20_001) } }),
       ).toBe(ProfileErrorCode.Invalid);
       expect(
+        await refused({
+          job: { source: 'link', url: 'http://intranet.local/job' },
+        }),
+      ).toBe(ProfileErrorCode.Invalid);
+      expect(
+        await refused({
+          job: {
+            source: 'file',
+            contentType: 'image/png' as 'application/pdf',
+            fileName: 'job.png',
+          },
+        }),
+      ).toBe(ProfileErrorCode.Invalid);
+    });
+
+    it('reads a pasted job: being read, then ready, with its names from its first lines', async () => {
+      const { gateway, pass } = await setUp();
+      const { applicationId } = await gateway.createApplication(job);
+
+      await expect(
+        gateway.getApplication(UID, applicationId),
+      ).resolves.toMatchObject({ title: '', job: { status: 'reading' } });
+      pass(PREVIEW_READ_MS);
+
+      await expect(
+        gateway.getApplication(UID, applicationId),
+      ).resolves.toMatchObject({
+        title: 'Senior Backend Engineer',
+        company: 'Northwind Logistics',
+        job: { source: 'text', status: 'ready' },
+      });
+    });
+
+    it('keeps the names given, and reads a posting: its copy and names from its address, or "could not read"', async () => {
+      const { gateway, pass } = await setUp();
+      const read = await added(gateway, pass, {
+        job: {
+          source: 'link',
+          url: 'https://careers.northwind.example/senior-backend-engineer',
+        },
+        title: 'My title',
+      });
+      const failed = await added(gateway, pass, {
+        job: { source: 'link', url: 'https://jobs.invalid/1' },
+      });
+
+      await expect(gateway.getApplication(UID, read)).resolves.toMatchObject({
+        title: 'My title',
+        company: 'Northwind',
+        postingUrl: 'https://careers.northwind.example/senior-backend-engineer',
+        job: { source: 'link', status: 'ready' },
+      });
+      expect(
+        (await gateway.getApplication(UID, read))?.jobDescription,
+      ).toContain('Copy of the posting');
+      await expect(gateway.getApplication(UID, failed)).resolves.toMatchObject({
+        job: { status: 'failed', failure: 'link-unreadable' },
+      });
+    });
+
+    it('reads a job given as a file once it is uploaded, with its title from the file’s name', async () => {
+      const { gateway, pass } = await setUp();
+      const { applicationId, upload } = await gateway.createApplication({
+        job: {
+          source: 'file',
+          contentType: 'application/pdf',
+          fileName: 'senior-backend-engineer.pdf',
+        },
+      });
+      expect(upload?.path).toBe(
+        `users/${UID}/application-docs/${applicationId}/job`,
+      );
+      await expect(
+        gateway.getApplication(UID, applicationId),
+      ).resolves.toMatchObject({ job: { status: 'awaitingUpload' } });
+
+      await gateway.uploadFile(upload!, pdf);
+      await expect(
+        gateway.getApplication(UID, applicationId),
+      ).resolves.toMatchObject({ job: { status: 'reading' } });
+      pass(PREVIEW_READ_MS);
+
+      await expect(
+        gateway.getApplication(UID, applicationId),
+      ).resolves.toMatchObject({
+        title: 'senior backend engineer',
+        job: {
+          source: 'file',
+          status: 'ready',
+          fileName: 'senior-backend-engineer.pdf',
+        },
+      });
+    });
+
+    it('fails the next reading on request; a text pasted after a failure makes the job ready', async () => {
+      const { gateway, pass } = await setUp();
+      gateway.controls.failNextJob('model');
+      const applicationId = await added(gateway, pass);
+      await expect(
+        gateway.getApplication(UID, applicationId),
+      ).resolves.toMatchObject({ job: { status: 'failed', failure: 'model' } });
+
+      await gateway.updateApplication({
+        applicationId,
+        jobDescription: 'Go services in production.',
+      });
+
+      await expect(
+        gateway.getApplication(UID, applicationId),
+      ).resolves.toMatchObject({ job: { status: 'ready', edited: true } });
+    });
+
+    it('does not change the job, nor prepare a brief, while the job is being read', async () => {
+      const { gateway } = await setUp();
+      const { applicationId } = await gateway.createApplication(job);
+
+      expect(
         await codeOf(
-          gateway.createApplication({
-            title: 'Go',
-            postingUrl: 'http://intranet.local/job',
-          }),
+          gateway.updateApplication({ applicationId, jobDescription: 'New' }),
         ),
       ).toBe(ProfileErrorCode.Invalid);
+      expect(await codeOf(gateway.prepareBrief(applicationId))).toBe(
+        ProfileErrorCode.Invalid,
+      );
+    });
+
+    it('counts a job read towards today’s limit', async () => {
+      const { gateway } = await setUp();
+      gateway.controls.setExtractionsToday(PROFILE_DAILY_EXTRACTIONS);
+
+      expect(await codeOf(gateway.createApplication(job))).toBe(
+        ProfileErrorCode.DailyLimit,
+      );
     });
 
     it('holds 50 applications at most', async () => {
       const { gateway } = await setUp();
       for (let index = 0; index < 50; index += 1) {
-        await gateway.createApplication({ title: `Job ${index}` });
+        gateway.controls.setExtractionsToday(0);
+        await gateway.createApplication({
+          job: { source: 'text', text: `Job ${index}` },
+        });
       }
+      gateway.controls.setExtractionsToday(0);
 
       expect(await codeOf(gateway.createApplication(job))).toBe(
         ProfileErrorCode.MaxApplications,
@@ -770,8 +912,8 @@ describe('previewProfileGateway', () => {
     });
 
     it('changes an application: a change the brief is built from moves its revision, the address does not', async () => {
-      const { gateway } = await setUp();
-      const { applicationId } = await gateway.createApplication(job);
+      const { gateway, pass } = await setUp();
+      const applicationId = await added(gateway, pass);
 
       await expect(
         gateway.updateApplication({
@@ -792,8 +934,8 @@ describe('previewProfileGateway', () => {
     });
 
     it('does not empty the job description, and says when an application is gone', async () => {
-      const { gateway } = await setUp();
-      const { applicationId } = await gateway.createApplication(job);
+      const { gateway, pass } = await setUp();
+      const applicationId = await added(gateway, pass);
 
       expect(
         await codeOf(
@@ -808,8 +950,8 @@ describe('previewProfileGateway', () => {
     });
 
     it('removes an application', async () => {
-      const { gateway } = await setUp();
-      const { applicationId } = await gateway.createApplication(job);
+      const { gateway, pass } = await setUp();
+      const applicationId = await added(gateway, pass);
 
       await gateway.removeApplication(applicationId);
 
@@ -832,12 +974,13 @@ describe('previewProfileGateway', () => {
     });
 
     it('prepares a brief: a requirement for each sentence of the job, the last two as gaps, and four questions', async () => {
-      const { gateway } = await setUp();
+      const { gateway, pass } = await setUp();
       gateway.controls.seed();
-      const { applicationId } = await gateway.createApplication({
-        title: 'Go',
-        jobDescription:
-          'You will run Go services. You will mentor engineers. You will lead incidents. You know Kafka.',
+      const applicationId = await added(gateway, pass, {
+        job: {
+          source: 'text',
+          text: 'You will run Go services. You will mentor engineers. You will lead incidents. You know Kafka.',
+        },
       });
 
       await gateway.prepareBrief(applicationId);
@@ -856,8 +999,8 @@ describe('previewProfileGateway', () => {
     });
 
     it('fails a brief on request, and stops at today’s limit of 10', async () => {
-      const { gateway } = await setUp();
-      const { applicationId } = await gateway.createApplication(job);
+      const { gateway, pass } = await setUp();
+      const applicationId = await added(gateway, pass);
 
       gateway.controls.failNextBrief('model');
       expect(await codeOf(gateway.prepareBrief(applicationId))).toBe(

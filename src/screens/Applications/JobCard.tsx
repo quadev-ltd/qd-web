@@ -11,16 +11,26 @@ import { formatDay } from '@/screens/Profile/Resource/resourceMeta';
 const SHORT_JOB_CHARS = 700;
 
 /**
- * "The job" (A7, D78): the text the brief is built from, and where it came from. A pasted
- * job is the only kind until the backend reads jobs from files and links (research doc 17).
+ * "The job" (A7, D78): the text the brief is built from, and where it came from: pasted, read
+ * from a file, or the copy of a posting (research doc 17).
  */
 export const JobCard: React.FC<{
-  application: Pick<JobApplication, 'jobDescription' | 'createdAt'>;
-}> = ({ application: { jobDescription = '', createdAt } }) => {
+  application: Pick<JobApplication, 'jobDescription' | 'createdAt' | 'job'>;
+}> = ({ application: { jobDescription = '', createdAt, job } }) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const textId = useId();
   const long = jobDescription.length > SHORT_JOB_CHARS;
+  const taken = job?.takenAt ?? createdAt;
+  const date = taken === null || taken === undefined ? null : formatDay(taken);
+  const sourceLine =
+    job?.source === 'file' && date
+      ? t('applications.jobReadFrom', { fileName: job.fileName, date })
+      : job?.source === 'link' && date
+        ? t('applications.jobCopyTakenOn', { date })
+        : date
+          ? t('applications.jobPastedOn', { date })
+          : t('applications.jobPasted');
 
   return (
     <Card as="section" elevation="raised" aria-labelledby={`${textId}-title`}>
@@ -31,9 +41,9 @@ export const JobCard: React.FC<{
           {t('applications.jobTitle')}
         </h2>
         <p className="text-sm leading-normal text-muted">
-          {createdAt === null
-            ? t('applications.jobPasted')
-            : t('applications.jobPastedOn', { date: formatDay(createdAt) })}
+          {sourceLine}
+          {job?.edited && ` ${t('applications.jobEditedHint')}`}
+          {job?.truncated && ` ${t('applications.jobTruncated')}`}
         </p>
       </div>
       <div

@@ -52,7 +52,7 @@ export const newApplicationSchema = z.object({
 });
 export type NewApplicationSchemaType = z.infer<typeof newApplicationSchema>;
 
-export const editApplicationSchema = z.object({
+const editFields = {
   [ApplicationFields.title]: title,
   [ApplicationFields.company]: optionalName,
   [ApplicationFields.role]: optionalName,
@@ -70,5 +70,13 @@ export const editApplicationSchema = z.object({
     .max(APPLICATION_NOTES_MAX_CHARS, {
       error: t('applications.notesLengthError'),
     }),
+};
+
+export const editApplicationSchema = z.object(editFields);
+
+/** While the job is being read, its text cannot change: the form leaves it out. */
+export const editWhileReadingSchema = z.object({
+  ...editFields,
+  [ApplicationFields.jobDescription]: z.string(),
 });
 export type EditApplicationSchemaType = z.infer<typeof editApplicationSchema>;

@@ -15,6 +15,7 @@ import {
   APPLICATION_NAME_MAX_CHARS,
   APPLICATION_NOTES_MAX_CHARS,
   JOB_DESCRIPTION_MAX_CHARS,
+  isJobPending,
   type JobApplication,
   type UpdateJobApplicationRequest,
 } from '@/core/profile/applications';
@@ -27,6 +28,7 @@ import {
   ApplicationFields,
   editApplicationSchema,
   type EditApplicationSchemaType,
+  editWhileReadingSchema,
 } from '@/schemas/applicationSchema';
 
 /** Only the fields that changed; an optional one that was emptied becomes `null` (cleared). */
@@ -38,7 +40,10 @@ export const changesOf = (
   if (values.title !== application.title) {
     changes.title = values.title;
   }
-  if (values.jobDescription !== (application.jobDescription ?? '')) {
+  if (
+    !isJobPending(application) &&
+    values.jobDescription !== (application.jobDescription ?? '')
+  ) {
     changes.jobDescription = values.jobDescription;
   }
   const optional = (
@@ -81,7 +86,11 @@ export const EditApplicationPanel: React.FC<EditApplicationPanelProps> = ({
     handleSubmit,
     formState: { errors },
   } = useForm<EditApplicationSchemaType>({
-    resolver: zodResolver(editApplicationSchema),
+    resolver: zodResolver(
+      isJobPending(application)
+        ? editWhileReadingSchema
+        : editApplicationSchema,
+    ),
     mode: 'onChange',
     defaultValues: {
       title: application.title,
@@ -161,23 +170,25 @@ export const EditApplicationPanel: React.FC<EditApplicationPanelProps> = ({
           disabled={isBusy}
           counter={name(role)}
         />
-        <Controller
-          name={ApplicationFields.jobDescription}
-          control={control}
-          render={({ field }) => (
-            <FormTextArea
-              {...field}
-              label={t('applications.jobLabel')}
-              hint={t('applications.jobEditHint')}
-              error={errors.jobDescription}
-              disabled={isBusy}
-              counter={{
-                length: job.trim().length,
-                max: JOB_DESCRIPTION_MAX_CHARS,
-              }}
-            />
-          )}
-        />
+        {!isJobPending(application) && (
+          <Controller
+            name={ApplicationFields.jobDescription}
+            control={control}
+            render={({ field }) => (
+              <FormTextArea
+                {...field}
+                label={t('applications.jobLabel')}
+                hint={t('applications.jobEditHint')}
+                error={errors.jobDescription}
+                disabled={isBusy}
+                counter={{
+                  length: job.trim().length,
+                  max: JOB_DESCRIPTION_MAX_CHARS,
+                }}
+              />
+            )}
+          />
+        )}
         <HookFormTextInput
           name={ApplicationFields.postingUrl}
           control={control}

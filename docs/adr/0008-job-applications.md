@@ -2,8 +2,8 @@
 
 - **Status:** accepted (15 October 2026), built slice by slice (research doc 15 §16). Done: the
   applications foundation, the home that lists them, a new application with the pasted job, the
-  page of an application (its details, the job, "Edit", "Remove"), and its brief (slice 7). Next:
-  the job from a file or a link once the backend has it (research doc 17).
+  page of an application (its details, the job, "Edit", "Remove"), its brief (slice 7), and the job
+  as its text, a file or a link, read and named by the backend (slice 8, research doc 17).
 - **Scope:** `src/core/profile/applications.ts`, `src/core/profile/ApplicationsProvider.tsx`, the
   `applications` slice of the store, `src/core/firebase/applications.ts`, `src/screens/Applications/`
   and `src/screens/Home/InterviewHome.tsx`
@@ -81,6 +81,34 @@ Where the brief goes beyond the artboards, or stops short of them:
 | A gap             | "Add a story" only                                                     | "Practise this" has no backend yet                           |
 | A likely question | Its notes, with the profile item a note comes from or "Advice"         | "Practise this question" has no backend yet                  |
 | The tabs          | "Brief" and "Details"                                                  | Sessions and CV versions have no backend yet                 |
+
+## The job from its text, a file or a link (slice 8)
+
+The backend reads a job since quadev-backend #28 (research doc 17, D79): a new application is its
+job and nothing else, and the backend names it.
+
+- **"New application" asks for the job only:** "Text", "File" or "Link". A file follows the rules of
+  a resource's file (PDF, Word or text, 10 MB) and is uploaded after the application is created, to
+  the place the backend answers; a failed upload can be tried again there. The title, the company
+  and the role are read from the job.
+- **The application's page follows the reading,** as the profile follows a resource: every 2
+  seconds, for 3 minutes at most. Until it is named, it is "New application", with the posting's
+  site or the file's name under it. Until the job is ready there is no brief to prepare: the brief
+  tab says the job is being read, or that it could not be read and why, with "Paste the text
+  instead" (the edit form, where the job and a title can be given) and "Open the posting".
+- **"The job" says where its text came from:** pasted, read from a file, or the copy of a posting,
+  with the day, and whether the candidate changed it since.
+- **While the job is being read its text cannot change** (the backend refuses), so "Edit the
+  application" leaves it out.
+- **A job read counts towards the day's limit of 20 readings,** shared with resources.
+
+Where it goes beyond the artboards, or stops short of them:
+
+| Where                      | What                                                                    | Why                                                                       |
+| -------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| "Paste the text instead"   | Opens "Edit the application" on the job, where a title can be given too | After a failed reading the backend reads no names: the candidate names it |
+| The job's file not arrived | "Waiting for the file", with removing as the way out                    | Not drawn                                                                 |
+| "Read the posting again"   | Not built                                                               | It comes with the backend's slice 4 (research doc 17)                     |
 
 ## Consequences
 

@@ -165,6 +165,41 @@ describe('ApplicationScreen', () => {
     expect(details).toHaveAttribute('href', '/applications/a1/details');
   });
 
+  it.each([
+    [
+      { source: 'link' as const },
+      'https://careers.northwind.example/jobs/1',
+      'careers.northwind.example',
+    ],
+    [
+      { source: 'file' as const, fileName: 'northwind.pdf' },
+      undefined,
+      'northwind.pdf',
+    ],
+  ])(
+    'is named "New application" until its names are read, with where its job comes from (%o)',
+    (from, postingUrl, subtitle) => {
+      setUp(
+        loaded(
+          applicationFixture({
+            title: '',
+            company: undefined,
+            postingUrl,
+            job: { ...from, status: 'reading', edited: false },
+          }),
+        ),
+      );
+
+      expect(
+        screen.getByRole('heading', {
+          level: 1,
+          name: 'applications.untitled',
+        }),
+      ).toBeInTheDocument();
+      expect(screen.getByText(subtitle)).toBeInTheDocument();
+    },
+  );
+
   it('says so when the application is not in the list', () => {
     setUp(loaded(applicationFixture({ id: 'other' })));
 

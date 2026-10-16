@@ -30,6 +30,7 @@ import {
   UpdateJobApplicationResponseSchema,
 } from '@/core/profile/applications';
 import { interviewProfilePath, usageDayPath } from '@/core/profile/contract';
+import { type UploadTarget } from '@/core/profile/gateway';
 
 /** An application as the contract reads it: every Firestore Timestamp in milliseconds. */
 const withDates = (id: string, data: DocumentData) => {
@@ -97,16 +98,10 @@ export const getProfileRevision = (uid: string): Promise<number> =>
     return typeof revision === 'number' && revision > 0 ? revision : 0;
   });
 
-export const createApplication = async (
+export const createApplication = (
   request: CreateJobApplicationRequest,
-): Promise<{ applicationId: string }> => {
-  const { applicationId } = await call(
-    CREATE_JOB_APPLICATION,
-    CreateJobApplicationResponseSchema,
-    request,
-  );
-  return { applicationId };
-};
+): Promise<{ applicationId: string; upload?: UploadTarget }> =>
+  call(CREATE_JOB_APPLICATION, CreateJobApplicationResponseSchema, request);
 
 export const updateApplication = async (
   request: UpdateJobApplicationRequest,

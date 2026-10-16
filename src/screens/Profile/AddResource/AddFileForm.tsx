@@ -13,10 +13,10 @@ import FilePicker from '@/components/ui/FilePicker';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import {
   PROFILE_TITLE_MAX_CHARS,
-  PROFILE_UPLOAD_MAX_BYTES,
   RESOURCE_TYPES_BY_SOURCE,
 } from '@/core/profile/contract';
 import {
+  fileProblemOf,
   formatFileSize,
   PROFILE_UPLOAD_ACCEPT,
   titleFromFileName,
@@ -33,17 +33,6 @@ export interface AddFileFormProps {
   /** The form adds a CV and nothing else ("Add your CV"): there is no type to choose. */
   cvOnly?: boolean;
 }
-
-/** Why a chosen file cannot be added, in the order the candidate can act on. */
-const fileProblem = (file: File) => {
-  if (!uploadContentTypeOf(file)) {
-    return 'type' as const;
-  }
-  if (file.size === 0) {
-    return 'empty' as const;
-  }
-  return file.size > PROFILE_UPLOAD_MAX_BYTES ? ('size' as const) : undefined;
-};
 
 /** "Upload a file": the file, a title and whether it is a CV or another document. */
 export const AddFileForm: React.FC<AddFileFormProps> = ({
@@ -69,7 +58,7 @@ export const AddFileForm: React.FC<AddFileFormProps> = ({
   const title = useWatch({ control, name: AddResourceFields.title });
   const type = useWatch({ control, name: AddResourceFields.type });
 
-  const problem = file ? fileProblem(file) : undefined;
+  const problem = file ? fileProblemOf(file) : undefined;
   const fileError = problem
     ? t(
         problem === 'type'

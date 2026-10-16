@@ -9,6 +9,8 @@ import {
   QuestionsCard,
   RequirementsCard,
 } from './BriefCards';
+import EditApplicationPanel from './EditApplicationPanel';
+import JobStatusPanel from './JobStatusPanel';
 
 import Icon from '@/components/Icon';
 import Spinner from '@/components/Spinner';
@@ -19,6 +21,7 @@ import {
   BRIEF_DAILY_LIMIT,
   briefStateOf,
   type JobApplication,
+  jobStatusOf,
 } from '@/core/profile/applications';
 import {
   useApplications,
@@ -87,6 +90,7 @@ export const BriefTab: React.FC<{ application: JobApplication }> = ({
   const [failure, setFailure] = useState<'model' | 'limit' | null>(null);
   const [briefsToday, setBriefsToday] = useState<number | null>(null);
   const [adding, setAdding] = useState<'cv' | 'note'>();
+  const [pasting, setPasting] = useState(false);
   const { brief } = application;
   const items = useProfileItems(brief?.builtAt);
 
@@ -222,6 +226,24 @@ export const BriefTab: React.FC<{ application: JobApplication }> = ({
       }}
     />
   );
+
+  // The job is read first: until it is ready, there is nothing to prepare a brief from.
+  if (jobStatusOf(application) !== 'ready') {
+    return (
+      <div className="flex flex-col gap-5">
+        <JobStatusPanel
+          application={application}
+          onPaste={() => setPasting(true)}
+        />
+        {pasting && (
+          <EditApplicationPanel
+            application={application}
+            onClose={() => setPasting(false)}
+          />
+        )}
+      </div>
+    );
+  }
 
   if (!brief) {
     return (

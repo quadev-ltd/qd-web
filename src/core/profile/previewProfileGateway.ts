@@ -6,9 +6,12 @@ import {
   BRIEF_DAILY_LIMIT,
   type BriefQuestion,
   type BriefRequirement,
+  APPLICATION_FILE_NAME_MAX_CHARS,
   type CreateJobApplicationRequest,
+  isJobPending,
   JOB_DESCRIPTION_MAX_CHARS,
   type JobApplication,
+  type NewJob,
 } from './applications';
 import {
   type CreateProfileResourceRequest,
@@ -77,6 +80,20 @@ interface PreviewProfile {
   revision?: number;
   /** How many briefs were prepared today. */
   briefsToday?: number;
+  /** The readings of applications' jobs, by application. */
+  jobReadings?: Record<string, JobReading>;
+}
+
+/** How the fake reads the job of an application (research doc 17). */
+interface JobReading {
+  /** When the reading ends; `null` while the file has not arrived. */
+  settlesAt: number | null;
+  outcome: ProfileResourceFailure | 'ready';
+  source: NewJob['source'];
+  /** The pasted text, the address, or the file's name: what the names are read from. */
+  from: string;
+  /** For a file: where it is uploaded. */
+  path?: string;
 }
 
 interface PreviewProfileState {
@@ -101,6 +118,8 @@ export interface PreviewProfileControls {
   seedApplications(): void;
   /** The next brief cannot be prepared: the model failed, or today's limit was reached. */
   failNextBrief(reason: 'model' | 'quota'): void;
+  /** The job of the next application cannot be read, for this reason. */
+  failNextJob(reason: ProfileResourceFailure): void;
   /** How many briefs were already prepared today. */
   setBriefsToday(count: number): void;
 }
@@ -225,6 +244,83 @@ export const createPreviewProfileGateway = ({
   };
 
   let nextBriefFailure: 'model' | 'quota' | null = null;
+  let nextJobFailure: ProfileResourceFailure | null = null;
+
+  /** The names a reading finds: from the first lines of a text, an address or a file's name. */
+  const namesFrom = (
+    reading: JobReading,
+  ): { title?: string; company?: string } => {
+    const short = (value?: string) =>
+      value && value.length <= 60 ? value : undefined;
+    if (reading.source === 'text') {
+      const lines = reading.from
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean);
+      return {
+        title: short(lines[0]) ?? lines[0]?.split(/\s+/).slice(0, 5).join(' '),
+        company: lines.length > 2 ? short(lines[1]) : undefined,
+      };
+    }
+    if (reading.source === 'link') {
+      const url = new URL(reading.from);
+      const slug = url.pathname.split('/').filter(Boolean).pop() ?? '';
+      const words = slug.replace(/[-_]+/g, ' ').trim();
+      const label = url.hostname
+        .split('.')
+        .find(part => !['www', 'jobs', 'careers'].includes(part));
+      return {
+        title: words
+          ? words.charAt(0).toUpperCase() + words.slice(1)
+          : undefined,
+        company: label
+          ? label.charAt(0).toUpperCase() + label.slice(1)
+          : undefined,
+      };
+    }
+    return {
+      title: reading.from.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' '),
+    };
+  };
+
+  /** Ends the readings whose time has come, as the backend's trigger would. */
+  const settleJobs = (profile: PreviewProfile) => {
+    const time = now();
+    let changed = false;
+    for (const application of profile.applications ?? []) {
+      const reading = profile.jobReadings?.[application.id];
+      const job = application.job;
+      if (
+        !reading ||
+        !job ||
+        job.status !== 'reading' ||
+        reading.settlesAt === null ||
+        reading.settlesAt > time
+      ) {
+        continue;
+      }
+      changed = true;
+      application.updatedAt = reading.settlesAt;
+      if (reading.outcome !== 'ready') {
+        job.status = 'failed';
+        job.failure = reading.outcome;
+        continue;
+      }
+      job.status = 'ready';
+      job.takenAt = reading.settlesAt;
+      const names = namesFrom(reading);
+      application.title ||= names.title ?? '';
+      application.company ??= names.company;
+      if (reading.source === 'link') {
+        application.jobDescription = `Copy of the posting at ${reading.from}. We are hiring for this role: you will design and run services in production and lead incident response for your area.`;
+      } else if (reading.source === 'file') {
+        application.jobDescription = `Read from ${reading.from}. You will design and run services in production and mentor engineers on the team.`;
+      }
+    }
+    if (changed) {
+      save();
+    }
+  };
 
   /**
    * A brief as the fake prepares it: one requirement for each sentence of the job (six at
@@ -388,6 +484,7 @@ export const createPreviewProfileGateway = ({
     lastReadUid = uid;
     const profile = profileOf(uid);
     settle(profile);
+    settleJobs(profile);
     return profile;
   };
 
@@ -481,6 +578,9 @@ export const createPreviewProfileGateway = ({
     },
     failNextBrief: reason => {
       nextBriefFailure = reason;
+    },
+    failNextJob: reason => {
+      nextJobFailure = reason;
     },
     setBriefsToday: count => {
       currentProfile().briefsToday = count;
@@ -612,11 +712,15 @@ export const createPreviewProfileGateway = ({
       const resource = profile.resources.find(
         ({ storagePath }) => storagePath === target.path,
       );
+      const jobId = Object.entries(profile.jobReadings ?? {}).find(
+        ([, reading]) => reading.path === target.path,
+      )?.[0];
+      const job = applicationsOf(profile).find(({ id }) => id === jobId)?.job;
       // Like the rules of the file store: the owner's path, once, within the limits.
       if (
-        !resource ||
+        (!resource && !job) ||
         uploaded.has(target.path) ||
-        resource.status !== 'awaitingUpload' ||
+        (resource ? resource.status : job?.status) !== 'awaitingUpload' ||
         file.size === 0 ||
         file.size > target.maxBytes
       ) {
@@ -633,8 +737,17 @@ export const createPreviewProfileGateway = ({
         throw new ProfileError(ProfileErrorCode.UploadCancelled);
       }
       uploaded.add(target.path);
-      startReading(resource);
-      resource.updatedAt = now();
+      if (resource) {
+        startReading(resource);
+        resource.updatedAt = now();
+      } else if (job && jobId) {
+        // The trigger reads the job once its file has arrived.
+        job.status = 'reading';
+        const reading = profile.jobReadings?.[jobId];
+        if (reading) {
+          reading.settlesAt = now() + PREVIEW_READ_MS;
+        }
+      }
       save();
     },
 
@@ -714,26 +827,99 @@ export const createPreviewProfileGateway = ({
     getProfileRevision: async uid => read(uid).revision ?? 0,
 
     createApplication: async (request: CreateJobApplicationRequest) => {
+      const uid = currentUid();
       const profile = currentProfile();
+      const { job } = request;
       const application: JobApplication = {
         id: '',
-        title: name(request.title, true) ?? '',
+        title: name(request.title) ?? '',
         company: name(request.company),
         role: name(request.role),
-        jobDescription: text(request.jobDescription, JOB_DESCRIPTION_MAX_CHARS),
-        postingUrl: posting(request.postingUrl),
         notes: text(request.notes, APPLICATION_NOTES_MAX_CHARS),
         revision: 1,
         createdAt: now(),
         updatedAt: now(),
       };
+      let reading: JobReading;
+      if (job.source === 'text') {
+        const pasted = text(job.text, JOB_DESCRIPTION_MAX_CHARS);
+        if (!pasted) {
+          throw new ProfileError(ProfileErrorCode.Invalid);
+        }
+        application.jobDescription = pasted;
+        reading = {
+          settlesAt: null,
+          outcome: 'ready',
+          source: 'text',
+          from: pasted,
+        };
+      } else if (job.source === 'link') {
+        const link = posting(job.url);
+        if (!link) {
+          throw new ProfileError(ProfileErrorCode.Invalid);
+        }
+        application.postingUrl = link;
+        reading = {
+          settlesAt: null,
+          outcome: isHttpsInvalidHost(link) ? 'link-unreadable' : 'ready',
+          source: 'link',
+          from: link,
+        };
+      } else {
+        const fileName = job.fileName.trim();
+        if (
+          !PROFILE_UPLOAD_CONTENT_TYPES.includes(job.contentType) ||
+          fileName.length === 0 ||
+          fileName.length > APPLICATION_FILE_NAME_MAX_CHARS
+        ) {
+          throw new ProfileError(ProfileErrorCode.Invalid);
+        }
+        reading = {
+          settlesAt: null,
+          outcome: 'ready',
+          source: 'file',
+          from: fileName,
+        };
+      }
       if (applicationsOf(profile).length >= APPLICATIONS_MAX) {
         throw new ProfileError(ProfileErrorCode.MaxApplications);
       }
+      if (profile.extractionsToday >= PROFILE_DAILY_EXTRACTIONS) {
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+      }
+      if (nextJobFailure) {
+        reading.outcome = nextJobFailure;
+        nextJobFailure = null;
+      }
       application.id = newId('application');
+      application.job = {
+        source: job.source,
+        status: job.source === 'file' ? 'awaitingUpload' : 'reading',
+        ...(job.source === 'file' ? { fileName: job.fileName.trim() } : {}),
+        edited: false,
+      };
+      if (job.source === 'file') {
+        reading.path = `users/${uid}/application-docs/${application.id}/job`;
+      } else {
+        reading.settlesAt = now() + PREVIEW_READ_MS;
+      }
+      profile.jobReadings = {
+        ...profile.jobReadings,
+        [application.id]: reading,
+      };
       applicationsOf(profile).push(application);
+      profile.extractionsToday += 1;
       save();
-      return { applicationId: application.id };
+      return job.source === 'file' && reading.path
+        ? {
+            applicationId: application.id,
+            upload: {
+              path: reading.path,
+              contentType: job.contentType,
+              maxBytes: PROFILE_UPLOAD_MAX_BYTES,
+            },
+          }
+        : { applicationId: application.id };
     },
 
     updateApplication: async ({ applicationId, ...changes }) => {
@@ -755,10 +941,17 @@ export const createPreviewProfileGateway = ({
       }
       if (changes.jobDescription !== undefined) {
         const job = text(changes.jobDescription, JOB_DESCRIPTION_MAX_CHARS);
-        if (!job) {
+        // Not while the job is being read ("job-not-ready"), and never emptied.
+        if (!job || isJobPending(application)) {
           throw new ProfileError(ProfileErrorCode.Invalid);
         }
         application.jobDescription = job;
+        if (application.job) {
+          // Pasted after a failed reading, the job becomes ready.
+          application.job.status = 'ready';
+          application.job.failure = undefined;
+          application.job.edited = true;
+        }
       }
       if (changes.postingUrl !== undefined) {
         application.postingUrl = posting(changes.postingUrl ?? undefined);
@@ -789,6 +982,9 @@ export const createPreviewProfileGateway = ({
       );
       if (!application) {
         throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      if (application.job && application.job.status !== 'ready') {
+        throw new ProfileError(ProfileErrorCode.Invalid);
       }
       const failure = nextBriefFailure;
       nextBriefFailure = null;
