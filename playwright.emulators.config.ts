@@ -27,8 +27,11 @@ export default defineConfig({
         ],
       ]
     : 'list',
-  // A first call starts a function in the emulator, which takes a few seconds.
-  expect: { timeout: 15_000 },
+  // A first call starts a function in the emulator, and the first reading loads the
+  // service's bundle (with pdf.js): several seconds each, more on a first run after `npm ci`
+  // in the backend. A test waits for up to three readings.
+  timeout: 90_000,
+  expect: { timeout: 30_000 },
   use: {
     baseURL: BASE_URL,
     trace: 'retain-on-failure',

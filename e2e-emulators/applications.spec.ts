@@ -29,7 +29,7 @@ test('E4: a pasted job is read and named, shown on its page and the home, edited
   await panel.getByRole('button', { name: 'Add the job' }).click();
   await expect(page).toHaveURL(/\/applications\/.+/);
   const title = page.getByRole('heading', { level: 1 });
-  await expect(title).toHaveText(FAKE_NAME, { timeout: 30_000 });
+  await expect(title).toHaveText(FAKE_NAME);
   await expect(
     page.getByRole('button', { name: 'Prepare the brief' }),
   ).toBeVisible();
@@ -86,9 +86,7 @@ test('a job as a file: uploaded under the Storage rules, read by the trigger, na
   });
   await panel.getByRole('button', { name: 'Add the job' }).click();
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(FAKE_NAME, {
-    timeout: 30_000,
-  });
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(FAKE_NAME);
   await page.getByRole('link', { name: 'Details' }).click();
   await expect(page.getByRole('region', { name: 'The job' })).toContainText(
     /Read from platform-engineer\.txt on/,
@@ -109,9 +107,7 @@ test('a posting that cannot be read: said, then its text pasted instead, named b
     .fill('https://jobs.invalid/platform-engineer');
   await panel.getByRole('button', { name: 'Add the job' }).click();
   const status = page.getByRole('status');
-  await expect(status).toContainText('We couldn’t read this page', {
-    timeout: 30_000,
-  });
+  await expect(status).toContainText('We couldn’t read this page');
 
   // updateJobApplication with the text makes the job ready; the names are given by hand
   await status.getByRole('button', { name: 'Paste the text instead' }).click();
@@ -149,7 +145,7 @@ test('E5 and E6: a brief is prepared, goes out of date when the job changes, is 
   const requirements = page.getByRole('region', {
     name: 'What the job asks for',
   });
-  await expect(requirements).toBeVisible({ timeout: 30_000 });
+  await expect(requirements).toBeVisible();
   await expect(
     page.getByRole('region', { name: 'Likely questions' }),
   ).toBeVisible();
@@ -170,7 +166,7 @@ test('E5 and E6: a brief is prepared, goes out of date when the job changes, is 
   );
   await expect(changed).toBeVisible();
   await page.getByRole('button', { name: 'Refresh' }).click();
-  await expect(changed).toBeHidden({ timeout: 30_000 });
+  await expect(changed).toBeHidden();
   const application = page.url();
 
   // E6: a resource added to the profile moves the profile's revision
