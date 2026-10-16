@@ -478,6 +478,13 @@ Rules (the same as in `qd-mobile` where they exist there):
   (Android App Links, iOS Universal Links): they must never change by accident.
   `yarn check:well-known` compares them, and their copies in `dist/`, with pinned SHA-256 hashes
   (`scripts/check-well-known.mjs`); changing one on purpose means updating its hash in the same commit.
+- **Files for the dev site only** live in `public-dev/`: every build except production copies them
+  into the output (`vite.config.ts`), and `yarn check:bundle` fails if one is in a production build.
+  Today they are two fictional pages that the backend's evaluations read
+  (`/evals/profile/portfolio-page` and `/evals/profile/page-with-instructions`; quadev-backend,
+  `packages/career-skills/evals/profile-extract/pages`). They are copies byte for byte: the second
+  one tells AI assistants to misdescribe its candidate on purpose (a prompt-injection case), so
+  don't edit or reformat them (they are in `.prettierignore`).
 - **Content-Security-Policy:** the hosting sends one (`firebase.json`, see
   [Hosting configuration](#hosting-configuration)). Code must work under it: no inline `<script>` or
   `<style>`, no `style` attribute, no `eval`, and nothing loaded from another origin without adding

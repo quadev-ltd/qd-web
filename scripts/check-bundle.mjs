@@ -12,6 +12,8 @@
 //    finds the addresses the Firebase SDK calls. They are first looked up in the installed
 //    SDK, so an SDK that stops using them fails the check instead of passing it unseen.
 //    With the account screens on, Firebase is expected and this part is skipped.
+// 3. The files of public-dev/ are for the dev site only (vite.config.ts): the check fails
+//    when one of them is in the output.
 //
 // Only for production builds (`yarn build`, mode prod). A dev build (`yarn build:dev`,
 // .env.dev) is configured with the preview gateway and contains it on purpose, so this
@@ -71,6 +73,18 @@ const offenders = filesContaining(marker);
 if (offenders.length > 0) {
   console.error(
     `Bundle check failed: the preview auth gateway is in the build output:\n- ${offenders.join('\n- ')}`,
+  );
+  process.exit(1);
+}
+
+const devOnly = join(root, 'public-dev');
+const devOnlyFound = (existsSync(devOnly) ? filesIn(devOnly) : [])
+  .map(file => relative(devOnly, file))
+  .filter(file => existsSync(join(dist, file)))
+  .map(file => join(distName, file));
+if (devOnlyFound.length > 0) {
+  console.error(
+    `Bundle check failed: files for the dev site only (public-dev/) are in the build output:\n- ${devOnlyFound.join('\n- ')}`,
   );
   process.exit(1);
 }
