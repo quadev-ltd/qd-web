@@ -1043,4 +1043,76 @@ describe('previewProfileGateway', () => {
       expect(none?.brief).toBeUndefined();
     });
   });
+
+  describe('the texts kept of resources (D78)', () => {
+    it('keeps a note as it was pasted once it is read, and nothing before', async () => {
+      const { gateway, pass } = await setUp();
+      const { resourceId } = await gateway.createResource(note);
+      await expect(
+        gateway.getResourceText(UID, resourceId),
+      ).resolves.toBeNull();
+
+      pass(PREVIEW_READ_MS);
+
+      const resource = await gateway.getResource(UID, resourceId);
+      expect(resource?.textAt).toBe(1_000_000 + PREVIEW_READ_MS);
+      expect(resource).not.toHaveProperty('pasted');
+      await expect(
+        gateway.getResourceText(UID, resourceId),
+      ).resolves.toMatchObject({
+        text: 'Pushed back on a launch date.',
+        kind: 'note',
+        format: 'text',
+      });
+    });
+
+    it('keeps the text of a file once it is read, and none for a link', async () => {
+      const { gateway, pass } = await setUp();
+      const { resourceId, upload } = await gateway.createResource(cvFile);
+      await gateway.uploadFile(upload!, pdf);
+      const { resourceId: link } = await gateway.createResource({
+        source: 'link',
+        type: 'link',
+        title: 'Talk',
+        url: 'https://talks.example/ledgers',
+      });
+      pass(PREVIEW_READ_MS);
+
+      await expect(
+        gateway.getResourceText(UID, resourceId),
+      ).resolves.toMatchObject({
+        kind: 'file',
+        format: 'pdf',
+      });
+      await expect(gateway.getResourceText(UID, link)).resolves.toBeNull();
+    });
+
+    it('removes the text with its resource', async () => {
+      const { gateway, pass } = await setUp();
+      const { resourceId } = await gateway.createResource(note);
+      pass(PREVIEW_READ_MS);
+      await gateway.getResources(UID);
+
+      await gateway.removeResource(resourceId);
+
+      await expect(
+        gateway.getResourceText(UID, resourceId),
+      ).resolves.toBeNull();
+    });
+
+    it('gives the ready resources of the designs their texts', async () => {
+      const { gateway } = await setUp();
+      gateway.controls.seed();
+
+      const cv = (await gateway.getResources(UID)).find(
+        ({ title }) => title === 'Maya Okafor CV 2026',
+      );
+      expect(cv?.textAt).toEqual(expect.any(Number));
+      await expect(gateway.getResourceText(UID, cv!.id)).resolves.toMatchObject(
+        {
+          kind: 'file',
+        },
+      );
+    });
+  });
 });

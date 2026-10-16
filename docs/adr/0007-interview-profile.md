@@ -353,6 +353,24 @@ notes). The skill map may come back later with editing, removing and adding item
 The design chat redraws P1, P3 and the homes from the same list; anything that differs is adjusted
 when the canvas has them.
 
+## The text kept of a resource (16 Oct 2026)
+
+The owner asked to see the content of what was added (D78 in the research notes). The backend
+keeps it since research doc 17's slice 2: a note as it was added, the text of a file without its
+layout (a PDF's cut at the end of a line after 50,000 characters), in a document of its own,
+`users/{uid}/interviewProfile/main/texts/{resourceId}`, with `textAt` on the resource.
+
+- **The page of a resource shows it** under its header: "The text" ("As you added it on …") for a
+  note, "The text of the file" ("Read from the PDF on …, without its layout") for a file, its start
+  fading out and "Show all", which opens it in place with "Show less". "Download the file" shows
+  the file as it looks.
+- **One document, read when the page opens,** and only for a resource with `textAt`: the profile's
+  list never loads texts. A link has none until the backend keeps a copy of its page (research doc
+  17, slice 3); nor do a scan with no text, a resource that failed, and resources added before the
+  backend kept texts.
+- **The website reads Storage files only as links** (the bucket has no cross-origin rule), which is
+  why the text is a Firestore document and not the stored file.
+
 ## Consequences
 
 - The plan holds: nothing found here changes a screen or needs a change in the backend.

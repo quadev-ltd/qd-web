@@ -104,6 +104,10 @@ export type ProfileUploadContentType =
 export const interviewProfilePath = (uid: string) =>
   `users/${uid}/interviewProfile/main`;
 
+/** The text kept of one resource; its id is the resource's. */
+export const profileTextPath = (uid: string, resourceId: string) =>
+  `${interviewProfilePath(uid)}/texts/${resourceId}`;
+
 /** The resources of a profile; with `resourceId`, one of them. */
 export const profileResourcesPath = (uid: string, resourceId?: string) =>
   `${interviewProfilePath(uid)}/resources${resourceId === undefined ? '' : `/${resourceId}`}`;
@@ -276,10 +280,27 @@ export const ProfileResourceSchema = z.object({
   failure: z.enum(PROFILE_RESOURCE_FAILURES).optional().catch('internal'),
   /** Items in the skill map that came from this resource. */
   itemCount: z.number().int().nonnegative().catch(0),
+  /** When its text was kept (D78, research doc 17): there is a text to open. */
+  textAt: timestamp.optional(),
   createdAt: timestamp,
   updatedAt: timestamp,
 });
 export type ProfileResource = z.infer<typeof ProfileResourceSchema>;
+
+/**
+ * `users/{uid}/interviewProfile/main/texts/{resourceId}`: the text kept of a resource (D78). A
+ * note as added, the text of a file without its layout, or, later, the copy of a page.
+ */
+export const ProfileResourceTextSchema = z.object({
+  text: z.string(),
+  kind: z.enum(['note', 'file', 'page']).catch('file'),
+  format: z.enum(['text', 'docx', 'pdf', 'page']).catch('text'),
+  takenAt: timestamp,
+  chars: z.number().int().nonnegative().catch(0),
+  /** A long PDF's text was cut at the end of a line. */
+  truncated: z.boolean().catch(false),
+});
+export type ProfileResourceText = z.infer<typeof ProfileResourceTextSchema>;
 
 /** `users/{uid}/interviewProfile/main/items/{id}`, with its id. */
 export const SkillMapItemSchema = z.object({

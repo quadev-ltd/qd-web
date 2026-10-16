@@ -511,14 +511,14 @@ describe('JobCard', () => {
     );
     const card = screen.getByRole('region', { name: 'applications.jobTitle' });
     const toggle = within(card).getByRole('button', {
-      name: 'applications.showAllButton',
+      name: 'textPreview.showAll',
     });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
 
     await userEvent.click(toggle);
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(toggle).toHaveTextContent('applications.showLessButton');
+    expect(toggle).toHaveTextContent('textPreview.showLess');
   });
 
   it.each([

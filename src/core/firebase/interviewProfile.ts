@@ -30,6 +30,9 @@ import {
   type ProfileResource,
   ProfileResourceSchema,
   profileResourcesPath,
+  type ProfileResourceText,
+  ProfileResourceTextSchema,
+  profileTextPath,
   REMOVE_PROFILE_RESOURCE,
   type RemoveProfileResourceRequest,
   RemoveProfileResourceResponseSchema,
@@ -140,6 +143,7 @@ const withDates = (id: string, data: DocumentData) => ({
   id,
   createdAt: millis(data.createdAt),
   updatedAt: millis(data.updatedAt),
+  ...(data.textAt === undefined ? {} : { textAt: millis(data.textAt) }),
 });
 
 /**
@@ -200,6 +204,28 @@ export const getItems = (uid: string): Promise<SkillMapItem[]> =>
   mapped(async () => {
     const snapshot = await getDocs(collection(db(), skillMapItemsPath(uid)));
     return parseAll('getItems', SkillMapItemSchema, snapshot.docs);
+  });
+
+/** The text kept of one resource, or `null` when there is none. */
+export const getResourceText = (
+  uid: string,
+  resourceId: string,
+): Promise<ProfileResourceText | null> =>
+  mapped(async () => {
+    const snapshot = await getDoc(doc(db(), profileTextPath(uid, resourceId)));
+    if (!snapshot.exists()) {
+      return null;
+    }
+    const data = snapshot.data();
+    const parsed = ProfileResourceTextSchema.safeParse({
+      ...data,
+      takenAt: millis(data.takenAt),
+    });
+    if (!parsed.success) {
+      logger().logError(new Error('getResourceText: not understood'));
+      return null;
+    }
+    return parsed.data;
   });
 
 /** How many resources the backend read for this user today (UTC). */
