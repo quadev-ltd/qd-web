@@ -8,6 +8,7 @@ import { Link } from 'react-router';
 import { StartCardContent } from './StartCard';
 
 import Icon, { type IconName } from '@/components/Icon';
+import Spinner from '@/components/Spinner';
 import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/ButtonLink';
@@ -17,6 +18,7 @@ import {
   APPLICATIONS_MAX,
   briefStateOf,
   type JobApplication,
+  jobStatusOf,
 } from '@/core/profile/applications';
 import {
   ApplicationsProvider,
@@ -91,6 +93,23 @@ const BriefChips: React.FC<{
   profileRevision: number | null;
 }> = ({ application, profileRevision }) => {
   const { t } = useTranslation();
+  // The job is read first; its brief can only follow.
+  const job = jobStatusOf(application);
+  if (job === 'reading' || job === 'awaitingUpload') {
+    return (
+      <Chip>
+        <Spinner size="tiny" decorative />
+        {t('home.readingChip')}
+      </Chip>
+    );
+  }
+  if (job === 'failed') {
+    return (
+      <Chip tone="danger" icon="alert">
+        {t('home.unreadableChip')}
+      </Chip>
+    );
+  }
   const state = briefStateOf(application, profileRevision);
   if (state.kind === 'none') {
     return <Chip>{t('home.briefNoneChip')}</Chip>;
@@ -119,33 +138,39 @@ const BriefChips: React.FC<{
 const ApplicationCard: React.FC<{
   application: JobApplication;
   profileRevision: number | null;
-}> = ({ application, profileRevision }) => (
-  <Card as="article" elevation="raised" className="relative gap-3 p-4">
-    <div className="flex items-start gap-3">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <h3 className="text-[17px] leading-normal font-bold wrap-anywhere">
-          {/* The whole card opens the application. */}
-          <Link
-            to={applicationPath(application.id)}
-            className="text-text no-underline after:absolute after:inset-0 after:rounded-card hover:text-text hover:underline">
-            {application.title}
-          </Link>
-        </h3>
-        {application.company && (
-          <p className="text-[15px] leading-normal text-muted wrap-anywhere">
-            {application.company}
-          </p>
-        )}
+}> = ({ application, profileRevision }) => {
+  const { t } = useTranslation();
+  return (
+    <Card as="article" elevation="raised" className="relative gap-3 p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h3 className="text-[17px] leading-normal font-bold wrap-anywhere">
+            {/* The whole card opens the application. */}
+            <Link
+              to={applicationPath(application.id)}
+              className="text-text no-underline after:absolute after:inset-0 after:rounded-card hover:text-text hover:underline">
+              {application.title || t('applications.untitled')}
+            </Link>
+          </h3>
+          {application.company && (
+            <p className="text-[15px] leading-normal text-muted wrap-anywhere">
+              {application.company}
+            </p>
+          )}
+        </div>
+        <span className="flex pt-1 text-muted">
+          <Icon name="right" />
+        </span>
       </div>
-      <span className="flex pt-1 text-muted">
-        <Icon name="right" />
-      </span>
-    </div>
-    <div className="flex flex-wrap gap-2">
-      <BriefChips application={application} profileRevision={profileRevision} />
-    </div>
-  </Card>
-);
+      <div className="flex flex-wrap gap-2">
+        <BriefChips
+          application={application}
+          profileRevision={profileRevision}
+        />
+      </div>
+    </Card>
+  );
+};
 
 const ProfileCard: React.FC = () => {
   const { t } = useTranslation();

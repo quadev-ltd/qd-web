@@ -145,6 +145,37 @@ describe('InterviewHome', () => {
       expect(screen.queryByText('home.pathsTitle')).not.toBeInTheDocument();
     });
 
+    it('says a job is being read or could not be read, and names one that has no name yet', () => {
+      setUp({
+        applications: loaded({
+          applications: [
+            applicationFixture({
+              id: 'reading',
+              title: '',
+              company: undefined,
+              updatedAt: 3,
+              job: { source: 'link', status: 'reading', edited: false },
+            }),
+            applicationFixture({
+              id: 'failed',
+              updatedAt: 2,
+              job: {
+                source: 'file',
+                status: 'failed',
+                failure: 'empty',
+                edited: false,
+              },
+            }),
+          ],
+        }),
+      });
+
+      const cards = screen.getAllByRole('listitem');
+      expect(cards[0]).toHaveTextContent('applications.untitled');
+      expect(cards[0]).toHaveTextContent('home.readingChip');
+      expect(cards[1]).toHaveTextContent('home.unreadableChip');
+    });
+
     it('says a brief is out of date when the profile changed since', () => {
       setUp({
         applications: loaded({

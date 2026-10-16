@@ -82,6 +82,45 @@ beforeEach(() => {
 });
 
 describe('BriefTab', () => {
+  describe('while the job is not ready', () => {
+    it('says it is being read, and offers no brief yet', () => {
+      setUp(
+        applicationFixture({
+          job: { source: 'text', status: 'reading', edited: false },
+        }),
+      );
+
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'applications.readingJobTitle',
+      );
+      expect(
+        screen.queryByRole('button', { name: 'applications.prepareButton' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('opens "Edit the application" on the job when it could not be read', async () => {
+      setUp(
+        applicationFixture({
+          jobDescription: undefined,
+          job: {
+            source: 'link',
+            status: 'failed',
+            failure: 'link-unreadable',
+            edited: false,
+          },
+        }),
+      );
+
+      await userEvent.click(
+        screen.getByRole('button', { name: 'applications.pasteInsteadButton' }),
+      );
+
+      expect(
+        screen.getByRole('textbox', { name: 'applications.jobLabel' }),
+      ).toHaveValue('');
+    });
+  });
+
   describe('before the first brief', () => {
     it('offers to prepare it, and says what it is', () => {
       setUp(applicationFixture());

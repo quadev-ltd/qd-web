@@ -45,27 +45,31 @@ describe('NewApplicationPanel', () => {
   };
   const add = () =>
     screen.getByRole('button', { name: 'applications.addButton' });
+  const how = (option: string) =>
+    userEvent.click(screen.getByRole('radio', { name: option }));
+  const pdf = new File(['%PDF-1.7 fictional'], 'northwind-job.pdf', {
+    type: 'application/pdf',
+  });
 
-  it('asks for a title and the job, and says what is missing', async () => {
+  it('asks for the job only, pasted by default, and says when it is missing', async () => {
     const { gateway } = setUp();
+    expect(
+      screen.queryByRole('textbox', { name: 'applications.titleLabel' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('radio', { name: 'applications.howText' }),
+    ).toBeChecked();
 
     await userEvent.click(add());
 
     expect(
-      await screen.findByText('applications.titleRequiredError'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('applications.jobRequiredError'),
+      await screen.findByText('applications.jobRequiredError'),
     ).toBeInTheDocument();
     expect(gateway.createApplication).not.toHaveBeenCalled();
   });
 
   it('refuses a job longer than 20,000 characters before anything is sent', async () => {
     setUp();
-    await userEvent.type(
-      screen.getByRole('textbox', { name: 'applications.titleLabel' }),
-      'Go',
-    );
     await userEvent.click(
       screen.getByRole('textbox', { name: 'applications.jobLabel' }),
     );
@@ -77,7 +81,7 @@ describe('NewApplicationPanel', () => {
     expect(add()).toBeDisabled();
   });
 
-  it('adds the application, puts it in the list and opens its page', async () => {
+  it('adds a pasted job, puts the application in the list and opens its page', async () => {
     const gateway = createMockProfileGateway();
     gateway.getApplication.mockResolvedValue(
       applicationFixture({ id: 'application-1' }),
@@ -85,12 +89,8 @@ describe('NewApplicationPanel', () => {
     const { store } = setUp(gateway);
 
     await userEvent.type(
-      screen.getByRole('textbox', { name: 'applications.titleLabel' }),
-      '  Senior Backend Engineer ',
-    );
-    await userEvent.type(
       screen.getByRole('textbox', { name: 'applications.jobLabel' }),
-      'Go services in production.',
+      '  Go services in production. ',
     );
     await userEvent.click(add());
 
@@ -98,16 +98,127 @@ describe('NewApplicationPanel', () => {
       await screen.findByText('at /applications/application-1'),
     ).toBeInTheDocument();
     expect(gateway.createApplication).toHaveBeenCalledExactlyOnceWith({
-      title: 'Senior Backend Engineer',
-      jobDescription: 'Go services in production.',
+      job: { source: 'text', text: 'Go services in production.' },
     });
     expect(store.getState().applications.applications[0]?.id).toBe(
       'application-1',
     );
   });
 
+  it('adds a posting by its address, and refuses one that is not a public page', async () => {
+    const gateway = createMockProfileGateway();
+    setUp(gateway);
+    await how('applications.howLink');
+    const address = screen.getByRole('textbox', {
+      name: 'applications.linkLabel',
+    });
+
+    await userEvent.type(address, 'http://intranet.local/job');
+    await userEvent.click(add());
+    expect(
+      await screen.findByText('addResource.addressError'),
+    ).toBeInTheDocument();
+    expect(gateway.createApplication).not.toHaveBeenCalled();
+
+    await userEvent.clear(address);
+    await userEvent.type(address, 'https://northwind.example/jobs/1482#apply');
+    await userEvent.click(add());
+
+    await screen.findByText('at /applications/application-1');
+    expect(gateway.createApplication).toHaveBeenCalledExactlyOnceWith({
+      job: { source: 'link', url: 'https://northwind.example/jobs/1482' },
+    });
+  });
+
+  it('adds a job as a file: creates the application, uploads the file where the backend said, then opens its page', async () => {
+    const gateway = createMockProfileGateway();
+    const upload = {
+      path: 'users/uid-1/application-docs/application-1/job.pdf',
+      contentType: 'application/pdf' as const,
+      maxBytes: 10_485_760,
+    };
+    gateway.createApplication.mockResolvedValue({
+      applicationId: 'application-1',
+      upload,
+    });
+    setUp(gateway);
+    await how('applications.howFile');
+
+    await userEvent.upload(
+      document.querySelector('input[type=file]') as HTMLInputElement,
+      pdf,
+    );
+    await userEvent.click(add());
+
+    await screen.findByText('at /applications/application-1');
+    expect(gateway.createApplication).toHaveBeenCalledExactlyOnceWith({
+      job: {
+        source: 'file',
+        contentType: 'application/pdf',
+        fileName: 'northwind-job.pdf',
+      },
+    });
+    expect(gateway.uploadFile).toHaveBeenCalledWith(
+      upload,
+      pdf,
+      expect.objectContaining({ onProgress: expect.any(Function) }),
+    );
+  });
+
+  it('offers to try the upload again when it failed, to the same place', async () => {
+    const gateway = createMockProfileGateway();
+    const upload = {
+      path: 'users/uid-1/application-docs/application-1/job.pdf',
+      contentType: 'application/pdf' as const,
+      maxBytes: 10_485_760,
+    };
+    gateway.createApplication.mockResolvedValue({
+      applicationId: 'application-1',
+      upload,
+    });
+    gateway.uploadFile.mockRejectedValueOnce(
+      new ProfileError(ProfileErrorCode.Network),
+    );
+    setUp(gateway);
+    await how('applications.howFile');
+    await userEvent.upload(
+      document.querySelector('input[type=file]') as HTMLInputElement,
+      pdf,
+    );
+    await userEvent.click(add());
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'addResource.uploadFailedMessage',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'addResource.retryUploadButton' }),
+    );
+
+    await screen.findByText('at /applications/application-1');
+    expect(gateway.createApplication).toHaveBeenCalledTimes(1);
+    expect(gateway.uploadFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses a file of another kind before anything is sent', async () => {
+    const gateway = createMockProfileGateway();
+    setUp(gateway);
+    await how('applications.howFile');
+
+    await userEvent.upload(
+      document.querySelector('input[type=file]') as HTMLInputElement,
+      new File(['x'], 'photo.png', { type: 'image/png' }),
+      { applyAccept: false },
+    );
+
+    expect(
+      await screen.findByText('addResource.fileTypeError'),
+    ).toBeInTheDocument();
+    expect(add()).toBeDisabled();
+  });
+
   it.each([
     [ProfileErrorCode.MaxApplications, 'applications.maxMessage'],
+    [ProfileErrorCode.DailyLimit, 'applications.jobLimitMessage'],
     [ProfileErrorCode.FlagOff, 'applications.notAvailableMessage'],
     [ProfileErrorCode.Network, 'applications.failedMessage'],
   ])(
@@ -118,19 +229,22 @@ describe('NewApplicationPanel', () => {
       setUp(gateway);
 
       await userEvent.type(
-        screen.getByRole('textbox', { name: 'applications.titleLabel' }),
-        'Go',
-      );
-      await userEvent.type(
         screen.getByRole('textbox', { name: 'applications.jobLabel' }),
         'Job',
       );
       await userEvent.click(add());
 
       expect(await screen.findByRole('alert')).toHaveTextContent(message);
-      expect(mockLogger.logMessage).toHaveBeenCalledWith(
-        `createApplication failed: code=${code} uid=uid-1`,
-      );
+      expect(
+        [
+          ...mockLogger.logMessage.mock.calls.map(([text]) => text),
+          ...mockLogger.logError.mock.calls.map(([error]) => String(error)),
+        ].some(text =>
+          String(text).includes(
+            `createApplication failed: code=${code} uid=uid-1`,
+          ),
+        ),
+      ).toBe(true);
       expect(add()).toBeEnabled();
     },
   );
@@ -195,6 +309,43 @@ describe('EditApplicationPanel', () => {
   };
   const save = () =>
     screen.getByRole('button', { name: 'applications.saveButton' });
+
+  it('leaves the job out while it is being read, and saves the rest', async () => {
+    const gateway = createMockProfileGateway();
+    const reading = applicationFixture({
+      title: '',
+      jobDescription: undefined,
+      job: { source: 'link', status: 'reading', edited: false },
+    });
+    const onClose = vi.fn();
+    renderProfilePage(
+      <EditApplicationPanel application={reading} onClose={onClose} />,
+      {
+        gateway,
+        applications: {
+          uid: 'uid-1',
+          status: 'loaded',
+          applications: [reading],
+        },
+      },
+    );
+
+    expect(
+      screen.queryByRole('textbox', { name: 'applications.jobLabel' }),
+    ).not.toBeInTheDocument();
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'applications.titleLabel' }),
+      'Platform Engineer',
+    );
+    await userEvent.click(save());
+
+    await waitFor(() =>
+      expect(gateway.updateApplication).toHaveBeenCalledExactlyOnceWith({
+        applicationId: 'a1',
+        title: 'Platform Engineer',
+      }),
+    );
+  });
 
   it('starts with what the application has', () => {
     setUp();
@@ -368,6 +519,27 @@ describe('JobCard', () => {
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(toggle).toHaveTextContent('applications.showLessButton');
+  });
+
+  it.each([
+    [
+      { source: 'file' as const, fileName: 'northwind.pdf' },
+      'applications.jobReadFrom',
+    ],
+    [{ source: 'link' as const }, 'applications.jobCopyTakenOn'],
+    [{ source: 'text' as const }, 'applications.jobPastedOn'],
+  ])('says where the job came from (%o)', (from, line) => {
+    renderProfilePage(
+      <JobCard
+        application={applicationFixture({
+          job: { ...from, status: 'ready', edited: true, takenAt: 1 },
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByRole('region', { name: 'applications.jobTitle' }),
+    ).toHaveTextContent(`${line} applications.jobEditedHint`);
   });
 
   it('says when the job was pasted, or only that it was', () => {

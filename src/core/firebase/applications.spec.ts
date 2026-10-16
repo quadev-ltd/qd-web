@@ -146,20 +146,38 @@ describe('reading applications', () => {
 });
 
 describe('changing applications', () => {
-  it('creates one with createJobApplication', async () => {
+  it('creates one from its job with createJobApplication', async () => {
     callable.mockResolvedValue({ data: { applicationId: 'a9' } });
 
     await expect(
-      createApplication({ title: 'Go', jobDescription: 'Job' }),
+      createApplication({ job: { source: 'text', text: 'Job' } }),
     ).resolves.toEqual({ applicationId: 'a9' });
     expect(httpsCallable).toHaveBeenCalledWith(
       { name: 'functions' },
       'createJobApplication',
     );
     expect(callable).toHaveBeenCalledWith({
-      title: 'Go',
-      jobDescription: 'Job',
+      job: { source: 'text', text: 'Job' },
     });
+  });
+
+  it('answers where to upload the file of a job given as a file', async () => {
+    const upload = {
+      path: 'users/uid-1/application-docs/a9/job.pdf',
+      contentType: 'application/pdf',
+      maxBytes: 10_485_760,
+    };
+    callable.mockResolvedValue({ data: { applicationId: 'a9', upload } });
+
+    await expect(
+      createApplication({
+        job: {
+          source: 'file',
+          contentType: 'application/pdf',
+          fileName: 'northwind.pdf',
+        },
+      }),
+    ).resolves.toEqual({ applicationId: 'a9', upload });
   });
 
   it('changes one with updateJobApplication, and resolves its new revision', async () => {
@@ -190,9 +208,9 @@ describe('changing applications', () => {
       }),
     );
 
-    await expect(createApplication({ title: 'Go' })).rejects.toEqual(
-      new ProfileError(ProfileErrorCode.MaxApplications),
-    );
+    await expect(
+      createApplication({ job: { source: 'text', text: 'Job' } }),
+    ).rejects.toEqual(new ProfileError(ProfileErrorCode.MaxApplications));
   });
 });
 

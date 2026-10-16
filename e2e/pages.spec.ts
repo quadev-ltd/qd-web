@@ -100,10 +100,28 @@ test('applications: the home without and with them, a new one, an application, i
   await page.getByRole('button', { name: /Prepare for a job/ }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel.getByRole('button', { name: 'Add the job' }).click();
-  await expect(panel.getByText('Enter a title')).toBeVisible();
+  await expect(
+    panel.getByText('Paste the job description', { exact: true }),
+  ).toBeVisible();
   await expectInsideViewport(page, panel);
   await expectAccessibleAndNotTooWide(page);
-  await panel.getByRole('button', { name: 'Close' }).click();
+  await panel.getByText('File', { exact: true }).click();
+  await expectAccessibleAndNotTooWide(page);
+  await panel.getByText('Link', { exact: true }).click();
+  await panel
+    .getByLabel('Address of the posting')
+    .fill('https://jobs.invalid/1');
+  await expectAccessibleAndNotTooWide(page);
+
+  // A posting being read, then not readable
+  await panel.getByRole('button', { name: 'Add the job' }).click();
+  await expect(page.getByRole('status')).toContainText('Reading the job');
+  await expectAccessibleAndNotTooWide(page);
+  await expect(page.getByRole('status')).toContainText(
+    'We couldn’t read this page',
+  );
+  await expectAccessibleAndNotTooWide(page);
+  await page.goto('/home');
 
   // The list, with every state of a brief
   await seedApplications(page);

@@ -3,6 +3,12 @@
 // names, limits and checks are mirrored here; the backend applies them again and refuses what fails.
 import { z } from 'zod';
 
+import {
+  PROFILE_RESOURCE_FAILURES,
+  PROFILE_UPLOAD_CONTENT_TYPES,
+  type ProfileUploadContentType,
+} from './contract';
+
 // ---------- Limits ----------
 
 /** Applications one user can hold. */
@@ -70,27 +76,45 @@ export const ApplicationBriefSchema = z.object({
 });
 export type ApplicationBrief = z.infer<typeof ApplicationBriefSchema>;
 
+export const JOB_SOURCES = ['text', 'file', 'link'] as const;
+export type JobSource = (typeof JOB_SOURCES)[number];
+
 /**
- * Where the job came from and where its reading is, once the backend reads the job itself
- * (research doc 17, not on the backend's `main` yet). An application without it has a pasted
- * job and is ready.
+ * Where the job of an application is in its reading (research doc 17): created and waiting for
+ * its file, being read, ready (its text and names are there), or failed (why: `failure`). An
+ * application without a `job` was created with a title and a pasted job, and is ready.
  */
+export const JOB_STATUSES = [
+  'awaitingUpload',
+  'reading',
+  'ready',
+  'failed',
+] as const;
+export type JobStatus = (typeof JOB_STATUSES)[number];
+
+/** Longest name of a job's file, as shown ("Read from …"). */
+export const APPLICATION_FILE_NAME_MAX_CHARS = 200;
+
 export const ApplicationJobSchema = z.object({
-  source: z.enum(['text', 'file', 'link']).catch('text'),
-  status: z
-    .enum(['awaitingUpload', 'reading', 'ready', 'failed'])
-    .catch('ready'),
-  failure: z.string().optional().catch(undefined),
+  source: z.enum(JOB_SOURCES).catch('text'),
+  status: z.enum(JOB_STATUSES).catch('ready'),
+  /** The reasons of a resource (`ProfileResourceFailure`). */
+  failure: z.enum(PROFILE_RESOURCE_FAILURES).optional().catch('internal'),
+  /** Only for a file: its name on the candidate's device. */
   fileName: z.string().optional().catch(undefined),
+  /** When its text was kept: pasted, read from the file, or the copy of the page taken. */
   takenAt: timestamp.optional(),
+  /** The candidate changed the text since it was kept. */
   edited: z.boolean().catch(false),
+  /** The copy of a page was cut at JOB_DESCRIPTION_MAX_CHARS. */
+  truncated: z.boolean().optional().catch(undefined),
 });
 export type ApplicationJob = z.infer<typeof ApplicationJobSchema>;
 
 /** `users/{uid}/applications/{applicationId}`. */
 export const JobApplicationSchema = z.object({
   id: z.string().min(1),
-  /** Required today; read from the job once the backend reads it (doc 17). */
+  /** Read from the job, or given; empty until a reading names it. */
   title: z.string().catch(''),
   company: z.string().optional().catch(undefined),
   role: z.string().optional().catch(undefined),
@@ -116,13 +140,22 @@ export const UPDATE_JOB_APPLICATION = 'updateJobApplication';
 export const REMOVE_JOB_APPLICATION = 'removeJobApplication';
 export const PREPARE_APPLICATION_BRIEF = 'prepareApplicationBrief';
 
-/** What `createJobApplication` takes today: a title, and the rest optional. */
+/** The job of a new application (D74, D76): pasted, a file to upload, or a posting's address. */
+export type NewJob =
+  | { source: 'text'; text: string }
+  | {
+      source: 'file';
+      contentType: ProfileUploadContentType;
+      fileName: string;
+    }
+  | { source: 'link'; url: string };
+
+/** What `createJobApplication` takes: the job; the names are read from it unless given. */
 export interface CreateJobApplicationRequest {
-  title: string;
+  job: NewJob;
+  title?: string;
   company?: string;
   role?: string;
-  jobDescription?: string;
-  postingUrl?: string;
   notes?: string;
 }
 
@@ -144,6 +177,14 @@ const documentId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 
 export const CreateJobApplicationResponseSchema = z.object({
   applicationId: documentId,
+  /** Only for a job given as a file: upload it here, once, with this content type. */
+  upload: z
+    .object({
+      path: z.string().min(1),
+      contentType: z.enum(PROFILE_UPLOAD_CONTENT_TYPES),
+      maxBytes: z.number().int().positive(),
+    })
+    .optional(),
 });
 export const UpdateJobApplicationResponseSchema = z.object({
   applicationId: documentId,
@@ -190,4 +231,14 @@ export const briefStateOf = (
     gaps: brief.requirements.filter(({ itemIds }) => itemIds.length === 0)
       .length,
   };
+};
+
+/** Where the job of an application is; one created before jobs were read is ready. */
+export const jobStatusOf = ({ job }: Pick<JobApplication, 'job'>): JobStatus =>
+  job?.status ?? 'ready';
+
+/** The backend has not finished with the job: its file has not arrived, or it is being read. */
+export const isJobPending = (application: Pick<JobApplication, 'job'>) => {
+  const status = jobStatusOf(application);
+  return status === 'awaitingUpload' || status === 'reading';
 };

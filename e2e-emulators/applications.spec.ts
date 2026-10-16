@@ -1,30 +1,37 @@
-// Job applications against the real backend code (E4): createJobApplication,
-// updateJobApplication and removeJobApplication through App Check and the flag, and the
-// documents the site reads back under the Firestore rules. No model call is involved.
-import { expect, test } from '@playwright/test';
+// Job applications against the real backend code: createJobApplication with a job as text, a
+// file or a link (research doc 17), the reading that names it, updateJobApplication,
+// removeJobApplication and prepareApplicationBrief, through App Check and the flag, and the
+// documents the site reads back under the rules. The backend's fake model names a job
+// "fake-…": the tests check that a name appears, not what it says.
+import { expect, type Page, test } from '@playwright/test';
 
 import { createAccount, signIn } from './support';
 
-test('E4: an application created with its job shows on the home and its page, is edited and removed', async ({
+/** A name the fake model gave: "fake-<digest>", or "fake-… at fake-…" for a title. */
+const FAKE_NAME = /^fake-/;
+
+const newApplication = async (page: Page) => {
+  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  return page.getByRole('dialog', { name: 'New application' });
+};
+
+test('E4: a pasted job is read and named, shown on its page and the home, edited and removed', async ({
   page,
 }) => {
   const account = await createAccount({ interviewAssistant: true });
   await signIn(page, account);
-  await expect(
-    page.getByRole('heading', { name: 'What do you want to do?' }),
-  ).toBeVisible();
 
-  // createJobApplication
-  await page.getByRole('button', { name: /Prepare for a job/ }).click();
-  const panel = page.getByRole('dialog', { name: 'New application' });
-  await panel.getByLabel('Title').fill('Senior Backend Engineer');
+  // createJobApplication with the job's text; the backend reads it and names it
+  const panel = await newApplication(page);
   await panel
     .getByLabel('Job description')
     .fill('Go services in production, Kafka, and incident response.');
   await panel.getByRole('button', { name: 'Add the job' }).click();
   await expect(page).toHaveURL(/\/applications\/.+/);
+  const title = page.getByRole('heading', { level: 1 });
+  await expect(title).toHaveText(FAKE_NAME, { timeout: 30_000 });
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Senior Backend Engineer' }),
+    page.getByRole('button', { name: 'Prepare the brief' }),
   ).toBeVisible();
   await page.getByRole('link', { name: 'Details' }).click();
   await expect(page.getByRole('region', { name: 'The job' })).toContainText(
@@ -44,9 +51,7 @@ test('E4: an application created with its job shows on the home and its page, is
 
   // On the home, with no brief yet
   await page.getByRole('link', { name: 'Home', exact: true }).last().click();
-  const card = page
-    .getByRole('listitem')
-    .filter({ hasText: 'Senior Backend Engineer' });
+  const card = page.getByRole('listitem').filter({ hasText: FAKE_NAME });
   await expect(card).toContainText('No brief yet');
 
   // removeJobApplication: gone from the backend, not only from the page
@@ -64,22 +69,83 @@ test('E4: an application created with its job shows on the home and its page, is
   ).toBeVisible();
 });
 
+test('a job as a file: uploaded under the Storage rules, read by the trigger, named', async ({
+  page,
+}) => {
+  const account = await createAccount({ interviewAssistant: true });
+  await signIn(page, account);
+
+  const panel = await newApplication(page);
+  await panel.getByText('File', { exact: true }).click();
+  await panel.locator('input[type=file]').setInputFiles({
+    name: 'platform-engineer.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(
+      'Platform Engineer at Halvorsen. Kubernetes and Terraform.',
+    ),
+  });
+  await panel.getByRole('button', { name: 'Add the job' }).click();
+
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(FAKE_NAME, {
+    timeout: 30_000,
+  });
+  await page.getByRole('link', { name: 'Details' }).click();
+  await expect(page.getByRole('region', { name: 'The job' })).toContainText(
+    /Read from platform-engineer\.txt on/,
+  );
+});
+
+test('a posting that cannot be read: said, then its text pasted instead, named by hand', async ({
+  page,
+}) => {
+  const account = await createAccount({ interviewAssistant: true });
+  await signIn(page, account);
+
+  // A host under .invalid fails in the emulators (link-unreadable)
+  const panel = await newApplication(page);
+  await panel.getByText('Link', { exact: true }).click();
+  await panel
+    .getByLabel('Address of the posting')
+    .fill('https://jobs.invalid/platform-engineer');
+  await panel.getByRole('button', { name: 'Add the job' }).click();
+  const status = page.getByRole('status');
+  await expect(status).toContainText('We couldn’t read this page', {
+    timeout: 30_000,
+  });
+
+  // updateJobApplication with the text makes the job ready; the names are given by hand
+  await status.getByRole('button', { name: 'Paste the text instead' }).click();
+  const edit = page.getByRole('dialog', { name: 'Edit the application' });
+  await edit.getByLabel('Title').fill('Platform Engineer');
+  await edit
+    .getByLabel('Job description')
+    .fill('Kubernetes and Terraform for 40 engineers.');
+  await edit.getByRole('button', { name: 'Save changes' }).click();
+  await expect(edit).toBeHidden();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Platform Engineer' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Prepare the brief' }),
+  ).toBeVisible();
+});
+
 test('E5 and E6: a brief is prepared, goes out of date when the job changes, is refreshed, and says when the profile changed', async ({
   page,
 }) => {
   const account = await createAccount({ interviewAssistant: true });
   await signIn(page, account);
 
-  await page.getByRole('button', { name: /Prepare for a job/ }).click();
-  const panel = page.getByRole('dialog', { name: 'New application' });
-  await panel.getByLabel('Title').fill('Platform Engineer');
+  const panel = await newApplication(page);
   await panel
     .getByLabel('Job description')
     .fill('Kubernetes and Terraform for 40 engineers.');
   await panel.getByRole('button', { name: 'Add the job' }).click();
 
-  // prepareApplicationBrief, with the backend's fake model
-  await page.getByRole('button', { name: 'Prepare the brief' }).click();
+  // prepareApplicationBrief, with the backend's fake model, once the job is read
+  await page
+    .getByRole('button', { name: 'Prepare the brief' })
+    .click({ timeout: 30_000 });
   const requirements = page.getByRole('region', {
     name: 'What the job asks for',
   });
@@ -87,7 +153,7 @@ test('E5 and E6: a brief is prepared, goes out of date when the job changes, is 
   await expect(
     page.getByRole('region', { name: 'Likely questions' }),
   ).toBeVisible();
-  await expect(page.getByText(/1 of 10|9 of 10 left today/)).toBeVisible();
+  await expect(page.getByText(/9 of 10 left today/)).toBeVisible();
 
   // E5: the job changes (updateJobApplication moves the revision), then "Refresh"
   await page.getByRole('link', { name: 'Details' }).click();

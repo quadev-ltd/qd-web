@@ -1,6 +1,7 @@
 // What the "upload a file" form needs to know about a file before anything is sent.
 import {
   PROFILE_UPLOAD_CONTENT_TYPES,
+  PROFILE_UPLOAD_MAX_BYTES,
   type ProfileUploadContentType,
 } from './contract';
 
@@ -57,4 +58,17 @@ export const formatFileSize = (bytes: number): string => {
 export const titleFromFileName = (name: string): string => {
   const dot = name.lastIndexOf('.');
   return (dot > 0 ? name.slice(0, dot) : name).trim();
+};
+
+/** Why a chosen file cannot be uploaded, in the order the candidate can act on. */
+export const fileProblemOf = (
+  file: Pick<File, 'name' | 'type' | 'size'>,
+): 'type' | 'empty' | 'size' | undefined => {
+  if (!uploadContentTypeOf(file)) {
+    return 'type';
+  }
+  if (file.size === 0) {
+    return 'empty';
+  }
+  return file.size > PROFILE_UPLOAD_MAX_BYTES ? 'size' : undefined;
 };

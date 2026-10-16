@@ -19,6 +19,7 @@ import {
 } from '@/core/profile/ApplicationsProvider';
 import { applicationDetailsPath, applicationPath } from '@/core/profile/paths';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
+import { shortAddress } from '@/screens/Profile/Resource/resourceMeta';
 
 const HOME_PATH = '/home';
 
@@ -99,6 +100,17 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
     );
   }
 
+  // Until the names are read: where the job comes from, the posting's site or the file.
+  const subtitle =
+    application.company ||
+    (application.title
+      ? undefined
+      : application.job?.source === 'file'
+        ? application.job.fileName
+        : application.postingUrl
+          ? shortAddress(application.postingUrl).split('/')[0]
+          : undefined);
+
   const tabClass = ({ isActive }: { isActive: boolean }) =>
     isActive
       ? `${TAB} border-primary text-primary`
@@ -108,11 +120,11 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
     <>
       <div className="flex flex-col gap-1">
         <h1 className="font-display text-[clamp(26px,4vw,32px)] leading-tight font-semibold wrap-anywhere">
-          {application.title}
+          {application.title || t('applications.untitled')}
         </h1>
-        {application.company && (
+        {subtitle && (
           <p className="text-[17px] leading-normal text-muted wrap-anywhere">
-            {application.company}
+            {subtitle}
           </p>
         )}
       </div>

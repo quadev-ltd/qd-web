@@ -4,8 +4,9 @@ import { expect, test } from '@playwright/test';
 
 import { openHome, seedApplications } from './support';
 
+// The in-memory reading takes the title and the company from the first two lines.
 const JOB =
-  'Northwind Logistics moves two million parcels a day across Europe. We are looking for a Senior Backend Engineer to own the services behind parcel tracking.';
+  'Senior Backend Engineer\nNorthwind Logistics\nNorthwind Logistics moves two million parcels a day across Europe. We are looking for a Senior Backend Engineer to own the services behind parcel tracking.';
 
 test('an application: added from the home, its page, edited, removed', async ({
   page,
@@ -16,17 +17,16 @@ test('an application: added from the home, its page, edited, removed', async ({
   await page.getByRole('button', { name: /Prepare for a job/ }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel.getByRole('button', { name: 'Add the job' }).click();
-  await expect(panel.getByText('Enter a title')).toBeVisible();
   await expect(
     panel.getByText('Paste the job description', { exact: true }),
   ).toBeVisible();
-  await panel.getByLabel('Title').fill('Senior Backend Engineer');
   await panel.getByLabel('Job description').fill(JOB);
   await expect(panel.getByText(`${JOB.length} / 20,000`)).toBeVisible();
   await panel.getByRole('button', { name: 'Add the job' }).click();
 
-  // Its page opens on the brief; the details are a tab
+  // Its page opens on the job being read, then names it and offers the brief
   await expect(page).toHaveURL(/\/applications\/.+/);
+  await expect(page.getByRole('status')).toContainText('Reading the job');
   await expect(
     page.getByRole('heading', { level: 1, name: 'Senior Backend Engineer' }),
   ).toBeVisible();
@@ -42,7 +42,7 @@ test('an application: added from the home, its page, edited, removed', async ({
   // Edited: the company, a notes line and the posting
   await page.getByRole('button', { name: 'Edit' }).click();
   const edit = page.getByRole('dialog', { name: 'Edit the application' });
-  await edit.getByLabel('Company (optional)').fill('Northwind Logistics');
+  await edit.getByLabel('Company (optional)').fill('Northwind Logistics Ltd');
   await edit
     .getByLabel('Link to the posting (optional)')
     .fill('http://intranet.local/job');
@@ -57,7 +57,7 @@ test('an application: added from the home, its page, edited, removed', async ({
   await edit.getByRole('button', { name: 'Save changes' }).click();
   await expect(edit).toBeHidden();
   const details = page.getByRole('region', { name: 'Details' });
-  await expect(details).toContainText('Northwind Logistics');
+  await expect(details).toContainText('Northwind Logistics Ltd');
   await expect(details).toContainText('Two technical rounds.');
   await expect(
     details.getByRole('link', {
@@ -67,7 +67,7 @@ test('an application: added from the home, its page, edited, removed', async ({
 
   // Still there after a reload, and listed on the home
   await page.reload();
-  await expect(details).toContainText('Northwind Logistics');
+  await expect(details).toContainText('Northwind Logistics Ltd');
   await page.getByRole('link', { name: 'Home', exact: true }).last().click();
   await expect(page).toHaveURL('/home');
   const card = page
@@ -126,7 +126,6 @@ test('the brief: prepared, opened on a gap and a question, out of date when the 
   // A new application opens on its brief, not prepared yet
   await page.getByRole('button', { name: /Prepare for a job/ }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
-  await panel.getByLabel('Title').fill('Senior Backend Engineer');
   await panel
     .getByLabel('Job description')
     .fill(
@@ -202,4 +201,67 @@ test('the brief: prepared, opened on a gap and a question, out of date when the 
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect(changed).toBeHidden();
   await expect(requirements).toContainText('2 · 2 gaps');
+});
+
+test('a posting that cannot be read: "Paste the text instead", named in the same form, then the brief', async ({
+  page,
+}) => {
+  await openHome(page);
+  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  const panel = page.getByRole('dialog', { name: 'New application' });
+  await panel.getByText('Link', { exact: true }).click();
+  await panel
+    .getByLabel('Address of the posting')
+    .fill('https://jobs.invalid/senior-backend-engineer');
+  await panel.getByRole('button', { name: 'Add the job' }).click();
+
+  // Named "New application", with the posting's site, until it is read
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'New application' }),
+  ).toBeVisible();
+  await expect(page.getByText('jobs.invalid', { exact: true })).toBeVisible();
+  const status = page.getByRole('status');
+  await expect(status).toContainText('We couldn’t read this page');
+  await expect(
+    status.getByRole('link', { name: 'Open the posting' }),
+  ).toHaveAttribute('href', 'https://jobs.invalid/senior-backend-engineer');
+
+  await status.getByRole('button', { name: 'Paste the text instead' }).click();
+  const edit = page.getByRole('dialog', { name: 'Edit the application' });
+  await edit.getByLabel('Title').fill('Senior Backend Engineer');
+  await edit
+    .getByLabel('Job description')
+    .fill('You will run Go services in production.');
+  await edit.getByRole('button', { name: 'Save changes' }).click();
+  await expect(edit).toBeHidden();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Senior Backend Engineer' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Prepare the brief' }),
+  ).toBeVisible();
+});
+
+test('a job as a file: uploaded, read, named from the file, its source on Details', async ({
+  page,
+}) => {
+  await openHome(page);
+  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  const panel = page.getByRole('dialog', { name: 'New application' });
+  await panel.getByText('File', { exact: true }).click();
+  await panel.locator('input[type=file]').setInputFiles({
+    name: 'platform-engineer.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.7 Platform Engineer at Halvorsen.'),
+  });
+  await expect(panel.getByText('platform-engineer.pdf')).toBeVisible();
+  await panel.getByRole('button', { name: 'Add the job' }).click();
+
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'platform engineer' }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Details' }).click();
+  await expect(page.getByRole('region', { name: 'The job' })).toContainText(
+    /Read from platform-engineer\.pdf on/,
+  );
 });
