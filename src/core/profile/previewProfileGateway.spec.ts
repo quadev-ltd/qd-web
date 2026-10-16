@@ -1066,7 +1066,7 @@ describe('previewProfileGateway', () => {
       });
     });
 
-    it('keeps the text of a file once it is read, and none for a link', async () => {
+    it('keeps the text of a file and the copy of a link’s page once they are read', async () => {
       const { gateway, pass } = await setUp();
       const { resourceId, upload } = await gateway.createResource(cvFile);
       await gateway.uploadFile(upload!, pdf);
@@ -1084,7 +1084,33 @@ describe('previewProfileGateway', () => {
         kind: 'file',
         format: 'pdf',
       });
-      await expect(gateway.getResourceText(UID, link)).resolves.toBeNull();
+      await expect(gateway.getResourceText(UID, link)).resolves.toMatchObject({
+        text: expect.stringContaining('https://talks.example/ledgers'),
+        kind: 'page',
+        format: 'page',
+      });
+      expect((await gateway.getResource(UID, link))?.textAt).toEqual(
+        expect.any(Number),
+      );
+    });
+
+    it('keeps no text for a resource that could not be read', async () => {
+      const { gateway, pass } = await setUp();
+      gateway.controls.failNext('link-unreadable');
+      const { resourceId } = await gateway.createResource({
+        source: 'link',
+        type: 'link',
+        title: 'Talk',
+        url: 'https://talks.example/ledgers',
+      });
+      pass(PREVIEW_READ_MS);
+
+      expect((await gateway.getResource(UID, resourceId))?.status).toBe(
+        'failed',
+      );
+      await expect(
+        gateway.getResourceText(UID, resourceId),
+      ).resolves.toBeNull();
     });
 
     it('removes the text with its resource', async () => {

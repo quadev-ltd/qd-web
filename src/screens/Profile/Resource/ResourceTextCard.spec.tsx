@@ -82,6 +82,39 @@ describe('ResourceTextCard', () => {
     },
   );
 
+  it('shows the copy of a link’s page with the day it was taken', async () => {
+    const gateway = createMockProfileGateway();
+    gateway.getResourceText.mockResolvedValue(
+      kept({
+        text: 'Moving a ledger to event sourcing',
+        kind: 'page',
+        format: 'page',
+      }),
+    );
+    setUp({ source: 'link', textAt: TAKEN }, gateway);
+
+    const card = screen.getByRole('region', { name: 'resource.pageTextTitle' });
+    expect(card).toHaveTextContent('resource.pageTextMeta');
+    expect(
+      await screen.findByText('Moving a ledger to event sourcing'),
+    ).toBeInTheDocument();
+  });
+
+  it('says when a page’s copy was cut, at its own length', async () => {
+    const gateway = createMockProfileGateway();
+    gateway.getResourceText.mockResolvedValue(
+      kept({ kind: 'page', format: 'page', truncated: true }),
+    );
+    setUp({ source: 'link', textAt: TAKEN }, gateway);
+
+    expect(
+      await screen.findByText(/resource\.pageTextTruncated/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/resource\.textTruncated/),
+    ).not.toBeInTheDocument();
+  });
+
   it('says when a long text was cut', async () => {
     const gateway = createMockProfileGateway();
     gateway.getResourceText.mockResolvedValue(

@@ -142,7 +142,7 @@ test('a link that cannot be read fails, and the list says why', async ({
   ).toContainText('Could not read this page');
 });
 
-test('a link that is read: its address to open, and "Remove this link"', async ({
+test('a link that is read: its address to open, the copy of its page, and "Remove this link"', async ({
   page,
 }) => {
   await openProfile(page);
@@ -167,6 +167,11 @@ test('a link that is read: its address to open, and "Remove this link"', async (
     }),
   ).toHaveAttribute('target', '_blank');
   await expect(page.getByText(/What we read|items/)).toHaveCount(0);
+  const copy = page.getByRole('region', { name: 'Copy of the page' });
+  await expect(copy).toContainText(/Taken on /);
+  await expect(copy).toContainText(
+    'https://talks.example/ledgers-without-tears',
+  );
 
   await details.getByRole('button', { name: 'Remove this link' }).click();
   const dialog = page.getByRole('dialog', { name: 'Remove this resource?' });

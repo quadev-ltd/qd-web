@@ -1,6 +1,6 @@
-// The text kept of a resource (D78, research doc 17): a note as it was added, or the text of a
-// file without its layout ("Download the file" shows it as it looks). Read when the page opens,
-// one document, only for a resource that has one.
+// The text kept of a resource (D78, research doc 17): a note as it was added, the text of a
+// file without its layout ("Download the file" shows it as it looks), or the dated copy of a
+// link's page. Read when the page opens, one document, only for a resource that has one.
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -19,11 +19,17 @@ import { logProfileError } from '@/core/profile/errors';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
 import { useSessionUser } from '@/core/session/hooks';
 
+const TITLE_KEYS = {
+  note: 'resource.noteTextTitle',
+  file: 'resource.fileTextTitle',
+  page: 'resource.pageTextTitle',
+} as const satisfies Record<ProfileResourceText['kind'], string>;
+
 const META_KEYS = {
   text: 'resource.plainTextMeta',
   docx: 'resource.docxTextMeta',
   pdf: 'resource.pdfTextMeta',
-  page: 'resource.plainTextMeta',
+  page: 'resource.pageTextMeta',
 } as const satisfies Record<ProfileResourceText['format'], string>;
 
 type Loaded =
@@ -65,7 +71,7 @@ export const ResourceTextCard: React.FC<{
     };
   }, [read]);
 
-  // No text kept: a link (its copy comes later), a scan with no text, or a resource read before.
+  // No text kept: a scan with no text, a failed resource, or one read before texts were kept.
   if (textAt === undefined || textAt === null) {
     return null;
   }
@@ -73,9 +79,19 @@ export const ResourceTextCard: React.FC<{
     return null;
   }
 
-  const note = resource.source === 'text';
+  // From the resource, so the title is right before its text arrives.
+  const kind =
+    resource.source === 'text'
+      ? 'note'
+      : resource.source === 'link'
+        ? 'page'
+        : 'file';
   const text = loaded.status === 'loaded' ? loaded.text : null;
   const date = formatDay(text?.takenAt ?? textAt);
+  const meta =
+    kind === 'note'
+      ? 'resource.noteTextMeta'
+      : META_KEYS[kind === 'page' ? 'page' : (text?.format ?? 'text')];
   return (
     <Card
       as="section"
@@ -86,13 +102,12 @@ export const ResourceTextCard: React.FC<{
         <h2
           id={titleId}
           className="font-display text-[18px] leading-tight font-semibold">
-          {t(note ? 'resource.noteTextTitle' : 'resource.fileTextTitle')}
+          {t(TITLE_KEYS[kind])}
         </h2>
         <p className="text-sm leading-normal text-muted">
-          {note
-            ? t('resource.noteTextMeta', { date })
-            : t(META_KEYS[text?.format ?? 'text'], { date })}
-          {text?.truncated && ` ${t('resource.textTruncated')}`}
+          {t(meta, { date })}
+          {text?.truncated &&
+            ` ${t(kind === 'page' ? 'resource.pageTextTruncated' : 'resource.textTruncated')}`}
         </p>
       </div>
       {loaded.status === 'loading' && (
