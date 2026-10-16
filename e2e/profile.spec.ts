@@ -301,3 +301,45 @@ test('an account without the interview tools has the home as before: no starting
   await expect(page.getByText('Coming soon')).toHaveCount(3);
   await expect(page.getByText('Start here')).toHaveCount(0);
 });
+
+test('the text kept of a resource: a note as added, a file’s text without its layout, "Show all"', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await seedProfile(page);
+
+  // A file: its text, where it came from, and the file itself to download
+  await page.getByRole('link', { name: /Maya Okafor CV 2026/ }).click();
+  const fileText = page.getByRole('region', { name: 'The text of the file' });
+  await expect(fileText).toContainText(
+    /Read from the PDF on .*, without its layout/,
+  );
+  await expect(fileText).toContainText('Maya Okafor CV 2026');
+  await expect(
+    page.getByRole('link', { name: 'Download the file' }),
+  ).toBeVisible();
+
+  // A note, pasted long enough to open with "Show all"
+  await page.goto('/profile');
+  await page.getByRole('button', { name: 'Add a resource' }).click();
+  await page.getByRole('button', { name: /Paste or type text/ }).click();
+  const form = page.getByRole('dialog', { name: 'Paste or type text' });
+  const story = `${'Two weeks before the wallet launch our load test failed. '.repeat(14)}We shipped without an incident.`;
+  await form.getByLabel('Title').fill('Launch story');
+  await form.getByRole('textbox', { name: 'Text', exact: true }).fill(story);
+  await form.getByRole('button', { name: 'Add to profile' }).click();
+  const row = page.getByRole('listitem').filter({ hasText: 'Launch story' });
+  await expect(row.getByText('Ready', { exact: true })).toBeVisible();
+  await row.getByRole('link').click();
+  const noteText = page.getByRole('region', { name: 'The text' });
+  await expect(noteText).toContainText(/As you added it on/);
+  const showAll = noteText.getByRole('button', { name: 'Show all' });
+  await expect(showAll).toHaveAttribute('aria-expanded', 'false');
+  await showAll.click();
+  await expect(
+    noteText.getByText(/We shipped without an incident\./),
+  ).toBeVisible();
+  await expect(
+    noteText.getByRole('button', { name: 'Show less' }),
+  ).toBeVisible();
+});

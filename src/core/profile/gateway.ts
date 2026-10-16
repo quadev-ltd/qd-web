@@ -6,6 +6,7 @@ import {
 import {
   type CreateProfileResourceRequest,
   type ProfileResource,
+  type ProfileResourceText,
   type ProfileUploadContentType,
   type SkillMapItem,
 } from './contract';
@@ -97,6 +98,14 @@ export interface ProfileGateway {
 
   /** An address that downloads the file of a resource, to open as a normal link. */
   getFileUrl(resource: Pick<ProfileResource, 'storagePath'>): Promise<string>;
+  /**
+   * The text kept of one resource (D78), when it has `textAt`; `null` when there is none.
+   * Read one at a time, on the resource's page: a list never loads texts.
+   */
+  getResourceText(
+    uid: string,
+    resourceId: string,
+  ): Promise<ProfileResourceText | null>;
 
   // ---------- Job applications (delivery 2a) ----------
 

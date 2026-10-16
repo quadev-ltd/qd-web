@@ -17,6 +17,7 @@ import {
   getItems,
   getResource,
   getResources,
+  getResourceText,
   removeItem,
   removeResource,
   toProfileError,
@@ -575,5 +576,64 @@ describe('the file', () => {
     expect(await codeOf(getFileUrl({ storagePath: target.path }))).toBe(
       ProfileErrorCode.NotFound,
     );
+  });
+});
+
+describe('the text kept of a resource', () => {
+  it('reads its one document, with the day it was kept in milliseconds', async () => {
+    vi.mocked(getDoc).mockResolvedValueOnce(
+      document('r1', {
+        text: 'The load test failed.',
+        kind: 'note',
+        format: 'text',
+        takenAt: at(7),
+        chars: 21,
+        truncated: false,
+      }) as never,
+    );
+
+    await expect(getResourceText('uid-1', 'r1')).resolves.toEqual({
+      text: 'The load test failed.',
+      kind: 'note',
+      format: 'text',
+      takenAt: 7,
+      chars: 21,
+      truncated: false,
+    });
+    expect(doc).toHaveBeenCalledWith(
+      { name: 'db' },
+      'users/uid-1/interviewProfile/main/texts/r1',
+    );
+  });
+
+  it('is null when there is none, or when it is not understood (counted in the log, not shown)', async () => {
+    vi.mocked(getDoc).mockResolvedValueOnce(document('r1') as never);
+    await expect(getResourceText('uid-1', 'r1')).resolves.toBeNull();
+
+    vi.mocked(getDoc).mockResolvedValueOnce(
+      document('r1', { text: 42 }) as never,
+    );
+    await expect(getResourceText('uid-1', 'r1')).resolves.toBeNull();
+    expect(mockLogger.logError).toHaveBeenCalledWith(
+      new Error('getResourceText: not understood'),
+    );
+  });
+
+  it('gives a resource the day its text was kept, when it has one', async () => {
+    vi.mocked(getDoc).mockResolvedValueOnce(
+      document('r1', {
+        type: 'note',
+        title: 'Stories',
+        source: 'text',
+        status: 'ready',
+        createdAt: at(1),
+        updatedAt: at(2),
+        textAt: at(3),
+      }) as never,
+    );
+
+    await expect(getResource('uid-1', 'r1')).resolves.toMatchObject({
+      textAt: 3,
+    });
   });
 });

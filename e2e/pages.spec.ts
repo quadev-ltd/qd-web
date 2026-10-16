@@ -245,11 +245,14 @@ test('a resource, ready, being read and failed, a link that was read, and the re
     ).toBeVisible();
   };
 
-  // Ready
+  // Ready, with the text kept of it
   await open('Maya Okafor CV 2026');
   await expect(
     page.getByRole('link', { name: 'Download the file' }),
   ).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'The text of the file' }),
+  ).toContainText('Maya Okafor CV 2026');
   await expectAccessibleAndNotTooWide(page);
 
   // The confirmation

@@ -128,3 +128,49 @@ test('pasted text is read; a link that cannot be read fails, says why, and is re
   ).toBeVisible();
   await expect(note.getByText('Ready', { exact: true })).toBeVisible();
 });
+
+test('the text kept of a resource: a note as added, and the text of a text file, read back under the rules', async ({
+  page,
+}) => {
+  const account = await createAccount({ interviewAssistant: true });
+  await signIn(page, account);
+  await openProfile(page);
+
+  // A note: its text is kept when the backend reads it
+  await page.getByRole('button', { name: 'Add something else' }).click();
+  await page.getByRole('button', { name: /Paste or type text/ }).click();
+  const form = page.getByRole('dialog', { name: 'Paste or type text' });
+  await form.getByLabel('Title').fill('Launch story');
+  await form
+    .getByRole('textbox', { name: 'Text', exact: true })
+    .fill(
+      'The load test failed a week before launch; we shipped without an incident.',
+    );
+  await form.getByRole('button', { name: 'Add to profile' }).click();
+  const note = page.getByRole('listitem').filter({ hasText: 'Launch story' });
+  await expect(note.getByText('Ready', { exact: true })).toBeVisible();
+  await note.getByRole('link').click();
+  const noteText = page.getByRole('region', { name: 'The text' });
+  await expect(noteText).toContainText(/As you added it on/);
+  await expect(noteText).toContainText('we shipped without an incident.');
+
+  // A text file: its text, read by the trigger
+  await page.goto('/profile');
+  await page.getByRole('button', { name: 'Add a resource' }).click();
+  await page.getByRole('button', { name: /Upload a file/ }).click();
+  const upload = page.getByRole('dialog', { name: 'Upload a file' });
+  await upload.locator('input[type=file]').setInputFiles({
+    name: 'performance-review.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Performance review 2025. Led the on-call redesign.'),
+  });
+  await upload.getByRole('button', { name: 'Add to profile' }).click();
+  const file = page
+    .getByRole('listitem')
+    .filter({ hasText: 'performance-review' });
+  await expect(file.getByText('Ready', { exact: true })).toBeVisible();
+  await file.getByRole('link').click();
+  const fileText = page.getByRole('region', { name: 'The text of the file' });
+  await expect(fileText).toContainText(/Read from the text file on/);
+  await expect(fileText).toContainText('Led the on-call redesign.');
+});

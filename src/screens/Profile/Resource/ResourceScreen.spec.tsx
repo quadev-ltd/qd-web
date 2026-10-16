@@ -89,6 +89,26 @@ describe('ResourceScreen', () => {
       ]);
     });
 
+    it('shows the text kept of it, when it has one', async () => {
+      const gateway = createMockProfileGateway();
+      gateway.getResourceText.mockResolvedValue({
+        text: 'Maya Okafor. Senior Backend Engineer.',
+        kind: 'file',
+        format: 'pdf',
+        takenAt: DAYS_AGO,
+        chars: 37,
+        truncated: false,
+      });
+      setUp(ready({ textAt: DAYS_AGO }), {}, gateway);
+
+      expect(
+        screen.getByRole('region', { name: 'resource.fileTextTitle' }),
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByText('Maya Okafor. Senior Backend Engineer.'),
+      ).toBeInTheDocument();
+    });
+
     it('says the same "Ready" for a resource that added nothing new', () => {
       setUp(ready({ itemCount: 0 }));
 

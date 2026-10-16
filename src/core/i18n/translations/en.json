@@ -290,7 +290,16 @@
     "removingButton": "Removing…",
     "cancelButton": "Cancel",
     "removeFailedMessage": "We couldn’t remove this. Check your connection and try again.",
-    "downloadLink": "Download the file"
+    "downloadLink": "Download the file",
+    "noteTextTitle": "The text",
+    "fileTextTitle": "The text of the file",
+    "noteTextMeta": "As you added it on {{date}}",
+    "pdfTextMeta": "Read from the PDF on {{date}}, without its layout",
+    "docxTextMeta": "Read from the Word document on {{date}}, without its layout",
+    "plainTextMeta": "Read from the text file on {{date}}",
+    "textTruncated": "Only the first 50,000 characters were kept.",
+    "textLoadError": "We couldn’t load the text. Check your connection and try again.",
+    "textRetryButton": "Try again"
   },
   "applications": {
     "documentTitle": "Application | QuaDev",
@@ -332,8 +341,6 @@
     "jobTitle": "The job",
     "jobPastedOn": "Pasted on {{date}}",
     "jobPasted": "Pasted",
-    "showAllButton": "Show all",
-    "showLessButton": "Show less",
     "removeTitle": "Remove this application",
     "removeDescription": "Its brief is removed with it.",
     "removeLink": "Remove this application",
@@ -419,6 +426,10 @@
     "jobCopyTakenOn": "Copy of the posting, taken on {{date}}",
     "jobTruncated": "Only the first 20,000 characters were kept.",
     "jobEditedHint": "You changed this text."
+  },
+  "textPreview": {
+    "showAll": "Show all",
+    "showLess": "Show less"
   },
   "sidePanel": {
     "closeAccessibilityLabel": "Close"

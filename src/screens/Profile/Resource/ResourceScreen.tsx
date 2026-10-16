@@ -1,4 +1,5 @@
-// One resource of the profile: where it is, what it is, its file to download, and "Remove".
+// One resource of the profile: where it is, what it is, the text kept of it (D78), its file to
+// download, and "Remove".
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -12,6 +13,7 @@ import { PROFILE_MAIN } from '../ProfileRoutes';
 import RemoveResourceDialog from './RemoveResourceDialog';
 import { addedAt, contentOf, formatDay, shortAddress } from './resourceMeta';
 import ResourceStatusPanel from './ResourceStatusPanel';
+import ResourceTextCard from './ResourceTextCard';
 import { useFileUrl } from './useFileUrl';
 
 import Icon from '@/components/Icon';
@@ -197,6 +199,8 @@ export const ResourceScreen: React.FC = () => {
             stuck={stuck}
             onRemove={() => setRemoving(true)}
           />
+
+          <ResourceTextCard resource={resource} />
 
           <Card
             as="section"

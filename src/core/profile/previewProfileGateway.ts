@@ -24,6 +24,7 @@ import {
   PROFILE_UPLOAD_MAX_BYTES,
   type ProfileResource,
   type ProfileResourceFailure,
+  type ProfileResourceText,
   RESOURCE_TYPES_BY_SOURCE,
   SKILL_MAP_ITEM_MAX_CHARS,
   type SkillMapItem,
@@ -68,7 +69,13 @@ interface StoredResource extends ProfileResource {
   settlesAt: number | null;
   /** How the reading will end, decided when the resource is created. */
   outcome: ProfileResourceFailure | 'ready';
+  /** For a note: what was pasted, kept as its text once it is read. */
+  pasted?: string;
 }
+
+/** What the fake keeps of a file: no file is read here, so a text that says what it stands for. */
+const fileTextOf = (title: string) =>
+  `${title}\n\nThe text of the file, without its layout. In the real backend this is what was read from the PDF, the Word document or the text file.`;
 
 interface PreviewProfile {
   resources: StoredResource[];
@@ -82,6 +89,8 @@ interface PreviewProfile {
   briefsToday?: number;
   /** The readings of applications' jobs, by application. */
   jobReadings?: Record<string, JobReading>;
+  /** The texts kept of the resources (D78), by resource. */
+  texts?: Record<string, ProfileResourceText>;
 }
 
 /** How the fake reads the job of an application (research doc 17). */
@@ -192,6 +201,7 @@ const defaultWait = (milliseconds: number) =>
 const toResource = ({
   settlesAt: _settlesAt,
   outcome: _outcome,
+  pasted: _pasted,
   ...resource
 }: StoredResource): ProfileResource => resource;
 
@@ -448,6 +458,43 @@ export const createPreviewProfileGateway = ({
   };
 
   /** Ends the readings whose time has come. */
+  /**
+   * The text the backend keeps when a resource is read (research doc 17): a note as pasted, a
+   * file's text; nothing for a link until its copy is kept.
+   */
+  const keepText = (
+    profile: PreviewProfile,
+    resource: StoredResource,
+    at: number,
+  ) => {
+    if (resource.source === 'link') {
+      return;
+    }
+    const text =
+      resource.source === 'text'
+        ? (resource.pasted ?? '')
+        : fileTextOf(resource.title);
+    profile.texts = {
+      ...profile.texts,
+      [resource.id]: {
+        text,
+        kind: resource.source === 'text' ? 'note' : 'file',
+        format:
+          resource.source === 'text'
+            ? 'text'
+            : resource.contentType === 'application/pdf'
+              ? 'pdf'
+              : resource.contentType.startsWith('text/')
+                ? 'text'
+                : 'docx',
+        takenAt: at,
+        chars: text.length,
+        truncated: false,
+      },
+    };
+    resource.textAt = at;
+  };
+
   const settle = (profile: PreviewProfile) => {
     const time = now();
     let changed = false;
@@ -464,6 +511,7 @@ export const createPreviewProfileGateway = ({
       resource.updatedAt = resource.settlesAt;
       if (resource.outcome === 'ready') {
         resource.status = 'ready';
+        keepText(profile, resource, resource.settlesAt);
         resource.itemCount = addItems(
           profile,
           resource.id,
@@ -527,6 +575,7 @@ export const createPreviewProfileGateway = ({
       const profile = currentProfile();
       profile.resources = [];
       profile.items = [];
+      profile.texts = {};
       // Oldest first, so the first of the list is the newest: a day apart, ending today.
       const day = 24 * 60 * 60 * 1000;
       [...PREVIEW_SEED].reverse().forEach((entry, index, all) => {
@@ -562,6 +611,9 @@ export const createPreviewProfileGateway = ({
         };
         resource.storagePath = `users/${currentUid()}/interview-docs/${resource.id}/document`;
         resource.itemCount = addItems(profile, resource.id, entry.facts, at);
+        if (resource.status === 'ready') {
+          keepText(profile, resource, at);
+        }
         profile.resources.push(resource);
       });
       save();
@@ -676,6 +728,7 @@ export const createPreviewProfileGateway = ({
               ? 'text/uri-list'
               : 'text/plain',
         ...(link ? { url: link } : {}),
+        ...(request.source === 'text' ? { pasted: request.text.trim() } : {}),
         storagePath: `users/${currentUid()}/interview-docs/${id}/document`,
         status: 'awaitingUpload',
         itemCount: 0,
@@ -805,6 +858,10 @@ export const createPreviewProfileGateway = ({
       profile.items = profile.items.filter(
         item => item.resourceId !== resourceId,
       );
+      if (profile.texts?.[resourceId]) {
+        const { [resourceId]: _removed, ...texts } = profile.texts;
+        profile.texts = texts;
+      }
       touch(profile);
       save();
       return { itemsRemoved: before - profile.items.length };
@@ -812,6 +869,10 @@ export const createPreviewProfileGateway = ({
 
     // No file exists here: the address leads nowhere on purpose.
     getFileUrl: async () => '#',
+    getResourceText: async (uid, resourceId) => {
+      const text = read(uid).texts?.[resourceId];
+      return text ? { ...text } : null;
+    },
 
     getApplications: async uid =>
       structuredClone(applicationsOf(read(uid))).sort(
