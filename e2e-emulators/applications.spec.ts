@@ -7,7 +7,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { createAccount, signIn } from './support';
 
-/** A name the fake model gave: "fake-<digest>", or "fake-… at fake-…" for a title. */
+/** A name the fake model gave: "fake-<digest>", the role alone for a title. */
 const FAKE_NAME = /^fake-/;
 
 const newApplication = async (page: Page) => {
