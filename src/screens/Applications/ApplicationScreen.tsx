@@ -13,11 +13,18 @@ import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/ButtonLink';
 import Card from '@/components/ui/Card';
+import { useFlag } from '@/core/flags/FlagsProvider';
 import {
   useApplications,
   useApplicationsActions,
 } from '@/core/profile/ApplicationsProvider';
-import { applicationDetailsPath, applicationPath } from '@/core/profile/paths';
+import { CvVersionsProvider } from '@/core/profile/CvVersionsProvider';
+import {
+  applicationCvPath,
+  applicationDetailsPath,
+  applicationPath,
+} from '@/core/profile/paths';
+import ApplicationCvTab from '@/screens/Cv/ApplicationCvTab';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 import { shortAddress } from '@/screens/Profile/Resource/resourceMeta';
 
@@ -38,12 +45,14 @@ const BackLink: React.FC = () => {
   );
 };
 
-export type ApplicationTab = 'brief' | 'details';
+export type ApplicationTab = 'brief' | 'details' | 'cv';
 
 export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
   tab,
 }) => {
   const { t } = useTranslation();
+  // The CV tab comes with the CV tool (delivery 2b).
+  const cvTool = useFlag('cvTool');
   const { applicationId = '' } = useParams();
   const { status, applications } = useApplications();
   const { reload } = useApplicationsActions();
@@ -139,9 +148,18 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
           className={tabClass}>
           {t('applications.detailsTab')}
         </NavLink>
+        {cvTool && (
+          <NavLink to={applicationCvPath(application.id)} className={tabClass}>
+            {t('applications.cvTab')}
+          </NavLink>
+        )}
       </nav>
       {tab === 'details' ? (
         <DetailsTab application={application} />
+      ) : tab === 'cv' && cvTool ? (
+        <CvVersionsProvider>
+          <ApplicationCvTab application={application} />
+        </CvVersionsProvider>
       ) : (
         <BriefTab application={application} />
       )}
@@ -155,6 +173,10 @@ export const ApplicationBriefScreen: React.FC = () => (
 
 export const ApplicationDetailsScreen: React.FC = () => (
   <ApplicationScreen tab="details" />
+);
+
+export const ApplicationCvScreen: React.FC = () => (
+  <ApplicationScreen tab="cv" />
 );
 
 export default ApplicationScreen;

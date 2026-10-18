@@ -1627,6 +1627,25 @@ export const createPreviewProfileGateway = ({
       save();
       return { open: openReviews(version) };
     },
+    copyCvVersion: async versionId => {
+      const profile = currentProfile();
+      const version = readyVersion(versionId);
+      if ((profile.cvVersions ?? []).length >= CV_VERSIONS_MAX) {
+        throw new ProfileError(ProfileErrorCode.MaxCvVersions);
+      }
+      const at = now();
+      const { sentAt: _sent, ...kept } = structuredClone(version);
+      const copy: CvVersion = {
+        ...kept,
+        id: newId('version'),
+        copiedFrom: version.id,
+        createdAt: at,
+        updatedAt: at,
+      };
+      profile.cvVersions = [...(profile.cvVersions ?? []), copy];
+      save();
+      return { versionId: copy.id };
+    },
     markCvVersionSent: async (versionId, sent) => {
       const profile = currentProfile();
       const version = readyVersion(versionId);

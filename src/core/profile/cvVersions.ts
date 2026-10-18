@@ -141,6 +141,8 @@ export const CvVersionSchema = z.object({
   profileRevision: z.number().catch(0),
   /** For a job: when the candidate marked it as the version sent. */
   sentAt: timestamp.optional(),
+  /** The version this one is a copy of ("Restore"). */
+  copiedFrom: z.string().optional().catch(undefined),
   createdAt: timestamp,
   updatedAt: timestamp,
   readyAt: timestamp.optional(),
@@ -154,6 +156,7 @@ export const REMOVE_CV_VERSION = 'removeCvVersion';
 export const DECIDE_CV_CHANGE = 'decideCvChange';
 export const ANSWER_CV_QUESTION = 'answerCvQuestion';
 export const MARK_CV_VERSION_SENT = 'markCvVersionSent';
+export const COPY_CV_VERSION = 'copyCvVersion';
 
 /** Longest line the candidate writes: an edited change or an answer. */
 export const CV_LINE_MAX_CHARS = 800;
@@ -187,6 +190,11 @@ export const RemoveCvVersionResponseSchema = z.object({
 export const CvReviewResponseSchema = z.object({
   versionId: documentId,
   open: z.number().int().nonnegative(),
+});
+/** "Restore": the copy, which keeps every decision and becomes the newest version. */
+export const CopyCvVersionResponseSchema = z.object({
+  versionId: documentId,
+  copiedFrom: documentId,
 });
 export const MarkCvVersionSentResponseSchema = z.object({
   versionId: documentId,

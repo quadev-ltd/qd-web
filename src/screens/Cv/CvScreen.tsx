@@ -99,7 +99,7 @@ const VersionChips: React.FC<{ version: CvVersion }> = ({ version }) => {
   );
 };
 
-const VersionRow: React.FC<{
+export const VersionRow: React.FC<{
   version: CvVersion;
   title: string;
   meta: string;

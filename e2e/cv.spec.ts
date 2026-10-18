@@ -233,3 +233,64 @@ test('a version for a job, reviewed, is marked as the one sent', async ({
   await page.getByRole('button', { name: 'Mark as sent' }).click();
   await expect(page.getByText('Sent with your application')).toBeVisible();
 });
+
+test('two versions for a job compared, the earlier one restored as a copy, and the application’s CV tab', async ({
+  page,
+}) => {
+  await openHome(page);
+  await seedApplications(page);
+  await openCv(page);
+
+  // A first version, its rewrite accepted
+  await page.getByRole('button', { name: 'Choose a job' }).click();
+  await page
+    .getByRole('dialog', { name: 'New CV version' })
+    .getByRole('button', { name: 'Create the version' })
+    .click();
+  const aside = page.getByRole('complementary', { name: 'Changes' });
+  await aside.getByRole('button', { name: 'Accept' }).click();
+  await expect(page.getByText('1 of 3 reviewed')).toBeVisible();
+
+  // A second one for the same job, nothing decided yet
+  await page.getByRole('link', { name: 'CV', exact: true }).first().click();
+  await page.getByRole('button', { name: 'New version' }).click();
+  await page
+    .getByRole('dialog', { name: 'New CV version' })
+    .getByRole('button', { name: 'Create the version' })
+    .click();
+  await expect(page.getByText('0 of 3 reviewed')).toBeVisible();
+
+  // Compared: the line the first one rewrote
+  await page.getByRole('link', { name: 'Compare' }).click();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Compare two versions' }),
+  ).toBeVisible();
+  const differences = page.getByRole('region', { name: '1 difference' });
+  await expect(differences).toContainText('Changed');
+  await expect(differences).toContainText(
+    'which cut the time it took by half.',
+  );
+
+  // Restored: a copy, the newest, with its decision
+  await page.getByRole('button', { name: /Restore the version of/ }).click();
+  await expect(page.getByText(/A copy of the version of/)).toBeVisible();
+  await expect(page.getByText('1 of 3 reviewed')).toBeVisible();
+
+  // The application's CV tab: its versions, and a new one for it
+  await page.getByRole('link', { name: 'CV', exact: true }).first().click();
+  await page
+    .getByRole('link', { name: 'Open the application' })
+    .first()
+    .click();
+  await page
+    .getByRole('navigation', { name: 'Application' })
+    .getByRole('link', { name: 'CV' })
+    .click();
+  await expect(
+    page.getByRole('region', { name: 'Other versions' }).getByRole('listitem'),
+  ).toHaveCount(3);
+  await page.getByRole('button', { name: 'New version for this job' }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'New CV version' }),
+  ).toBeVisible();
+});

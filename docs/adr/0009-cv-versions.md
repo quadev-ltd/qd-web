@@ -79,12 +79,27 @@ are all merged (quadev-backend #33 to #36).
   text is written "?") and `docx` 9.8.1 (the release of 28 Sep 2026, two weeks old or more). The
   main file does not change.
 
+## Compare, restore and the application's CV tab (slice 15)
+
+- **"Compare two versions"** (`/cv/compare?earlier=…&later=…`), from "Compare" on a version that
+  has another one for the same job (or another general one): two selects, "Earlier" and "Later",
+  among the versions made for the same thing; what differs between their texts (`cvVersionText`),
+  line by line (a longest common subsequence; a line taken out where another came in reads as
+  "Changed"), with "Only what differs" on by default.
+- **"Restore"** the earlier one: `copyCvVersion` makes a copy with every decision and answer,
+  which becomes the newest and is not marked as sent; the page opens it, saying "A copy of the
+  version of …". Nothing is overwritten (FR-28).
+- **The application's CV tab** (A6), with the CV tool: the version sent, with "Not shown in it:"
+  and the job's words, "Open" and the download; the other versions for the job; and "Tailor your
+  CV for this job", which opens "New CV version" on this job.
+
 ## In this first slice, and what follows
 
 Slice 12 (this ADR's first part): the CV section in its three states, the panel, a version being
 made, failed and lost, a version made shown as its CV with what is left to review, and remove.
-Slices 13 and 14: the review and the download, above. Then compare, restore and the
-application's CV tab (doc 15 §18).
+Slices 13 to 15: the review, the download, compare, restore and the application's CV tab,
+above. What is left for later: "Save my answer to my profile too" (doc 13 Q32), names to leave
+out and "private" (D81), the US resume (D80), and the phone, which reads versions only.
 
 ## Not verified
 

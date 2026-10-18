@@ -16,6 +16,8 @@ import logger from '@/core/logger';
 import { usageDayPath } from '@/core/profile/contract';
 import {
   ANSWER_CV_QUESTION,
+  COPY_CV_VERSION,
+  CopyCvVersionResponseSchema,
   CREATE_CV_VERSION,
   type CreateCvVersionRequest,
   CreateCvVersionResponseSchema,
@@ -131,6 +133,15 @@ export const markCvVersionSent = async (
     versionId,
     sent,
   });
+};
+
+export const copyCvVersion = async (
+  versionId: string,
+): Promise<{ versionId: string }> => {
+  const copy = await call(COPY_CV_VERSION, CopyCvVersionResponseSchema, {
+    versionId,
+  });
+  return { versionId: copy.versionId };
 };
 
 /** How many versions the backend made for this user today (UTC). */

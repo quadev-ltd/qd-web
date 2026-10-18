@@ -30,3 +30,18 @@ export const CV_VERSION_PATH = `${CV_PATH}/versions/:versionId`;
 
 export const cvVersionPath = (versionId: string) =>
   `${CV_PATH}/versions/${encodeURIComponent(versionId)}`;
+
+/** Two versions side by side, with what differs, and "Restore" for the earlier one. */
+export const CV_COMPARE_PATH = `${CV_PATH}/compare`;
+
+export const cvComparePath = (later: string, earlier?: string) =>
+  `${CV_COMPARE_PATH}?${new URLSearchParams({
+    later,
+    ...(earlier ? { earlier } : {}),
+  }).toString()}`;
+
+/** The CV versions of one application (A6): the one sent, the others, a new one. */
+export const APPLICATION_CV_PATH = `${APPLICATION_PATH}/cv`;
+
+export const applicationCvPath = (applicationId: string) =>
+  `${applicationPath(applicationId)}/cv`;

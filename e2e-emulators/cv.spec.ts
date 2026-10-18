@@ -110,3 +110,63 @@ test('without the CV tool, the CV pages say "not available", and the navigation 
     page.getByText(/Tailor your CV for a job, or improve it/),
   ).toBeVisible();
 });
+
+test('a version restored (copyCvVersion): compared with a later one, copied with its decision, the newest', async ({
+  page,
+}) => {
+  const account = await createAccount({
+    interviewAssistant: true,
+    cvTool: true,
+  });
+  await signIn(page, account);
+  await openProfile(page);
+  await page.getByRole('button', { name: 'Add your CV' }).click();
+  await page.getByRole('button', { name: /Upload a file/ }).click();
+  const form = page.getByRole('dialog', { name: 'Upload your CV' });
+  await form.locator('input[type=file]').setInputFiles({
+    name: 'maya-okafor-cv.txt',
+    mimeType: 'text/plain',
+    buffer: CV_TEXT,
+  });
+  await form.getByLabel('Title').fill('Maya Okafor CV 2026');
+  await form.getByRole('button', { name: 'Add to profile' }).click();
+  await expect(
+    page
+      .getByRole('listitem')
+      .filter({ hasText: 'Maya Okafor CV 2026' })
+      .getByText('Ready', { exact: true }),
+  ).toBeVisible();
+  const cv = () =>
+    page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'CV', exact: true })
+      .click();
+
+  // A first general version, its rewrite accepted; then a second one
+  await cv();
+  await page.getByRole('button', { name: 'Improve my CV' }).click();
+  await page
+    .getByRole('dialog', { name: 'Improve your CV in general' })
+    .getByRole('button', { name: 'Create the version' })
+    .click();
+  await page
+    .getByRole('complementary', { name: 'Changes' })
+    .getByRole('button', { name: 'Accept' })
+    .first()
+    .click();
+  await expect(page.getByText(/^1 of \d+ reviewed$/)).toBeVisible();
+  await cv();
+  await page.getByRole('button', { name: 'New version' }).click();
+  const panel = page.getByRole('dialog', { name: 'New CV version' });
+  await panel.getByText('No job in particular').click();
+  await panel.getByRole('button', { name: 'Create the version' }).click();
+  await expect(page.getByText(/^0 of \d+ reviewed$/)).toBeVisible();
+
+  // Compared, then the first restored: a copy that keeps its decision
+  await page.getByRole('link', { name: 'Compare' }).click();
+  await expect(page.getByText('fake-rewrite:').first()).toBeVisible();
+  await page.getByRole('button', { name: /Restore the version of/ }).click();
+  await expect(page.getByText(/A copy of the version of/)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(/^1 of \d+ reviewed$/)).toBeVisible();
+});
