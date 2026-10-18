@@ -22,7 +22,7 @@ const openCv = async (page: Page) => {
   ).toBeVisible();
 };
 
-test('a general version: from the first screen, made in the background, its CV, then removed', async ({
+test('a general version: from the first screen, made in the background, reviewed to the end, then removed', async ({
   page,
 }) => {
   await openProfile(page);
@@ -49,10 +49,42 @@ test('a general version: from the first screen, made in the background, its CV, 
     page.getByRole('heading', { level: 1, name: 'Data engineer, in general' }),
   ).toBeVisible();
   await expect(page.getByRole('status')).toContainText('Creating your version');
-  const text = page.getByRole('region', { name: 'Your CV' });
-  await expect(text).toContainText(
-    '2 changes to review and 1 question are waiting for you.',
+  await expect(page.getByText('0 of 3 reviewed')).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'What we found' }),
+  ).toContainText('2 things to improve · 1 medium · 1 low');
+
+  // The review: the first change is open, beside the CV with it marked
+  const aside = page.getByRole('complementary', { name: 'Changes' });
+  await expect(aside).toContainText('Your line');
+  await aside.getByRole('button', { name: 'Edit' }).click();
+  await aside
+    .getByLabel('Your wording')
+    .fill('Built the reconciliation service and ran it.');
+  await aside.getByRole('button', { name: 'Save my wording' }).click();
+  await expect(page.getByText('1 of 3 reviewed')).toBeVisible();
+  await aside.getByRole('button', { name: /Added from your profile/ }).click();
+  await aside.getByRole('button', { name: 'Keep mine' }).click();
+  await aside.getByText(/^Questions · /).click();
+  await aside.getByRole('button', { name: /How many people/ }).click();
+  await aside.getByLabel('Your answer').fill('Nine engineers, for two years.');
+  await aside.getByRole('button', { name: 'Use my answer' }).click();
+
+  // Nothing left: ready, and the CV as it would be downloaded
+  await expect(
+    page.getByRole('heading', { name: 'Your version is ready' }),
+  ).toBeVisible();
+  // At phone width the CV is behind the "Your CV" switch
+  const showCv = page.getByText('Your CV', { exact: true });
+  if (await showCv.isVisible()) {
+    await showCv.click();
+  }
+  await page.getByRole('switch', { name: 'Show changes' }).uncheck();
+  const cv = page.getByRole('article', { name: 'Your CV' });
+  await expect(cv).toContainText(
+    'Built the reconciliation service and ran it.',
   );
+  await expect(cv).toContainText('Nine engineers, for two years.');
 
   // In the list under "General", then removed
   await page.getByRole('link', { name: 'CV', exact: true }).first().click();
@@ -84,9 +116,11 @@ test('a version for a job: asked in "New version", listed under its application'
   const panel = page.getByRole('dialog', { name: 'New CV version' });
   await panel.getByRole('radio', { name: /Platform Engineer/ }).check();
   await panel.getByRole('button', { name: 'Create the version' }).click();
-  await expect(page.getByRole('region', { name: 'Your CV' })).toContainText(
-    'waiting for you',
-  );
+  await expect(page.getByText('0 of 3 reviewed')).toBeVisible();
+  // For a job: what it asks for that neither the CV nor the profile shows
+  await expect(
+    page.getByRole('region', { name: 'Not in your CV or profile' }),
+  ).toBeVisible();
 
   await page.getByRole('link', { name: 'CV', exact: true }).first().click();
   const forJob = page.getByRole('region', { name: 'For a job' });
@@ -121,9 +155,7 @@ test('a version that could not be made is tried again, and made', async ({
   const failed = page.getByRole('alert');
   await expect(failed).toContainText('We couldn’t create this version');
   await failed.getByRole('button', { name: 'Try again' }).click();
-  await expect(page.getByRole('region', { name: 'Your CV' })).toContainText(
-    'waiting for you',
-  );
+  await expect(page.getByText('0 of 3 reviewed')).toBeVisible();
 
   // The failed one is gone: one version in the list
   await page.getByRole('link', { name: 'CV', exact: true }).first().click();
@@ -141,4 +173,28 @@ test('with no CV in the profile, "Add your CV first" leads to it', async ({
   await page.getByRole('button', { name: 'Add your CV' }).click();
   await expect(page).toHaveURL('/profile');
   await expect(page.getByRole('dialog', { name: 'Add your CV' })).toBeVisible();
+});
+
+test('a version for a job, reviewed, is marked as the one sent', async ({
+  page,
+}) => {
+  await openHome(page);
+  await seedApplications(page);
+  await openCv(page);
+  await page.getByRole('button', { name: 'Choose a job' }).click();
+  await page
+    .getByRole('dialog', { name: 'New CV version' })
+    .getByRole('button', { name: 'Create the version' })
+    .click();
+  const aside = page.getByRole('complementary', { name: 'Changes' });
+  await expect(aside).toContainText('Your line');
+  await aside.getByRole('button', { name: 'Accept' }).click();
+  await aside.getByRole('button', { name: /Added from your profile/ }).click();
+  await aside.getByRole('button', { name: 'Accept' }).click();
+  await aside.getByText(/^Questions · /).click();
+  await aside.getByRole('button', { name: /How many people/ }).click();
+  await aside.getByRole('button', { name: 'Skip' }).click();
+
+  await page.getByRole('button', { name: 'Mark as sent' }).click();
+  await expect(page.getByText('Sent with your application')).toBeVisible();
 });

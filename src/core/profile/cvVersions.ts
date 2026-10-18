@@ -151,6 +151,18 @@ export type CvVersion = z.infer<typeof CvVersionSchema>;
 
 export const CREATE_CV_VERSION = 'createCvVersion';
 export const REMOVE_CV_VERSION = 'removeCvVersion';
+export const DECIDE_CV_CHANGE = 'decideCvChange';
+export const ANSWER_CV_QUESTION = 'answerCvQuestion';
+export const MARK_CV_VERSION_SENT = 'markCvVersionSent';
+
+/** Longest line the candidate writes: an edited change or an answer. */
+export const CV_LINE_MAX_CHARS = 800;
+
+/**
+ * What the candidate decides on a change: "Accept", "Edit" (with their `text`), "Keep mine",
+ * or back to undecided. Any decision can be changed again.
+ */
+export type CvChangeDecisionRequest = 'accept' | 'edit' | 'keep' | 'reopen';
 
 /** What `createCvVersion` takes. A version is always a UK CV for now (D80). */
 export interface CreateCvVersionRequest {
@@ -171,6 +183,15 @@ export const CreateCvVersionResponseSchema = z.object({
 export const RemoveCvVersionResponseSchema = z.object({
   versionId: documentId,
 });
+/** The review's answers say how many changes and questions are still open. */
+export const CvReviewResponseSchema = z.object({
+  versionId: documentId,
+  open: z.number().int().nonnegative(),
+});
+export const MarkCvVersionSentResponseSchema = z.object({
+  versionId: documentId,
+  unmarked: z.number().int().nonnegative(),
+});
 
 /** `details.reason` of the `failed-precondition` refusals of `createCvVersion`. */
 export const CvRefusal = {
@@ -178,6 +199,12 @@ export const CvRefusal = {
   NoCvText: 'no-cv-text',
   MaxVersions: 'max-versions',
   NoJobDescription: 'no-job-description',
+  /** The version is being made, or could not be: nothing in it can be decided. */
+  NotReady: 'not-ready',
+  /** A removed line cannot be edited: accept the removal or keep the line. */
+  NotEditable: 'not-editable',
+  /** Only a version for a job is sent. */
+  NotAJob: 'not-a-job',
 } as const;
 
 // ---------- What the pages work out ----------
@@ -210,62 +237,80 @@ const lineAround = (text: string, index: number) => {
   return { start, end: next === -1 ? text.length : next };
 };
 
-/** Puts `line` on a line of its own after the line that holds `index`, with its list mark. */
-const insertLineAfter = (text: string, index: number, line: string) => {
-  const { start, end } = lineAround(text, index);
-  const mark = listMark(text.slice(start, end));
+/** One edit of the CV's text: `[start, end)` replaced by `text`. An insertion has `start === end`. */
+interface Edit {
+  start: number;
+  end: number;
+  text: string;
+}
+
+/** A new line after the line that holds `index` in `cv`, with that line's list mark. */
+const lineAfter = (cv: string, index: number, line: string): Edit => {
+  const { start, end } = lineAround(cv, index);
+  const mark = listMark(cv.slice(start, end));
   const body = mark && !line.startsWith(mark.trim()) ? `${mark}${line}` : line;
-  return `${text.slice(0, end)}\n${body}${text.slice(end)}`;
+  return { start: end, end, text: `\n${body}` };
 };
 
-const applyChange = (text: string, change: CvChange): string => {
+const editOf = (cv: string, change: CvChange): Edit | undefined => {
   const line =
     (change.decision === 'edited' ? change.text : change.proposed)?.trim() ??
     '';
   if (change.action === 'add') {
-    const at = text.indexOf(change.after);
+    const at = cv.indexOf(change.after);
     return at === -1 || !line
-      ? text
-      : insertLineAfter(text, at + change.after.length, line);
+      ? undefined
+      : lineAfter(cv, at + change.after.length, line);
   }
-  const at = text.indexOf(change.original);
-  if (at === -1) {
-    return text;
+  const at = cv.indexOf(change.original);
+  if (at === -1 || !change.original) {
+    return undefined;
   }
-  const before = text.slice(0, at);
-  const after = text.slice(at + change.original.length);
+  const end = at + change.original.length;
   if (change.action === 'rewrite') {
-    return line ? `${before}${line}${after}` : text;
+    return line ? { start: at, end, text: line } : undefined;
   }
-  // A removal of a whole line (its list mark aside) takes the line with it.
-  const { start, end } = lineAround(text, at);
-  const whole = text.slice(start, end);
+  // A removal of a whole line (its list mark aside) takes the line and one line break with it.
+  const around = lineAround(cv, at);
+  const whole = cv.slice(around.start, around.end);
   if (whole.slice(listMark(whole).length).trim() === change.original.trim()) {
-    return end < text.length
-      ? text.slice(0, start) + text.slice(end + 1)
-      : text.slice(0, Math.max(0, start - 1));
+    return around.start > 0
+      ? { start: around.start - 1, end: around.end, text: '' }
+      : { start: 0, end: Math.min(cv.length, around.end + 1), text: '' };
   }
-  // Part of a line: the words on either side join with one space, or none before punctuation.
-  const head = before.replace(/[ \t]+$/, '');
-  const tail = after.replace(/^[ \t]+/, '');
-  const space =
-    head && tail && !head.endsWith('\n') && !/^[\n.,;:)]/.test(tail) ? ' ' : '';
-  return `${head}${space}${tail}`;
+  // Part of a line: the words on either side keep one space between them, or none before punctuation.
+  const spaceBefore = at > 0 && cv[at - 1] === ' ';
+  const spaceAfter = cv[end] === ' ';
+  return {
+    start:
+      spaceBefore && (spaceAfter || /[.,;:)\n]/.test(cv[end] ?? '\n'))
+        ? at - 1
+        : at,
+    end: spaceAfter && !spaceBefore ? end + 1 : end,
+    text: '',
+  };
 };
 
 /**
- * The text of a version: its CV's text with every accepted or edited change applied, in their
- * order, and each answered question's answer on a line of its own after its passage (at the end
- * when it has none). A change whose passage is no longer there is left out. A copy of the
- * backend's function, so the download and the comparison say what the backend says.
+ * The text of a version: its CV's text with every accepted or edited change applied, and each
+ * answered question's answer on a line of its own after the line of its passage (at the end when
+ * it has none). Every passage is found in the CV as the version keeps it, so an added line still
+ * finds the line it goes after when that line was rewritten. A change that overlaps an earlier
+ * one is left out. A copy of the backend's function, so the download and the comparison say
+ * what the backend says.
  */
 export const cvVersionText = (
   version: Pick<CvVersion, 'cv' | 'changes' | 'questions'>,
 ): string => {
-  let text = version.cv;
+  const { cv } = version;
+  const edits: Edit[] = [];
   for (const change of version.changes) {
-    if (change.decision === 'accepted' || change.decision === 'edited') {
-      text = applyChange(text, change);
+    if (change.decision !== 'accepted' && change.decision !== 'edited') {
+      continue;
+    }
+    const edit = editOf(cv, change);
+    if (edit) {
+      edits.push(edit);
     }
   }
   for (const question of version.questions) {
@@ -274,11 +319,31 @@ export const cvVersionText = (
     if (!answer) {
       continue;
     }
-    const at = question.passage ? text.indexOf(question.passage) : -1;
-    text =
+    const at = question.passage ? cv.indexOf(question.passage) : -1;
+    edits.push(
       at === -1
-        ? `${text.trimEnd()}\n${answer}`
-        : insertLineAfter(text, at + question.passage.length, answer);
+        ? { start: cv.length, end: cv.length, text: `\n${answer}` }
+        : lineAfter(cv, at + question.passage.length, answer),
+    );
   }
-  return text;
+  // In the order of the CV; at one place, replacements before the lines that go after them.
+  const ordered = edits
+    .map((edit, order) => ({ edit, order }))
+    .sort(
+      (a, b) =>
+        a.edit.start - b.edit.start ||
+        Number(a.edit.start === a.edit.end) -
+          Number(b.edit.start === b.edit.end) ||
+        a.order - b.order,
+    );
+  let text = '';
+  let position = 0;
+  for (const { edit } of ordered) {
+    if (edit.start < position) {
+      continue;
+    }
+    text += cv.slice(position, edit.start) + edit.text;
+    position = edit.end;
+  }
+  return (text + cv.slice(position)).replace(/^\n+/, '').trimEnd();
 };

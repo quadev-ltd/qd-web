@@ -37,6 +37,9 @@ export const createMockProfileGateway = (): Mocked<ProfileGateway> => ({
   ),
   removeCvVersion: vi.fn(() => Promise.resolve()),
   getCvVersionsToday: vi.fn(() => Promise.resolve(0)),
+  decideCvChange: vi.fn(() => Promise.resolve({ open: 0 })),
+  answerCvQuestion: vi.fn(() => Promise.resolve({ open: 0 })),
+  markCvVersionSent: vi.fn(() => Promise.resolve()),
 });
 
 export default createMockProfileGateway;

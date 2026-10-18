@@ -8,7 +8,7 @@ import { CvVersionScreen } from './CvVersionScreen';
 import { CV_CREATING_STALE_MS } from '@/core/profile/cvVersions';
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import { applicationFixture } from '@/testUtil/applicationFixtures';
-import { CV_TEXT, cvVersionFixture } from '@/testUtil/cvVersionFixtures';
+import { cvVersionFixture } from '@/testUtil/cvVersionFixtures';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
 import { resourceFixture } from '@/testUtil/profileFixtures';
 import { renderCvPage } from '@/testUtil/renderCvPage';
@@ -162,13 +162,13 @@ describe('CvVersionScreen', () => {
     expect(gateway.removeCvVersion).not.toHaveBeenCalled();
   });
 
-  it('shows a version made with its CV and what is left to review', () => {
+  it('shows a version made as its review', () => {
     setUp(cvVersionFixture());
 
-    const text = screen.getByRole('region', { name: 'cv.yourCvTitle' });
-    expect(text).toHaveTextContent('cv.toReviewMessage');
-    // Nothing is accepted yet: the CV as it was.
-    expect(text).toHaveTextContent(CV_TEXT.split('\n')[2].slice(2));
+    expect(screen.getByText('cv.reviewedProgress')).toBeInTheDocument();
+    expect(
+      screen.getByRole('article', { name: 'cv.yourCvTitle' }),
+    ).toBeInTheDocument();
   });
 
   it('is removed, asked first, and goes back to the CV list', async () => {

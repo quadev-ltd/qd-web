@@ -2,10 +2,13 @@ import { doc, getDoc, getDocs, Timestamp } from 'firebase/firestore/lite';
 import { httpsCallable } from 'firebase/functions';
 
 import {
+  answerCvQuestion,
   createCvVersion,
+  decideCvChange,
   getCvVersion,
   getCvVersions,
   getCvVersionsToday,
+  markCvVersionSent,
   removeCvVersion,
 } from './cvVersions';
 
@@ -180,5 +183,55 @@ describe('making and removing CV versions', () => {
     await removeCvVersion('v9');
 
     expect(callable).toHaveBeenCalledWith({ versionId: 'v9' });
+  });
+});
+
+describe('the review', () => {
+  it('decides a change, with the candidate’s text only for an edit', async () => {
+    callable.mockResolvedValue({ data: { versionId: 'v1', open: 2 } });
+
+    await expect(decideCvChange('v1', 'c1', 'accept')).resolves.toEqual({
+      open: 2,
+    });
+    await decideCvChange('v1', 'c1', 'edit', 'Wrote it');
+    await decideCvChange('v1', 'c1', 'keep', 'ignored');
+
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'decideCvChange',
+    );
+    expect(callable.mock.calls.map(([data]) => data)).toEqual([
+      { versionId: 'v1', changeId: 'c1', decision: 'accept' },
+      { versionId: 'v1', changeId: 'c1', decision: 'edit', text: 'Wrote it' },
+      { versionId: 'v1', changeId: 'c1', decision: 'keep' },
+    ]);
+  });
+
+  it('answers a question, or skips it with no answer', async () => {
+    callable.mockResolvedValue({ data: { versionId: 'v1', open: 0 } });
+
+    await answerCvQuestion('v1', 'q1', '40 depots');
+    await answerCvQuestion('v1', 'q1');
+
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'answerCvQuestion',
+    );
+    expect(callable.mock.calls.map(([data]) => data)).toEqual([
+      { versionId: 'v1', questionId: 'q1', answer: '40 depots' },
+      { versionId: 'v1', questionId: 'q1' },
+    ]);
+  });
+
+  it('marks a version as sent, or not', async () => {
+    callable.mockResolvedValue({ data: { versionId: 'v1', unmarked: 1 } });
+
+    await markCvVersionSent('v1', true);
+
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'markCvVersionSent',
+    );
+    expect(callable).toHaveBeenCalledWith({ versionId: 'v1', sent: true });
   });
 });

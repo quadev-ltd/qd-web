@@ -1,5 +1,5 @@
-// The cases of quadev-backend's packages/shared/src/cvVersion.test.ts, so this copy of
-// cvVersionText says what the backend's says.
+// The cases of quadev-backend's packages/shared/src/cvVersion.test.ts (as of #35), so this
+// copy of cvVersionText says what the backend's says.
 import {
   type CvChange,
   type CvQuestion,
@@ -97,6 +97,47 @@ describe('cvVersionText', () => {
     expect(
       text([change({ action: 'remove', original: 'for two years' })]),
     ).toContain('\n- Ran the on-call rota\n');
+  });
+
+  it('adds a line after a line that was rewritten, and answers after it too', () => {
+    const rewrite = change({
+      original: '- Ran the on-call rota for two years',
+      proposed: '- Led on-call for two years',
+    });
+    const added = change({
+      id: 'c2',
+      action: 'add',
+      after: '- Ran the on-call rota for two years',
+      proposed: 'Cut pages by half',
+    });
+    const questions: CvQuestion[] = [
+      {
+        id: 'q1',
+        passage: 'Ran the on-call rota',
+        text: 'How many?',
+        status: 'answered',
+        answer: '12 engineers',
+      },
+    ];
+    expect(text([rewrite, added], questions)).toBe(
+      'Maya Okafor\nExperience\n- Built the booking API\n- Led on-call for two years\n- Cut pages by half\n- 12 engineers\nEducation\nBSc, Leeds',
+    );
+  });
+
+  it('removes a line and still adds the one that goes after it', () => {
+    const removed = change({
+      action: 'remove',
+      original: 'Ran the on-call rota for two years',
+    });
+    const added = change({
+      id: 'c2',
+      action: 'add',
+      after: 'Ran the on-call rota for two years',
+      proposed: 'Cut pages by half',
+    });
+    expect(text([removed, added])).toBe(
+      'Maya Okafor\nExperience\n- Built the booking API\n- Cut pages by half\nEducation\nBSc, Leeds',
+    );
   });
 
   it('leaves out a change whose passage an earlier one took', () => {

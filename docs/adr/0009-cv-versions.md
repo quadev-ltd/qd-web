@@ -43,13 +43,35 @@ are all merged (quadev-backend #33 to #36).
 - **State** is a `cvVersions` slice of the store, like the applications: read once by the first
   CV page of a session.
 
+## The review (slice 13)
+
+- **The page puts the CV beside the changes** (doc 13 §16.4 item 1): "What we found" across the
+  top (the most serious first, three shown, then "Show all"), "N of M reviewed" with its bar, and
+  for a job "Not in your CV or profile". Beside the CV, the changes and questions with the tabs
+  "To review", "Questions" and "Done"; one card open at a time, the first open change to start
+  with. At phone width a switch moves between "Changes" and "Your CV".
+- **The CV is drawn from its stored text, with each change found by position**, as the backend
+  applies it: an open rewrite tinted with its number, an open removal struck through, an added
+  line tinted after the line it follows, an open question as a dashed box where its line would
+  go; accepted ones in place with a ticked number. "Show changes" off gives `cvVersionText`, the
+  text as it would be downloaded.
+- **Every change has the same words** (D75): "Accept", "Edit" (left out on a removal: the backend
+  refuses it), "Keep mine"; a decided one can be changed again ("Change my decision"). A question:
+  "Use my answer" or "Skip", and "Change my answer". "Based on" names the CV, or the profile item
+  with "Where it says this" (its evidence); the items are read once for the page, as the brief
+  reads them.
+- **Each decision is one call, then the version is read again**, so the page shows what the
+  backend keeps. A failed save says so on its card.
+- **Once nothing is open:** "Your version is ready" with what was decided, and for a job "Did you
+  send it?" with "Mark as sent" (one per application; "Not the one I sent" takes it back). "Save
+  my answer to my profile too" is not there: the backend's slices leave it for later (doc 18).
+
 ## In this first slice, and what follows
 
 Slice 12 (this ADR's first part): the CV section in its three states, the panel, a version being
 made, failed and lost, a version made shown as its CV with what is left to review, and remove.
-Then: the review (findings, the job's terms, the CV with each change marked, the changes and
-questions with their decisions, "Mark as sent", the download), and compare, restore and the
-application's CV tab (doc 15 §18).
+Slice 13: the review, above. Then the download (PDF and Word, made in the browser from
+`cvVersionText`), and compare, restore and the application's CV tab (doc 15 §18).
 
 ## Not verified
 
