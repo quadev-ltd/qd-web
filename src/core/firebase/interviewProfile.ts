@@ -46,6 +46,7 @@ import {
   UpdateSkillMapItemResponseSchema,
   usageDayPath,
 } from '@/core/profile/contract';
+import { CvRefusal } from '@/core/profile/cvVersions';
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import {
   type CreatedResource,
@@ -78,6 +79,11 @@ const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
   [CallableReason.JobEdited]: ProfileErrorCode.JobEdited,
   // The pages only offer to read a link again.
   [CallableReason.NotALink]: ProfileErrorCode.Invalid,
+  // CV versions (research doc 18). The pages only offer a CV, and a job with its text.
+  [CvRefusal.MaxVersions]: ProfileErrorCode.MaxCvVersions,
+  [CvRefusal.NoCvText]: ProfileErrorCode.NoCvText,
+  [CvRefusal.NotACv]: ProfileErrorCode.Invalid,
+  [CvRefusal.NoJobDescription]: ProfileErrorCode.Invalid,
 };
 
 /**

@@ -43,13 +43,17 @@ const send = async (
 
 /**
  * A new account, ready to sign in.
- * `interviewAssistant`: the override of that flag in `featureFlags/{uid}`; left out, the
- * account has no override, which is what a new account has on the real backend. In the
- * emulators a flag comes only from that document (Remote Config is skipped there).
+ * `interviewAssistant`, `cvTool`: the overrides of those flags in `featureFlags/{uid}`; left
+ * out, the account has no override, which is what a new account has on the real backend. In
+ * the emulators a flag comes only from that document (Remote Config is skipped there).
  */
 export const createAccount = async ({
   interviewAssistant,
-}: { interviewAssistant?: boolean } = {}): Promise<TestAccount> => {
+  cvTool,
+}: {
+  interviewAssistant?: boolean;
+  cvTool?: boolean;
+} = {}): Promise<TestAccount> => {
   const email = `e2e-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
   const created = await send(
     'POST',
@@ -77,11 +81,16 @@ export const createAccount = async ({
     },
     OWNER,
   );
-  if (interviewAssistant !== undefined) {
+  const flags = Object.fromEntries(
+    Object.entries({ interviewAssistant, cvTool })
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, { booleanValue: value }]),
+  );
+  if (Object.keys(flags).length > 0) {
     await send(
       'PATCH',
       `${DOCUMENTS}/featureFlags/${uid}`,
-      { fields: { interviewAssistant: { booleanValue: interviewAssistant } } },
+      { fields: flags },
       OWNER,
     );
   }

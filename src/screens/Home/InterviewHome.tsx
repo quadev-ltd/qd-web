@@ -1,9 +1,9 @@
 // The home of an account with the interview tools (D58, delivery 2a): while it has no
 // application, "Add your CV" and the three paths; then "Your applications", with each one's
-// brief and "Your profile" beside them. Practice and the CV tool are not built yet.
+// brief and "Your profile" beside them. Practice is not built yet; the CV tool has its own flag.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 
 import { StartCardContent } from './StartCard';
 
@@ -14,6 +14,7 @@ import Button from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/ButtonLink';
 import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
+import { useFlag } from '@/core/flags/FlagsProvider';
 import {
   APPLICATIONS_MAX,
   briefStateOf,
@@ -29,7 +30,7 @@ import {
   InterviewProfileProvider,
   useInterviewProfile,
 } from '@/core/profile/InterviewProfileProvider';
-import { applicationPath, PROFILE_PATH } from '@/core/profile/paths';
+import { applicationPath, CV_PATH, PROFILE_PATH } from '@/core/profile/paths';
 import { ProfileGatewayProvider } from '@/core/profile/ProfileGatewayProvider';
 import NewApplicationPanel from '@/screens/Applications/NewApplicationPanel';
 
@@ -204,6 +205,9 @@ const Content: React.FC = () => {
   const { reload } = useApplicationsActions();
   const [adding, setAdding] = useState(false);
   const full = applications.length >= APPLICATIONS_MAX;
+  const navigate = useNavigate();
+  // The CV tool has its own flag (delivery 2b): without it, its path is "Coming soon".
+  const cvTool = useFlag('cvTool');
 
   let body: React.ReactNode = null;
   if (status === 'error') {
@@ -245,6 +249,7 @@ const Content: React.FC = () => {
               icon="file"
               title={t('home.improveCvTitle')}
               description={t('home.improveCvDescription')}
+              onOpen={cvTool ? () => navigate(CV_PATH) : undefined}
             />
           </div>
         </section>

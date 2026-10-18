@@ -146,12 +146,14 @@ describe('HomeScreen', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('reads no other flag', () => {
+    it('reads no other flag than the interview tools’ and, for the navigation, the CV tool’s', () => {
       renderHome();
 
       expect(mockUseFlag).toHaveBeenCalledWith('interviewAssistant');
       expect(
-        mockUseFlag.mock.calls.every(([key]) => key === 'interviewAssistant'),
+        mockUseFlag.mock.calls.every(([key]) =>
+          ['interviewAssistant', 'cvTool'].includes(key),
+        ),
       ).toBe(true);
     });
   });

@@ -10,6 +10,13 @@ import {
   updateApplication,
 } from './applications';
 import {
+  createCvVersion,
+  getCvVersion,
+  getCvVersions,
+  getCvVersionsToday,
+  removeCvVersion,
+} from './cvVersions';
+import {
   createResource,
   getExtractionsToday,
   getFileUrl,
@@ -56,6 +63,11 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   prepareBrief,
   readPostingAgain,
   getBriefsToday,
+  getCvVersions,
+  getCvVersion,
+  createCvVersion,
+  removeCvVersion,
+  getCvVersionsToday,
 });
 
 export default createFirebaseProfileGateway;

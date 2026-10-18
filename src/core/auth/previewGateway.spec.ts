@@ -302,7 +302,7 @@ describe('previewGateway', () => {
       ).resolves.toBe(false);
     });
 
-    it('has the interview tools on for the sample account, and no flag for a new one', async () => {
+    it('has the interview tools and the CV tool on for the sample account, and no flag for a new one', async () => {
       const gateway = createPreviewGateway(memoryStorage());
       const sample = await gateway.signInWithEmail(
         PREVIEW_USER.email,
@@ -316,6 +316,7 @@ describe('previewGateway', () => {
 
       await expect(gateway.getFlagOverrides(sample.uid)).resolves.toEqual({
         interviewAssistant: true,
+        cvTool: true,
       });
       await expect(gateway.getFlagOverrides(created.uid)).resolves.toEqual({});
       await expect(gateway.getFlagOverrides('nobody')).resolves.toEqual({});
@@ -352,14 +353,15 @@ describe('previewGateway', () => {
 
       await expect(gateway.getFlagOverrides(sample.uid)).resolves.toEqual({
         interviewAssistant: false,
+        cvTool: true,
       });
       await expect(
         createPreviewGateway(storage).getFlagOverrides(sample.uid),
-      ).resolves.toEqual({ interviewAssistant: false });
+      ).resolves.toEqual({ interviewAssistant: false, cvTool: true });
       // Another tab still has the sample account as it comes.
       await expect(
         createPreviewGateway(memoryStorage()).getFlagOverrides(sample.uid),
-      ).resolves.toEqual({ interviewAssistant: true });
+      ).resolves.toEqual({ interviewAssistant: true, cvTool: true });
     });
 
     it('cannot set a flag when nobody is signed in', () => {

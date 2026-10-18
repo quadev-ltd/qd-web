@@ -10,6 +10,11 @@ import {
   type ProfileUploadContentType,
   type SkillMapItem,
 } from './contract';
+import {
+  type CreateCvVersionRequest,
+  type CvVersion,
+  type CvVersionStatus,
+} from './cvVersions';
 
 /** Where a file goes, as `createResource` answers for a file. */
 export interface UploadTarget {
@@ -157,4 +162,22 @@ export interface ProfileGateway {
   ): Promise<void>;
   /** How many briefs were prepared for this user today (UTC), for the daily limit. */
   getBriefsToday(uid: string): Promise<number>;
+
+  // ---------- CV versions (delivery 2b) ----------
+
+  /** The CV versions, the newest first. */
+  getCvVersions(uid: string): Promise<CvVersion[]>;
+  /** One version; `null` when it does not exist (any more). */
+  getCvVersion(uid: string, versionId: string): Promise<CvVersion | null>;
+  /**
+   * Makes a new version: stored as `creating` at once, then made by the model (about a minute)
+   * and `ready` or `failed`. Resolves when it is made; the document says the same meanwhile.
+   */
+  createCvVersion(
+    request: CreateCvVersionRequest,
+  ): Promise<{ versionId: string; status: CvVersionStatus }>;
+  /** Removes a version. Nothing else changes: not the CV, the profile or the other versions. */
+  removeCvVersion(versionId: string): Promise<void>;
+  /** How many versions were made for this user today (UTC), for the daily limit. */
+  getCvVersionsToday(uid: string): Promise<number>;
 }

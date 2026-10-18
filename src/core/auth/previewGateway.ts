@@ -26,8 +26,8 @@ import { type FlagKey, type FlagValues } from '@/core/flags/registry';
  * They live in memory and in sessionStorage, so reloading the page keeps the session and
  * closing the tab forgets everything. Nothing is sent anywhere. Never type a real password.
  *
- * The sample account has the interview tools switched on (the `interviewAssistant` flag), as
- * an account an admin opened them for. An account created with the sign-up form has no flag
+ * The sample account has the interview tools and the CV tool switched on (the
+ * `interviewAssistant` and `cvTool` flags), as an account an admin opened them for. An account created with the sign-up form has no flag
  * set, as on the real backend, and sees "Not available for your account yet".
  *
  * An account created with the sign-up form starts with an unverified email, as on the real
@@ -95,7 +95,7 @@ const SEEDED_ACCOUNT: PreviewAccount = {
   providerIds: [PASSWORD_PROVIDER_ID, GOOGLE_PROVIDER_ID, APPLE_PROVIDER_ID],
   emailVerified: true,
   profile: { ...PREVIEW_USER.profile },
-  flags: { interviewAssistant: true },
+  flags: { interviewAssistant: true, cvTool: true },
 };
 
 const browserStorage = (): PreviewStorage | null => {

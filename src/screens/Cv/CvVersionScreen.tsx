@@ -1,0 +1,339 @@
+// One CV version (C3): being created (one line, D80), taking longer than it ever does, could
+// not be created ("Try again"), or made: its CV and what is left to review. "Remove this
+// version" is always there. The review itself comes with the next slices (research doc 15 §18).
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Link, useNavigate, useParams } from 'react-router';
+
+import { startTitle, versionDay, versionHeading } from './cvMeta';
+import RemoveCvVersionDialog from './RemoveCvVersionDialog';
+
+import Icon from '@/components/Icon';
+import SignedInShell from '@/components/layout/SignedInShell';
+import Spinner from '@/components/Spinner';
+import Banner from '@/components/ui/Banner';
+import Button from '@/components/ui/Button';
+import ButtonLink from '@/components/ui/ButtonLink';
+import Card from '@/components/ui/Card';
+import { useApplications } from '@/core/profile/ApplicationsProvider';
+import {
+  CV_DAILY_VERSIONS,
+  type CvVersion,
+  cvVersionText,
+  isCreating,
+} from '@/core/profile/cvVersions';
+import {
+  useCvVersions,
+  useCvVersionsActions,
+} from '@/core/profile/CvVersionsProvider';
+import {
+  getProfileErrorCode,
+  logProfileError,
+  ProfileErrorCode,
+} from '@/core/profile/errors';
+import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
+import { dailyLimitResetTime } from '@/core/profile/limits';
+import { CV_PATH, cvVersionPath } from '@/core/profile/paths';
+import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
+import { useSessionUser } from '@/core/session/hooks';
+import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
+
+/** How often the page looks at the clock, for "taking longer than usual". */
+const CLOCK_MS = 15_000;
+
+const FAILURES = {
+  model: 'cv.failedModel',
+  blocked: 'cv.failedBlocked',
+  quota: 'cv.failedQuota',
+  internal: 'cv.failedInternal',
+} as const satisfies Record<NonNullable<CvVersion['failure']>, string>;
+
+const BackLink: React.FC = () => {
+  const { t } = useTranslation();
+  return (
+    <Link
+      to={CV_PATH}
+      className="flex min-h-11 items-center gap-1 self-start text-[15px] leading-natural font-medium no-underline hover:underline">
+      <Icon name="left" size={18} />
+      {t('cv.title')}
+    </Link>
+  );
+};
+
+/** "Try again" after a failure: the same version asked for again, and the failed one removed. */
+const useTryAgain = (version: CvVersion | undefined) => {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const gateway = useProfileGateway();
+  const uid = useSessionUser()?.uid;
+  const { refreshVersion, refreshToday } = useCvVersionsActions();
+  const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>();
+
+  const start = async () => {
+    if (!version) {
+      return;
+    }
+    setBusy(true);
+    setErrorMessage(undefined);
+    try {
+      const { versionId } = await gateway.createCvVersion({
+        resourceId: version.resourceId,
+        target: version.target,
+        ...(version.length === 'same' ? {} : { length: version.length }),
+      });
+      // The failed one keeps nothing: it goes, so the list has the new one only.
+      await gateway.removeCvVersion(version.id).catch(() => undefined);
+      await Promise.all([
+        refreshVersion(version.id).catch(() => null),
+        refreshVersion(versionId).catch(() => null),
+      ]);
+      navigate(cvVersionPath(versionId), { replace: true });
+    } catch (error) {
+      logProfileError('createCvVersion', error, uid);
+      setErrorMessage(
+        getProfileErrorCode(error) === ProfileErrorCode.DailyLimit
+          ? t('cv.limitMessage', {
+              max: CV_DAILY_VERSIONS,
+              time: dailyLimitResetTime(),
+            })
+          : t('cv.createFailedMessage'),
+      );
+      refreshToday();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { start, busy, errorMessage };
+};
+
+export const CvVersionScreen: React.FC = () => {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { versionId = '' } = useParams();
+  const { status, versions } = useCvVersions();
+  const { reload } = useCvVersionsActions();
+  const { applications } = useApplications();
+  const { resources } = useInterviewProfile();
+  const [removing, setRemoving] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  const version = versions.find(({ id }) => id === versionId);
+  const tryAgain = useTryAgain(version);
+  const creating = version?.status === 'creating';
+  // Only a version being made changes with the clock.
+  useEffect(() => {
+    if (!creating) {
+      return undefined;
+    }
+    const timer = setInterval(() => setNow(Date.now()), CLOCK_MS);
+    return () => clearInterval(timer);
+  }, [creating]);
+
+  const frame = (children: React.ReactNode) => (
+    <SignedInShell
+      title={t('cv.versionDocumentTitle')}
+      mainClassName={PROFILE_MAIN}>
+      <div className="mx-auto flex max-w-[1120px] flex-col gap-6">
+        <BackLink />
+        {children}
+      </div>
+    </SignedInShell>
+  );
+
+  if (status === 'idle' || status === 'loading') {
+    return frame(
+      <div className="flex justify-center py-16 text-primary">
+        <Spinner />
+      </div>,
+    );
+  }
+  if (status === 'error') {
+    return frame(
+      <Banner
+        tone="danger"
+        role="alert"
+        action={
+          <Button variant="quiet" size="small" onClick={reload}>
+            {t('cv.retryButton')}
+          </Button>
+        }>
+        {t('cv.loadErrorMessage')}
+      </Banner>,
+    );
+  }
+  if (!version) {
+    return frame(
+      <Card
+        elevation="raised"
+        className="mx-auto w-full max-w-[560px] items-start gap-3 p-8">
+        <h1 className="font-display text-[22px] leading-tight font-semibold">
+          {t('cv.notFoundTitle')}
+        </h1>
+        <p className="text-[16px] leading-normal text-muted">
+          {t('cv.notFoundDescription')}
+        </p>
+        <ButtonLink to={CV_PATH} variant="secondary" size="small">
+          {t('cv.backToCvsButton')}
+        </ButtonLink>
+      </Card>,
+    );
+  }
+
+  const date = versionDay(version);
+  const sub = t(
+    version.target.kind === 'job' ? 'cv.tailoredSub' : 'cv.generalSub',
+    { date, title: startTitle(t, version, resources) },
+  );
+  const lost = creating && !isCreating(version, now);
+
+  let body: React.ReactNode;
+  if (creating && !lost) {
+    body = (
+      <Card
+        role="status"
+        elevation="raised"
+        className="mx-auto mt-4 w-full max-w-[620px] gap-4 p-8">
+        <div className="flex items-center gap-4">
+          <span className="flex text-primary">
+            <Spinner decorative />
+          </span>
+          <h2 className="font-display text-[22px] leading-tight font-semibold">
+            {t('cv.creatingTitle')}
+          </h2>
+        </div>
+        <p className="text-base leading-normal text-muted">
+          {t('cv.creatingDescription')}
+        </p>
+      </Card>
+    );
+  } else if (lost) {
+    body = (
+      <div
+        role="status"
+        className="mx-auto mt-4 flex w-full max-w-[620px] flex-col gap-3 rounded-card bg-warning-tint p-6">
+        <h2 className="font-display text-[20px] leading-tight font-semibold">
+          {t('cv.stuckTitle')}
+        </h2>
+        <p className="text-base leading-normal">{t('cv.stuckDescription')}</p>
+        <Button
+          variant="danger"
+          size="small"
+          onClick={() => setRemoving(true)}
+          className="gap-2 self-start">
+          <Icon name="trash" size={18} />
+          {t('cv.removeVersionButton')}
+        </Button>
+      </div>
+    );
+  } else if (version.status === 'failed') {
+    body = (
+      <Card
+        role="alert"
+        elevation="raised"
+        className="mx-auto mt-4 w-full max-w-[620px] gap-3.5 p-8">
+        <span
+          aria-hidden="true"
+          className="flex size-14 items-center justify-center rounded-full bg-danger-tint text-danger">
+          <Icon name="alert" size={24} />
+        </span>
+        <h2 className="font-display text-[22px] leading-tight font-semibold">
+          {t('cv.failedTitle')}
+        </h2>
+        <p className="text-base leading-normal text-muted">
+          {t(FAILURES[version.failure ?? 'internal'], {
+            max: CV_DAILY_VERSIONS,
+            time: dailyLimitResetTime(),
+          })}
+        </p>
+        {tryAgain.errorMessage && (
+          <Banner tone="danger">{tryAgain.errorMessage}</Banner>
+        )}
+        <div className="flex flex-wrap gap-3">
+          <Button
+            disabled={tryAgain.busy}
+            aria-busy={tryAgain.busy}
+            onClick={() => {
+              tryAgain.start();
+            }}
+            className="gap-2">
+            {tryAgain.busy ? (
+              <Spinner size="small" decorative />
+            ) : (
+              <Icon name="refresh" size={18} />
+            )}
+            {t('cv.tryAgainButton')}
+          </Button>
+          <ButtonLink to={CV_PATH} variant="secondary">
+            {t('cv.backToCvsButton')}
+          </ButtonLink>
+        </div>
+      </Card>
+    );
+  } else {
+    const changes = version.changes.filter(
+      ({ decision }) => decision === 'open',
+    ).length;
+    const questions = version.questions.filter(
+      ({ status: question }) => question === 'open',
+    ).length;
+    body = (
+      <Card
+        as="section"
+        elevation="raised"
+        aria-labelledby="cv-version-text"
+        className="gap-3">
+        <h2
+          id="cv-version-text"
+          className="font-display text-[18px] leading-tight font-semibold">
+          {t('cv.yourCvTitle')}
+        </h2>
+        <p className="text-[15px] leading-normal text-muted">
+          {changes + questions > 0
+            ? t('cv.toReviewMessage', {
+                changes: t('cv.changesToReview', { count: changes }),
+                questions: t('cv.questionsChip', { count: questions }),
+              })
+            : t('cv.nothingToReview')}
+        </p>
+        <div className="rounded-[6px] border border-border-faint bg-surface p-[clamp(18px,4vw,44px)] text-[15px] leading-relaxed whitespace-pre-wrap wrap-anywhere">
+          {cvVersionText(version)}
+        </div>
+      </Card>
+    );
+  }
+
+  return frame(
+    <>
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-1">
+          <h1 className="font-display text-[28px] leading-tight font-semibold wrap-anywhere">
+            {versionHeading(t, version, applications)}
+          </h1>
+          <p className="text-[16px] leading-normal text-muted">{sub}</p>
+        </div>
+        {!lost && (
+          <Button
+            variant="quietDanger"
+            size="small"
+            onClick={() => setRemoving(true)}
+            className="gap-2">
+            <Icon name="trash" size={18} />
+            {t('cv.removeVersionButton')}
+          </Button>
+        )}
+      </div>
+      {body}
+      {removing && (
+        <RemoveCvVersionDialog
+          versionId={version.id}
+          date={date}
+          onCancel={() => setRemoving(false)}
+          onRemoved={() => navigate(CV_PATH, { replace: true })}
+        />
+      )}
+    </>,
+  );
+};
+
+export default CvVersionScreen;

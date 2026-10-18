@@ -14,6 +14,10 @@ export const ProfileErrorCode = {
   MaxResources: 'profile/max-resources',
   /** The account already holds as many applications as it can. */
   MaxApplications: 'profile/max-applications',
+  /** The account already holds as many CV versions as it can. */
+  MaxCvVersions: 'profile/max-cv-versions',
+  /** The CV has no text kept yet, so no version can start from it. */
+  NoCvText: 'profile/no-cv-text',
   /** The resource or the item does not exist (any more). */
   NotFound: 'profile/not-found',
   /** It is being read (the first time, or its page again), so it cannot change or start again. */
@@ -57,6 +61,8 @@ const EXPECTED_CODES: ReadonlySet<string> = new Set([
   ProfileErrorCode.DailyLimit,
   ProfileErrorCode.MaxResources,
   ProfileErrorCode.MaxApplications,
+  ProfileErrorCode.MaxCvVersions,
+  ProfileErrorCode.NoCvText,
   ProfileErrorCode.NotFound,
   ProfileErrorCode.Reading,
   ProfileErrorCode.JobEdited,

@@ -24,6 +24,11 @@ export const FLAGS = {
     default: false,
     description: 'Interview Assist: interview practice and live note-taker.',
   },
+  cvTool: {
+    default: false,
+    description:
+      'CV versions (doc 18): a CV improved in general or tailored to one job, reviewed change by change.',
+  },
   aiDiagnostics: {
     default: false,
     description:
