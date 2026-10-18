@@ -1,6 +1,7 @@
 // CV versions against the real backend code (research doc 18): createCvVersion through App
 // Check and both flags, the background trigger that makes the version with the fake model's
-// offline answer, the version document read back under the rules, and removeCvVersion. The
+// offline answer, decideCvChange and answerCvQuestion, the version document read back under
+// the rules, and removeCvVersion. The
 // fake quotes real lines of the CV, so the test checks where a version is, not what it says.
 import { expect, test } from '@playwright/test';
 
@@ -18,7 +19,7 @@ const CV_TEXT = Buffer.from(
   ].join('\n'),
 );
 
-test('a general version: asked for, made in the background, read back, then removed', async ({
+test('a general version: asked for, made in the background, reviewed, read back, then removed', async ({
   page,
 }) => {
   const account = await createAccount({
@@ -57,13 +58,28 @@ test('a general version: asked for, made in the background, read back, then remo
     .getByRole('button', { name: 'Create the version' })
     .click();
   await expect(page).toHaveURL(/\/cv\/versions\/.+/);
-  const text = page.getByRole('region', { name: 'Your CV' });
-  await expect(text).toContainText('waiting for you');
-  await expect(text).toContainText('Ran the on-call rota');
+  await expect(page.getByText(/^0 of \d+ reviewed$/)).toBeVisible();
 
-  // Read back from the backend's document after a reload
+  // decideCvChange and answerCvQuestion: the fake's rewrite accepted, its question answered
+  const aside = page.getByRole('complementary', { name: 'Changes' });
+  await aside.getByRole('button', { name: 'Accept' }).first().click();
+  await expect(page.getByText(/^1 of \d+ reviewed$/)).toBeVisible();
+  await aside.getByText(/^Questions · /).click();
+  await aside
+    .getByRole('button', { name: /Question for you/ })
+    .first()
+    .click();
+  await aside.getByLabel('Your answer').fill('Nine engineers, for two years.');
+  await aside.getByRole('button', { name: 'Use my answer' }).click();
+  await expect(page.getByText(/^2 of \d+ reviewed$/)).toBeVisible();
+
+  // Read back from the backend's document after a reload: the text with both applied
   await page.reload();
-  await expect(text).toContainText('waiting for you');
+  await expect(page.getByText(/^2 of \d+ reviewed$/)).toBeVisible();
+  await page.getByRole('switch', { name: 'Show changes' }).uncheck();
+  const cv = page.getByRole('article', { name: 'Your CV' });
+  await expect(cv).toContainText('fake-rewrite:');
+  await expect(cv).toContainText('Nine engineers, for two years.');
 
   // removeCvVersion: gone from the backend, not only from the page
   await page.getByRole('button', { name: 'Remove this version' }).click();

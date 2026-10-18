@@ -1514,4 +1514,70 @@ describe('previewProfileGateway, CV versions (delivery 2b)', () => {
       ),
     ).toBe(ProfileErrorCode.NoCvText);
   });
+
+  it('keeps the candidate’s decisions, answers and the version sent, one per job', async () => {
+    const { gateway, pass, cv, applicationId } = await seeded();
+    const made = async () => {
+      const { versionId } = await gateway.createCvVersion({
+        resourceId: cv.id,
+        target: { kind: 'job', applicationId },
+      });
+      pass(PREVIEW_CV_MS);
+      return (await gateway.getCvVersion(UID, versionId))!;
+    };
+    const first = await made();
+    const [rewrite, add] = first.changes;
+
+    expect(
+      await codeOf(gateway.decideCvChange(first.id, rewrite!.id, 'edit')),
+    ).toBe(ProfileErrorCode.Invalid);
+    await gateway.decideCvChange(first.id, rewrite!.id, 'edit', ' Wrote it ');
+    await expect(
+      gateway.decideCvChange(first.id, add!.id, 'accept'),
+    ).resolves.toEqual({ open: 1 });
+    await expect(
+      gateway.answerCvQuestion(first.id, first.questions[0]!.id, '12 people'),
+    ).resolves.toEqual({ open: 0 });
+    const reviewed = (await gateway.getCvVersion(UID, first.id))!;
+    expect(reviewed.changes[0]).toMatchObject({
+      decision: 'edited',
+      text: 'Wrote it',
+    });
+    expect(reviewed.questions[0]).toMatchObject({
+      status: 'answered',
+      answer: '12 people',
+    });
+
+    await gateway.decideCvChange(first.id, rewrite!.id, 'reopen');
+    expect(
+      (await gateway.getCvVersion(UID, first.id))!.changes[0],
+    ).not.toHaveProperty('text');
+
+    const second = await made();
+    await gateway.markCvVersionSent(first.id, true);
+    await gateway.markCvVersionSent(second.id, true);
+    expect((await gateway.getCvVersion(UID, first.id))!.sentAt).toBeUndefined();
+    expect((await gateway.getCvVersion(UID, second.id))!.sentAt).toEqual(
+      expect.any(Number),
+    );
+  });
+
+  it('refuses a review of a version that is not made, and "sent" for a general one', async () => {
+    const { gateway, pass, cv } = await seeded();
+    const { versionId } = await gateway.createCvVersion({
+      resourceId: cv.id,
+      target: { kind: 'general' },
+    });
+    expect(
+      await codeOf(gateway.decideCvChange(versionId, 'c1', 'accept')),
+    ).toBe(ProfileErrorCode.Invalid);
+    pass(PREVIEW_CV_MS);
+
+    expect(await codeOf(gateway.markCvVersionSent(versionId, true))).toBe(
+      ProfileErrorCode.Invalid,
+    );
+    expect(
+      await codeOf(gateway.decideCvChange(versionId, 'nope', 'accept')),
+    ).toBe(ProfileErrorCode.NotFound);
+  });
 });

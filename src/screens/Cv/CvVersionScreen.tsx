@@ -1,12 +1,13 @@
 // One CV version (C3): being created (one line, D80), taking longer than it ever does, could
-// not be created ("Try again"), or made: its CV and what is left to review. "Remove this
-// version" is always there. The review itself comes with the next slices (research doc 15 §18).
+// not be created ("Try again"), or made: its review (CvReview). "Remove this version" is
+// always there.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { startTitle, versionDay, versionHeading } from './cvMeta';
 import RemoveCvVersionDialog from './RemoveCvVersionDialog';
+import CvReview from './review/CvReview';
 
 import Icon from '@/components/Icon';
 import SignedInShell from '@/components/layout/SignedInShell';
@@ -19,7 +20,6 @@ import { useApplications } from '@/core/profile/ApplicationsProvider';
 import {
   CV_DAILY_VERSIONS,
   type CvVersion,
-  cvVersionText,
   isCreating,
 } from '@/core/profile/cvVersions';
 import {
@@ -271,35 +271,8 @@ export const CvVersionScreen: React.FC = () => {
       </Card>
     );
   } else {
-    const changes = version.changes.filter(
-      ({ decision }) => decision === 'open',
-    ).length;
-    const questions = version.questions.filter(
-      ({ status: question }) => question === 'open',
-    ).length;
     body = (
-      <Card
-        as="section"
-        elevation="raised"
-        aria-labelledby="cv-version-text"
-        className="gap-3">
-        <h2
-          id="cv-version-text"
-          className="font-display text-[18px] leading-tight font-semibold">
-          {t('cv.yourCvTitle')}
-        </h2>
-        <p className="text-[15px] leading-normal text-muted">
-          {changes + questions > 0
-            ? t('cv.toReviewMessage', {
-                changes: t('cv.changesToReview', { count: changes }),
-                questions: t('cv.questionsChip', { count: questions }),
-              })
-            : t('cv.nothingToReview')}
-        </p>
-        <div className="rounded-[6px] border border-border-faint bg-surface p-[clamp(18px,4vw,44px)] text-[15px] leading-relaxed whitespace-pre-wrap wrap-anywhere">
-          {cvVersionText(version)}
-        </div>
-      </Card>
+      <CvReview version={version} cvTitle={startTitle(t, version, resources)} />
     );
   }
 

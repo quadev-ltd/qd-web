@@ -12,6 +12,7 @@ import {
 } from './contract';
 import {
   type CreateCvVersionRequest,
+  type CvChangeDecisionRequest,
   type CvVersion,
   type CvVersionStatus,
 } from './cvVersions';
@@ -180,4 +181,25 @@ export interface ProfileGateway {
   removeCvVersion(versionId: string): Promise<void>;
   /** How many versions were made for this user today (UTC), for the daily limit. */
   getCvVersionsToday(uid: string): Promise<number>;
+  /**
+   * The candidate's decision on one change of a ready version: `text` goes with `edit`, and only
+   * with it. Resolves how many changes and questions are still open.
+   */
+  decideCvChange(
+    versionId: string,
+    changeId: string,
+    decision: CvChangeDecisionRequest,
+    text?: string,
+  ): Promise<{ open: number }>;
+  /** Answers a question in the candidate's words, or skips it (no answer). */
+  answerCvQuestion(
+    versionId: string,
+    questionId: string,
+    answer?: string,
+  ): Promise<{ open: number }>;
+  /**
+   * Marks a version for a job as the one sent with the application, or not. One per
+   * application: marking one unmarks the others.
+   */
+  markCvVersionSent(versionId: string, sent: boolean): Promise<void>;
 }

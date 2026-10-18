@@ -15,14 +15,20 @@ import { call, mapped, millis } from './interviewProfile';
 import logger from '@/core/logger';
 import { usageDayPath } from '@/core/profile/contract';
 import {
+  ANSWER_CV_QUESTION,
   CREATE_CV_VERSION,
   type CreateCvVersionRequest,
   CreateCvVersionResponseSchema,
   CV_SERVICE,
+  type CvChangeDecisionRequest,
+  CvReviewResponseSchema,
   type CvVersion,
   CvVersionSchema,
   cvVersionsPath,
   type CvVersionStatus,
+  DECIDE_CV_CHANGE,
+  MARK_CV_VERSION_SENT,
+  MarkCvVersionSentResponseSchema,
   REMOVE_CV_VERSION,
   RemoveCvVersionResponseSchema,
 } from '@/core/profile/cvVersions';
@@ -87,6 +93,44 @@ export const createCvVersion = async (
 
 export const removeCvVersion = async (versionId: string): Promise<void> => {
   await call(REMOVE_CV_VERSION, RemoveCvVersionResponseSchema, { versionId });
+};
+
+export const decideCvChange = async (
+  versionId: string,
+  changeId: string,
+  decision: CvChangeDecisionRequest,
+  text?: string,
+): Promise<{ open: number }> => {
+  const { open } = await call(DECIDE_CV_CHANGE, CvReviewResponseSchema, {
+    versionId,
+    changeId,
+    decision,
+    ...(decision === 'edit' ? { text } : {}),
+  });
+  return { open };
+};
+
+export const answerCvQuestion = async (
+  versionId: string,
+  questionId: string,
+  answer?: string,
+): Promise<{ open: number }> => {
+  const { open } = await call(ANSWER_CV_QUESTION, CvReviewResponseSchema, {
+    versionId,
+    questionId,
+    ...(answer ? { answer } : {}),
+  });
+  return { open };
+};
+
+export const markCvVersionSent = async (
+  versionId: string,
+  sent: boolean,
+): Promise<void> => {
+  await call(MARK_CV_VERSION_SENT, MarkCvVersionSentResponseSchema, {
+    versionId,
+    sent,
+  });
 };
 
 /** How many versions the backend made for this user today (UTC). */

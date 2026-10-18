@@ -405,7 +405,22 @@ test('CV versions: no CV, no version yet, the panel, being made, made, the list 
     .click();
   await expect(page.getByRole('status')).toContainText('Creating your version');
   await expectAccessibleAndNotTooWide(page);
-  await expect(page.getByRole('region', { name: 'Your CV' })).toBeVisible();
+  await expect(page.getByText('0 of 3 reviewed')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  // A change being edited, and a question
+  const aside = page.getByRole('complementary', { name: 'Changes' });
+  await aside.getByRole('button', { name: 'Edit' }).click();
+  await expectAccessibleAndNotTooWide(page);
+  await aside.getByRole('button', { name: 'Cancel' }).click();
+  await aside.getByText(/^Questions · /).click();
+  await aside.getByRole('button', { name: /How many people/ }).click();
+  await expectAccessibleAndNotTooWide(page);
+  // The CV with its marks; at phone width it is behind the "Your CV" switch
+  const showCv = page.getByText('Your CV', { exact: true });
+  if (await showCv.isVisible()) {
+    await showCv.click();
+  }
+  await expect(page.getByRole('article', { name: 'Your CV' })).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
 
   // The remove dialog, then the list

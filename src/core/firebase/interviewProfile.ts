@@ -84,6 +84,10 @@ const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
   [CvRefusal.NoCvText]: ProfileErrorCode.NoCvText,
   [CvRefusal.NotACv]: ProfileErrorCode.Invalid,
   [CvRefusal.NoJobDescription]: ProfileErrorCode.Invalid,
+  // The review pages only offer what the version allows.
+  [CvRefusal.NotReady]: ProfileErrorCode.Invalid,
+  [CvRefusal.NotEditable]: ProfileErrorCode.Invalid,
+  [CvRefusal.NotAJob]: ProfileErrorCode.Invalid,
 };
 
 /**

@@ -32,10 +32,12 @@ import {
 } from './contract';
 import {
   CV_DAILY_VERSIONS,
+  CV_LINE_MAX_CHARS,
   CV_ROLE_MAX_CHARS,
   CV_VERSIONS_MAX,
   type CvVersion,
   type CvVersionFailure,
+  openReviews,
 } from './cvVersions';
 import { ProfileError, ProfileErrorCode } from './errors';
 import { type ProfileGateway } from './gateway';
@@ -824,6 +826,20 @@ export const createPreviewProfileGateway = ({
 
   let nextCvFailure: CvVersionFailure | null = null;
 
+  /** A version whose review can change: there, and made ("not-ready" otherwise). */
+  const readyVersion = (versionId: string): CvVersion => {
+    const version = currentProfile().cvVersions?.find(
+      ({ id }) => id === versionId,
+    );
+    if (!version) {
+      throw new ProfileError(ProfileErrorCode.NotFound);
+    }
+    if (version.status !== 'ready') {
+      throw new ProfileError(ProfileErrorCode.Invalid);
+    }
+    return version;
+  };
+
   const currentUid = (): string => {
     const uid = signedInUid() ?? lastReadUid;
     if (!uid) {
@@ -1555,6 +1571,84 @@ export const createPreviewProfileGateway = ({
       save();
     },
     getCvVersionsToday: async uid => read(uid).cvVersionsToday ?? 0,
+    decideCvChange: async (versionId, changeId, decision, text) => {
+      const version = readyVersion(versionId);
+      const change = version.changes.find(({ id }) => id === changeId);
+      if (!change) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      const wording = text?.trim() ?? '';
+      if (
+        (decision === 'edit') !== (text !== undefined) ||
+        (decision === 'edit' &&
+          (wording.length === 0 || wording.length > CV_LINE_MAX_CHARS)) ||
+        (decision === 'edit' && change.action === 'remove')
+      ) {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      change.decision = (
+        {
+          accept: 'accepted',
+          edit: 'edited',
+          keep: 'kept',
+          reopen: 'open',
+        } as const
+      )[decision];
+      if (decision === 'edit') {
+        change.text = wording;
+      } else {
+        delete change.text;
+      }
+      version.updatedAt = now();
+      save();
+      return { open: openReviews(version) };
+    },
+    answerCvQuestion: async (versionId, questionId, answer) => {
+      const version = readyVersion(versionId);
+      const question = version.questions.find(({ id }) => id === questionId);
+      if (!question) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      const words = answer?.trim() ?? '';
+      if (
+        answer !== undefined &&
+        (!words || words.length > CV_LINE_MAX_CHARS)
+      ) {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      if (words) {
+        question.status = 'answered';
+        question.answer = words;
+      } else {
+        question.status = 'skipped';
+        delete question.answer;
+      }
+      version.updatedAt = now();
+      save();
+      return { open: openReviews(version) };
+    },
+    markCvVersionSent: async (versionId, sent) => {
+      const profile = currentProfile();
+      const version = readyVersion(versionId);
+      if (version.target.kind !== 'job') {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      const { applicationId } = version.target;
+      // One version sent per application.
+      for (const other of profile.cvVersions ?? []) {
+        if (
+          other.target.kind === 'job' &&
+          other.target.applicationId === applicationId
+        ) {
+          delete other.sentAt;
+        }
+      }
+      if (sent) {
+        version.sentAt = now();
+      }
+      version.updatedAt = now();
+      save();
+    },
 
     removeApplication: async applicationId => {
       const profile = currentProfile();
