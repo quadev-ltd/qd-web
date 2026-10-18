@@ -77,6 +77,10 @@ interface StoredResource extends ProfileResource {
 const fileTextOf = (title: string) =>
   `${title}\n\nThe text of the file, without its layout. In the real backend this is what was read from the PDF, the Word document or the text file.`;
 
+/** What the fake keeps of a link: no page is read here, so a copy that says what it stands for. */
+const pageTextOf = (url: string) =>
+  `${url}\n\nThe copy of the page, as the model read it: its main text, without the menu, the cookie notice or the footer.\n\nIn the real backend\n- headings are plain lines\n- and lists are lines like these.`;
+
 interface PreviewProfile {
   resources: StoredResource[];
   items: SkillMapItem[];
@@ -457,36 +461,41 @@ export const createPreviewProfileGateway = ({
     return fresh.length;
   };
 
-  /** Ends the readings whose time has come. */
   /**
    * The text the backend keeps when a resource is read (research doc 17): a note as pasted, a
-   * file's text; nothing for a link until its copy is kept.
+   * file's text, or the copy of a link's page.
    */
   const keepText = (
     profile: PreviewProfile,
     resource: StoredResource,
     at: number,
   ) => {
-    if (resource.source === 'link') {
-      return;
-    }
     const text =
       resource.source === 'text'
         ? (resource.pasted ?? '')
-        : fileTextOf(resource.title);
+        : resource.source === 'link'
+          ? pageTextOf(resource.url ?? '')
+          : fileTextOf(resource.title);
     profile.texts = {
       ...profile.texts,
       [resource.id]: {
         text,
-        kind: resource.source === 'text' ? 'note' : 'file',
+        kind:
+          resource.source === 'text'
+            ? 'note'
+            : resource.source === 'link'
+              ? 'page'
+              : 'file',
         format:
           resource.source === 'text'
             ? 'text'
-            : resource.contentType === 'application/pdf'
-              ? 'pdf'
-              : resource.contentType.startsWith('text/')
-                ? 'text'
-                : 'docx',
+            : resource.source === 'link'
+              ? 'page'
+              : resource.contentType === 'application/pdf'
+                ? 'pdf'
+                : resource.contentType.startsWith('text/')
+                  ? 'text'
+                  : 'docx',
         takenAt: at,
         chars: text.length,
         truncated: false,
@@ -495,6 +504,7 @@ export const createPreviewProfileGateway = ({
     resource.textAt = at;
   };
 
+  /** Ends the readings whose time has come. */
   const settle = (profile: PreviewProfile) => {
     const time = now();
     let changed = false;

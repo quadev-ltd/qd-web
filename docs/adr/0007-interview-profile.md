@@ -365,9 +365,14 @@ layout (a PDF's cut at the end of a line after 50,000 characters), in a document
   fading out and "Show all", which opens it in place with "Show less". "Download the file" shows
   the file as it looks.
 - **One document, read when the page opens,** and only for a resource with `textAt`: the profile's
-  list never loads texts. A link has none until the backend keeps a copy of its page (research doc
-  17, slice 3); nor do a scan with no text, a resource that failed, and resources added before the
-  backend kept texts.
+  list never loads texts. A scan with no text, a resource that failed, and resources added before
+  the backend kept texts have none.
+- **A link shows the copy of its page** since research doc 17's slice 3 (quadev-backend #31):
+  "Copy of the page", "Taken on …", in the same card. It is the model's copy of the page's main
+  text, in plain text (headings as plain lines, lists as "- " lines), cut after 20,000 characters
+  ("Only the first 20,000 characters of the page were kept."). It is not a byte-for-byte copy, so
+  the card says when it was taken, not where it was read from. A link read before slice 3 has none
+  until it is read again ("Read the page again", slice 4).
 - **The website reads Storage files only as links** (the bucket has no cross-origin rule), which is
   why the text is a Firestore document and not the stored file.
 

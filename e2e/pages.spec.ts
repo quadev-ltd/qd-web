@@ -277,7 +277,7 @@ test('a resource, ready, being read and failed, a link that was read, and the re
   );
   await expectAccessibleAndNotTooWide(page);
 
-  // A link that was read: its address beside it
+  // A link that was read: its address beside it, and the copy of its page
   await page.goto('/profile');
   await page.getByRole('button', { name: 'Add a resource' }).click();
   await page.getByRole('button', { name: /Add a link/ }).click();
@@ -299,6 +299,9 @@ test('a resource, ready, being read and failed, a link that was read, and the re
       name: 'engineering.fenwickpay.example/blog/ledger-event-sourcing',
     }),
   ).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Copy of the page' }),
+  ).toContainText(/Taken on /);
   await expectAccessibleAndNotTooWide(page);
 });
 
