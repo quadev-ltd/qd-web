@@ -74,7 +74,11 @@ const setUp = (version: CvVersion, gateway = createMockProfileGateway()) => {
   gateway.getItems.mockResolvedValue([itemFixture()]);
   gateway.getCvVersion.mockResolvedValue(version);
   return renderCvPage(
-    <CvReview version={version} cvTitle="Maya Okafor CV 2026" />,
+    <CvReview
+      version={version}
+      cvTitle="Maya Okafor CV 2026"
+      fileTitle="Senior Backend Engineer - CV - 14 Oct 2026"
+    />,
     {
       gateway,
       interviewProfile: {
