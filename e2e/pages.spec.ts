@@ -434,6 +434,56 @@ test('CV versions: no CV, no version yet, the panel, being made, made, the list 
   await expectAccessibleAndNotTooWide(page);
 });
 
+test('CV versions compared, and the application’s CV tab: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openHome(page);
+  await seedApplications(page);
+  const cv = () =>
+    page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'CV', exact: true })
+      .click();
+  const create = async () => {
+    await page
+      .getByRole('dialog', { name: 'New CV version' })
+      .getByRole('button', { name: 'Create the version' })
+      .click();
+    await expect(page.getByText(/of 3 reviewed/)).toBeVisible();
+  };
+  await cv();
+  await page.getByRole('button', { name: 'Choose a job' }).click();
+  await create();
+  await page
+    .getByRole('complementary', { name: 'Changes' })
+    .getByRole('button', { name: 'Accept' })
+    .click();
+  await expect(page.getByText('1 of 3 reviewed')).toBeVisible();
+  await cv();
+  await page.getByRole('button', { name: 'New version' }).click();
+  await create();
+
+  await page.getByRole('link', { name: 'Compare' }).click();
+  await expect(
+    page.getByRole('region', { name: '1 difference' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  await cv();
+  await page
+    .getByRole('link', { name: 'Open the application' })
+    .first()
+    .click();
+  await page
+    .getByRole('navigation', { name: 'Application' })
+    .getByRole('link', { name: 'CV' })
+    .click();
+  await expect(
+    page.getByRole('region', { name: 'Other versions' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+});
+
 test('add a resource, in its three forms and with their messages: accessible and no horizontal scroll', async ({
   page,
 }) => {

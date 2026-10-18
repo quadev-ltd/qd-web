@@ -111,7 +111,15 @@ export const renderWithProviders = (
     store,
     ...render(
       <Providers>
-        <MemoryRouter initialEntries={[{ pathname: route, state: routeState }]}>
+        <MemoryRouter
+          initialEntries={[
+            {
+              // A route may carry a query ("/cv/compare?later=v1").
+              pathname: route.split('?')[0],
+              search: route.includes('?') ? `?${route.split('?')[1]}` : '',
+              state: routeState,
+            },
+          ]}>
           {ui}
         </MemoryRouter>
       </Providers>,

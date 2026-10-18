@@ -11,6 +11,7 @@ import {
 } from './applications';
 import {
   answerCvQuestion,
+  copyCvVersion,
   createCvVersion,
   decideCvChange,
   getCvVersion,
@@ -74,6 +75,7 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   decideCvChange,
   answerCvQuestion,
   markCvVersionSent,
+  copyCvVersion,
 });
 
 export default createFirebaseProfileGateway;

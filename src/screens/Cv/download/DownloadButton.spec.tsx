@@ -12,7 +12,7 @@ const mockFile = vi.hoisted(() => ({
   saveFile: vi.fn(),
 }));
 vi.mock('./cvFile', async original => ({
-  ...(await original<typeof import('./cvFile')>()),
+  ...(await original<object>()),
   ...mockFile,
 }));
 vi.mock('@/core/logger', () => ({

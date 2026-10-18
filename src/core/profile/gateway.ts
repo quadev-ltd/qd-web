@@ -202,4 +202,9 @@ export interface ProfileGateway {
    * application: marking one unmarks the others.
    */
   markCvVersionSent(versionId: string, sent: boolean): Promise<void>;
+  /**
+   * "Restore": a copy of a version, with every decision and answer, which becomes the newest.
+   * The version copied does not change. Resolves the copy's id.
+   */
+  copyCvVersion(versionId: string): Promise<{ versionId: string }>;
 }

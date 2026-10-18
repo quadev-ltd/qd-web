@@ -3,6 +3,7 @@ import { httpsCallable } from 'firebase/functions';
 
 import {
   answerCvQuestion,
+  copyCvVersion,
   createCvVersion,
   decideCvChange,
   getCvVersion,
@@ -233,5 +234,16 @@ describe('the review', () => {
       'markCvVersionSent',
     );
     expect(callable).toHaveBeenCalledWith({ versionId: 'v1', sent: true });
+  });
+
+  it('restores a version with copyCvVersion, and resolves the copy', async () => {
+    callable.mockResolvedValue({ data: { versionId: 'v2', copiedFrom: 'v1' } });
+
+    await expect(copyCvVersion('v1')).resolves.toEqual({ versionId: 'v2' });
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'copyCvVersion',
+    );
+    expect(callable).toHaveBeenCalledWith({ versionId: 'v1' });
   });
 });

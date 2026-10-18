@@ -51,12 +51,15 @@ export interface NewCvVersionPanelProps {
   kind?: CvVersionKind;
   /** Asks "What is it for?" (opened from "New version"). */
   ask: boolean;
+  /** The job chosen to start with (an application's "New version for this job"). */
+  applicationId?: string;
   onClose: () => void;
 }
 
 export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
   kind: initialKind = 'job',
   ask,
+  applicationId: initialApplicationId,
   onClose,
 }) => {
   const { t } = useTranslation();
@@ -71,7 +74,9 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
   const cvs = usableCvsOf(resources);
 
   const [kind, setKind] = useState<CvVersionKind>(initialKind);
-  const [applicationId, setApplicationId] = useState(jobs[0]?.id);
+  const [applicationId, setApplicationId] = useState(
+    jobs.find(({ id }) => id === initialApplicationId)?.id ?? jobs[0]?.id,
+  );
   const [role, setRole] = useState('');
   const [resourceId, setResourceId] = useState(cvs[0]?.id);
   const [length, setLength] = useState<CvVersionLength>('same');

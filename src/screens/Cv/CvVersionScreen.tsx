@@ -33,7 +33,7 @@ import {
 } from '@/core/profile/errors';
 import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
 import { dailyLimitResetTime } from '@/core/profile/limits';
-import { CV_PATH, cvVersionPath } from '@/core/profile/paths';
+import { cvComparePath, CV_PATH, cvVersionPath } from '@/core/profile/paths';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
 import { useSessionUser } from '@/core/session/hooks';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
@@ -186,6 +186,21 @@ export const CvVersionScreen: React.FC = () => {
     { date, title: startTitle(t, version, resources) },
   );
   const lost = creating && !isCreating(version, now);
+  // Another version made for the same job (or general) to compare it with.
+  const comparable =
+    version.status === 'ready' &&
+    versions.some(
+      other =>
+        other.id !== version.id &&
+        other.status === 'ready' &&
+        (other.target.kind === 'job'
+          ? version.target.kind === 'job' &&
+            other.target.applicationId === version.target.applicationId
+          : version.target.kind === 'general'),
+    );
+  const original = version.copiedFrom
+    ? versions.find(({ id }) => id === version.copiedFrom)
+    : undefined;
 
   let body: React.ReactNode;
   if (creating && !lost) {
@@ -291,7 +306,20 @@ export const CvVersionScreen: React.FC = () => {
             {versionHeading(t, version, applications)}
           </h1>
           <p className="text-[16px] leading-normal text-muted">{sub}</p>
+          {original && (
+            <p className="text-sm leading-normal text-muted">
+              {t('cv.copiedFrom', { date: versionDay(original) })}
+            </p>
+          )}
         </div>
+        {comparable && (
+          <ButtonLink
+            to={cvComparePath(version.id)}
+            variant="secondary"
+            size="small">
+            {t('cv.compareButton')}
+          </ButtonLink>
+        )}
         {!lost && (
           <Button
             variant="quietDanger"

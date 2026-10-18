@@ -23,8 +23,10 @@ import {
 } from '@/core/auth/paths';
 import { env } from '@/core/env';
 import {
+  APPLICATION_CV_PATH,
   APPLICATION_DETAILS_PATH,
   APPLICATION_PATH,
+  CV_COMPARE_PATH,
   CV_PATH,
   CV_VERSION_PATH,
   PROFILE_PATH,
@@ -149,6 +151,14 @@ const accountRoutes: RouteObject[] = [
                   ).ApplicationDetailsScreen,
                 }),
               },
+              {
+                path: APPLICATION_CV_PATH,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/screens/Applications/ApplicationScreen')
+                  ).ApplicationCvScreen,
+                }),
+              },
             ],
           },
           // CV versions (delivery 2b): behind the `cvTool` flag as well, with the
@@ -169,6 +179,14 @@ const accountRoutes: RouteObject[] = [
                 lazy: async () => ({
                   Component: (await import('@/screens/Cv/CvVersionScreen'))
                     .CvVersionScreen,
+                }),
+              },
+              {
+                path: CV_COMPARE_PATH,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/screens/Cv/compare/CvCompareScreen')
+                  ).CvCompareScreen,
                 }),
               },
             ],

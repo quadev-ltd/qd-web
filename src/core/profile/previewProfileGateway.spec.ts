@@ -1580,4 +1580,27 @@ describe('previewProfileGateway, CV versions (delivery 2b)', () => {
       await codeOf(gateway.decideCvChange(versionId, 'nope', 'accept')),
     ).toBe(ProfileErrorCode.NotFound);
   });
+
+  it('restores a version as a copy with its decisions, not sent, the newest', async () => {
+    const { gateway, pass, cv, applicationId } = await seeded();
+    const { versionId } = await gateway.createCvVersion({
+      resourceId: cv.id,
+      target: { kind: 'job', applicationId },
+    });
+    pass(PREVIEW_CV_MS);
+    const made = (await gateway.getCvVersion(UID, versionId))!;
+    await gateway.decideCvChange(versionId, made.changes[0]!.id, 'accept');
+    await gateway.markCvVersionSent(versionId, true);
+    pass(1000);
+
+    const { versionId: copyId } = await gateway.copyCvVersion(versionId);
+
+    const [newest] = await gateway.getCvVersions(UID);
+    expect(newest).toMatchObject({ id: copyId, copiedFrom: versionId });
+    expect(newest!.changes[0]!.decision).toBe('accepted');
+    expect(newest!.sentAt).toBeUndefined();
+    expect((await gateway.getCvVersion(UID, versionId))!.sentAt).toEqual(
+      expect.any(Number),
+    );
+  });
 });
