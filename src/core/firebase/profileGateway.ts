@@ -5,6 +5,7 @@ import {
   getBriefsToday,
   getProfileRevision,
   prepareBrief,
+  readPostingAgain,
   removeApplication,
   updateApplication,
 } from './applications';
@@ -16,6 +17,7 @@ import {
   getResource,
   getResources,
   getResourceText,
+  readLinkAgain,
   removeItem,
   removeResource,
   updateItem,
@@ -42,6 +44,7 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   updateItem,
   removeItem,
   removeResource,
+  readLinkAgain,
   getFileUrl,
   getResourceText,
   getApplications,
@@ -51,6 +54,7 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   updateApplication,
   removeApplication,
   prepareBrief,
+  readPostingAgain,
   getBriefsToday,
 });
 

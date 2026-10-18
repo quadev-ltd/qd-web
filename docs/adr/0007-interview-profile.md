@@ -376,6 +376,34 @@ layout (a PDF's cut at the end of a line after 50,000 characters), in a document
 - **The website reads Storage files only as links** (the bucket has no cross-origin rule), which is
   why the text is a Firestore document and not the stored file.
 
+## A page read again (18 Oct 2026)
+
+Research doc 17's slice 4 (quadev-backend #32) reads a link's page, or a job's posting, again in
+the background: `readProfileLinkAgain` and `readJobPostingAgain` answer at once, and the document
+says how it goes. The contract was agreed with the backend chat before it was built.
+
+- **"Read the page again"** ends the card of a link's copy, with what it does ("If the page has
+  changed. The new copy replaces this one, and briefs that used it will show as out of date.").
+  While the backend reads it (`refresh.status: 'reading'`), "Reading the page again…" and "The copy
+  from … stays until the new one is ready."; the copy stays. A link read before copies were kept
+  gets the same card with "No copy yet", to take its first one. The same part (`ReadAgain`) ends
+  "The job" of an application from a posting (ADR 0008).
+- **How it went comes from the document, not the answer** (`refresh` stays until the next time), so
+  a page that was left, reloaded or opened later still says it: a new copy, the same page, a page
+  taken down (its copy kept), today's limit, or another failure. It is said for an hour after it
+  ended (`REREAD_OUTCOME_SHOWN_MS`): "this copy is new" a day later would no longer be news. The
+  "Taken on …" date says the rest.
+- **"Try again" after a failed first reading** is the same callable: the resource goes back
+  through `awaitingUpload` and `processing`, so the page follows it as when it was added
+  (`watchResource`). Only links offer it; a file or a text is still read once.
+- **Following it:** the profile follows a link whose page is read again as it follows a reading
+  (every 2 seconds, for 3 minutes from `refresh.startedAt`), without showing it as "Reading" in the
+  list: it is `ready`, with its copy. A reading the backend has not ended after 10 minutes is lost
+  (`PAGE_READING_STALE_MS`, the backend's rule), and the button comes back.
+- **Refusals:** `already-reading` and `job-not-ready` are `ProfileErrorCode.Reading` (the page reads
+  the document again, which shows the reading); `quota` is the daily limit, said under the
+  button; `not-a-link` cannot happen from the pages and is "invalid".
+
 ## Consequences
 
 - The plan holds: nothing found here changes a screen or needs a change in the backend.

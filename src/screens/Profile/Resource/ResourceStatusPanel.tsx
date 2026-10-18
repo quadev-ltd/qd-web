@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import Icon, { type IconName } from '@/components/Icon';
 import Spinner from '@/components/Spinner';
+import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
 import {
   PROFILE_DAILY_EXTRACTIONS,
@@ -74,6 +75,8 @@ interface PanelProps {
   title: string;
   description: string;
   action?: ReactNode;
+  /** Below the actions: why one of them did not work. */
+  children?: ReactNode;
 }
 
 const Panel: React.FC<PanelProps> = ({
@@ -82,6 +85,7 @@ const Panel: React.FC<PanelProps> = ({
   title,
   description,
   action,
+  children,
 }) => (
   <div
     role="status"
@@ -97,6 +101,7 @@ const Panel: React.FC<PanelProps> = ({
       {description}
     </p>
     {action && <div className="flex flex-wrap gap-2">{action}</div>}
+    {children}
   </div>
 );
 
@@ -116,17 +121,21 @@ export interface ResourceStatusPanelProps {
   /** The backend has not finished with it for longer than it ever takes. */
   stuck: boolean;
   onRemove: () => void;
+  /** A link only: its page can be read again from the start ("Try again"). */
+  tryAgain?: { start: () => void; busy: boolean; errorMessage?: string };
 }
 
 /**
  * What is going on with a resource, when that needs more than a chip: it is being read, it
- * is stuck, or it failed and why. A resource is read once, so every way out of a failure is
- * "Remove". A resource that was read has no panel: its chip says it.
+ * is stuck, or it failed and why. A file or a text is read once, so its way out of a failure
+ * is "Remove"; a link can also be tried again. A resource that was read has no panel: its
+ * chip says it.
  */
 export const ResourceStatusPanel: React.FC<ResourceStatusPanelProps> = ({
   resource: { status, failure },
   stuck,
   onRemove,
+  tryAgain,
 }) => {
   const { t } = useTranslation();
   const remove = (
@@ -147,8 +156,33 @@ export const ResourceStatusPanel: React.FC<ResourceStatusPanelProps> = ({
           max: PROFILE_DAILY_EXTRACTIONS,
           time: dailyLimitResetTime(),
         })}
-        action={remove}
-      />
+        action={
+          <>
+            {tryAgain && (
+              <Button
+                variant="secondary"
+                size="small"
+                disabled={tryAgain.busy}
+                aria-busy={tryAgain.busy}
+                onClick={tryAgain.start}
+                className="gap-2">
+                {tryAgain.busy ? (
+                  <Spinner size="small" decorative />
+                ) : (
+                  <Icon name="refresh" size={18} />
+                )}
+                {t('resource.tryAgainButton')}
+              </Button>
+            )}
+            {remove}
+          </>
+        }>
+        {tryAgain?.errorMessage && (
+          <Banner tone="danger" role="alert">
+            {tryAgain.errorMessage}
+          </Banner>
+        )}
+      </Panel>
     );
   }
   if (status === 'ready') {

@@ -13,7 +13,7 @@ import {
   useRef,
 } from 'react';
 
-import { type ProfileResource } from './contract';
+import { isRereading, type ProfileResource } from './contract';
 import { logProfileError } from './errors';
 import { useProfileGateway } from './ProfileGatewayProvider';
 
@@ -39,6 +39,13 @@ export const RESOURCE_WATCH_MS = 3 * 60 * 1000;
 /** The backend has not finished with it: its content has not arrived, or is being read. */
 export const isPending = ({ status }: Pick<ProfileResource, 'status'>) =>
   status === 'awaitingUpload' || status === 'processing';
+
+/**
+ * Followed while the backend works on it: its first reading, or its page read again (which
+ * leaves it `ready`, with its old copy, until the new one is in).
+ */
+const isFollowed = (resource: ProfileResource, now = Date.now()) =>
+  isPending(resource) || isRereading(resource.refresh, now);
 
 export interface InterviewProfileActions {
   /** Reads the whole profile again (after "could not load"). */
@@ -135,7 +142,7 @@ export const InterviewProfileProvider: React.FC<{ children: ReactNode }> = ({
     if (loadedFor !== uid || status === 'idle') {
       reload();
     } else if (status === 'loaded') {
-      catchUp(resources.current.filter(isPending));
+      catchUp(resources.current.filter(resource => isFollowed(resource)));
     }
     // Once per mount and per user: `status` changes while this effect's own work runs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -143,7 +150,7 @@ export const InterviewProfileProvider: React.FC<{ children: ReactNode }> = ({
 
   // While the backend reads a resource, read it again every 2 seconds.
   const pendingIds = profile.resources
-    .filter(isPending)
+    .filter(resource => isFollowed(resource))
     .map(({ id }) => id)
     .join(',');
   useEffect(() => {
@@ -159,10 +166,11 @@ export const InterviewProfileProvider: React.FC<{ children: ReactNode }> = ({
       const followed = resources.current.filter(resource => {
         const since =
           watchedSince.current.get(resource.id) ??
+          (isPending(resource) ? undefined : resource.refresh?.startedAt) ??
           resource.updatedAt ??
           resource.createdAt ??
           0;
-        return isPending(resource) && now - since < RESOURCE_WATCH_MS;
+        return isFollowed(resource, now) && now - since < RESOURCE_WATCH_MS;
       });
       if (followed.length === 0) {
         return;

@@ -15,7 +15,7 @@ import {
   APPLICATION_NAME_MAX_CHARS,
   APPLICATION_NOTES_MAX_CHARS,
   JOB_DESCRIPTION_MAX_CHARS,
-  isJobPending,
+  isJobLocked,
   type JobApplication,
   type UpdateJobApplicationRequest,
 } from '@/core/profile/applications';
@@ -41,7 +41,7 @@ export const changesOf = (
     changes.title = values.title;
   }
   if (
-    !isJobPending(application) &&
+    !isJobLocked(application) &&
     values.jobDescription !== (application.jobDescription ?? '')
   ) {
     changes.jobDescription = values.jobDescription;
@@ -87,9 +87,7 @@ export const EditApplicationPanel: React.FC<EditApplicationPanelProps> = ({
     formState: { errors },
   } = useForm<EditApplicationSchemaType>({
     resolver: zodResolver(
-      isJobPending(application)
-        ? editWhileReadingSchema
-        : editApplicationSchema,
+      isJobLocked(application) ? editWhileReadingSchema : editApplicationSchema,
     ),
     mode: 'onChange',
     defaultValues: {
@@ -170,7 +168,7 @@ export const EditApplicationPanel: React.FC<EditApplicationPanelProps> = ({
           disabled={isBusy}
           counter={name(role)}
         />
-        {!isJobPending(application) && (
+        {!isJobLocked(application) && (
           <Controller
             name={ApplicationFields.jobDescription}
             control={control}
@@ -178,7 +176,11 @@ export const EditApplicationPanel: React.FC<EditApplicationPanelProps> = ({
               <FormTextArea
                 {...field}
                 label={t('applications.jobLabel')}
-                hint={t('applications.jobEditHint')}
+                hint={t(
+                  application.job?.source === 'link'
+                    ? 'applications.jobCopyEditHint'
+                    : 'applications.jobEditHint',
+                )}
                 error={errors.jobDescription}
                 disabled={isBusy}
                 counter={{

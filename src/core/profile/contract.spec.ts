@@ -1,11 +1,16 @@
 import {
   CreateProfileResourceResponseSchema,
   interviewProfilePath,
+  isRereading,
+  PAGE_READING_STALE_MS,
+  type PageRefresh,
   parseProfileLink,
   PROFILE_LINK_MAX_CHARS,
   PROFILE_UPLOAD_MAX_BYTES,
   ProfileResourceSchema,
   profileResourcesPath,
+  REREAD_OUTCOME_SHOWN_MS,
+  rereadOutcomeOf,
   RESOURCE_TYPES_BY_SOURCE,
   SkillMapItemSchema,
   skillMapItemsPath,
@@ -267,5 +272,69 @@ describe('the answer of createProfileResource', () => {
     expect(CreateProfileResourceResponseSchema.safeParse(value).success).toBe(
       false,
     );
+  });
+});
+
+describe('a page read again', () => {
+  const NOW = 10_000_000;
+  const ended = (refresh: Partial<PageRefresh>): PageRefresh => ({
+    status: 'done',
+    startedAt: NOW - 60_000,
+    finishedAt: NOW - 30_000,
+    ...refresh,
+  });
+
+  it('is being read until the backend says how it went, or the reading is lost', () => {
+    expect(isRereading(undefined, NOW)).toBe(false);
+    expect(isRereading({ status: 'reading', startedAt: NOW - 1000 }, NOW)).toBe(
+      true,
+    );
+    expect(
+      isRereading(
+        { status: 'reading', startedAt: NOW - PAGE_READING_STALE_MS },
+        NOW,
+      ),
+    ).toBe(false);
+    expect(isRereading(ended({}), NOW)).toBe(false);
+  });
+
+  it.each([
+    [{ changed: true }, 'changed'],
+    [{ changed: false }, 'unchanged'],
+    [{ status: 'failed', failure: 'link-unreadable' }, 'gone'],
+    [{ status: 'failed', failure: 'empty' }, 'gone'],
+    [{ status: 'failed', failure: 'quota' }, 'quota'],
+    [{ status: 'failed', failure: 'model' }, 'error'],
+    [{ status: 'failed' }, 'error'],
+  ] as const)('says %j as "%s"', (refresh, kind) => {
+    expect(rereadOutcomeOf(ended(refresh), NOW)).toEqual({ kind });
+  });
+
+  it('says nothing while it is read, once it is old news, or without an end', () => {
+    expect(rereadOutcomeOf(undefined, NOW)).toBeNull();
+    expect(
+      rereadOutcomeOf({ status: 'reading', startedAt: NOW }, NOW),
+    ).toBeNull();
+    expect(
+      rereadOutcomeOf(
+        ended({ finishedAt: NOW - REREAD_OUTCOME_SHOWN_MS - 1 }),
+        NOW,
+      ),
+    ).toBeNull();
+    expect(rereadOutcomeOf(ended({ finishedAt: null }), NOW)).toBeNull();
+  });
+
+  it('keeps a resource whose reading again it does not understand, without it', () => {
+    const parsed = ProfileResourceSchema.parse({
+      id: 'r1',
+      type: 'link',
+      title: 'Talk',
+      source: 'link',
+      status: 'ready',
+      createdAt: 1,
+      updatedAt: 2,
+      refresh: { status: 'queued' },
+    });
+    expect(parsed.refresh).toBeUndefined();
   });
 });

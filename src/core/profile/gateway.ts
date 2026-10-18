@@ -93,6 +93,12 @@ export interface ProfileGateway {
   removeItem(itemId: string): Promise<void>;
   /** Removes a resource, its stored content and every item that came from it. */
   removeResource(resourceId: string): Promise<{ itemsRemoved: number }>;
+  /**
+   * Reads the page of a link again, in the background (D78, research doc 17): a link that was
+   * read keeps its copy until the new one is in (`refresh`); one whose first reading failed is
+   * read from the start (`status`). Resolves once it has started: follow the resource.
+   */
+  readLinkAgain(resourceId: string): Promise<void>;
 
   // ---------- The original file ----------
 
@@ -140,6 +146,15 @@ export interface ProfileGateway {
    * minute. The brief is then on the application (`getApplication`).
    */
   prepareBrief(applicationId: string): Promise<void>;
+  /**
+   * Reads the posting of a job from a link again, as readLinkAgain does (`job.refresh`, or
+   * `job.status` after a failed first reading). Over a text the candidate edited, only with
+   * `replaceEdited`: without it, ProfileErrorCode.JobEdited.
+   */
+  readPostingAgain(
+    applicationId: string,
+    options?: { replaceEdited?: boolean },
+  ): Promise<void>;
   /** How many briefs were prepared for this user today (UTC), for the daily limit. */
   getBriefsToday(uid: string): Promise<number>;
 }

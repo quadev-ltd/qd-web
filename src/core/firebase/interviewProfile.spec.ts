@@ -18,6 +18,7 @@ import {
   getResource,
   getResources,
   getResourceText,
+  readLinkAgain,
   removeItem,
   removeResource,
   toProfileError,
@@ -362,6 +363,20 @@ describe('the callables', () => {
     expect(callable).toHaveBeenCalledWith({ resourceId: 'r1' });
   });
 
+  it('asks for a link’s page to be read again; the answer only says it started', async () => {
+    callable.mockResolvedValue({
+      data: { resourceId: 'r1', startedAt: '2026-10-18T10:00:00.000Z' },
+    });
+
+    await expect(readLinkAgain('r1')).resolves.toBeUndefined();
+
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'readProfileLinkAgain',
+    );
+    expect(callable).toHaveBeenCalledWith({ resourceId: 'r1' });
+  });
+
   it.each([
     [
       'createResource',
@@ -376,6 +391,7 @@ describe('the callables', () => {
     ],
     ['updateItem', () => updateItem('i1', { starred: true }), { itemId: 'i1' }],
     ['removeResource', () => removeResource('r1'), { resourceId: 'r1' }],
+    ['readLinkAgain', () => readLinkAgain('r1'), { resourceId: 'r1' }],
   ])(
     'does not trust an answer of %s that is not what the contract says',
     async (_name, run, data) => {
@@ -402,6 +418,38 @@ describe('the callables', () => {
         details: { reason: 'max-resources' },
       },
       ProfileErrorCode.MaxResources,
+    ],
+    [
+      {
+        code: 'functions/failed-precondition',
+        details: { reason: 'already-reading' },
+      },
+      ProfileErrorCode.Reading,
+    ],
+    [
+      {
+        code: 'functions/failed-precondition',
+        details: { reason: 'job-not-ready' },
+      },
+      ProfileErrorCode.Reading,
+    ],
+    [
+      {
+        code: 'functions/failed-precondition',
+        details: { reason: 'job-edited' },
+      },
+      ProfileErrorCode.JobEdited,
+    ],
+    [
+      {
+        code: 'functions/failed-precondition',
+        details: { reason: 'not-a-link' },
+      },
+      ProfileErrorCode.Invalid,
+    ],
+    [
+      { code: 'functions/resource-exhausted', details: { reason: 'quota' } },
+      ProfileErrorCode.DailyLimit,
     ],
     [
       { code: 'functions/failed-precondition', details: null },
@@ -635,5 +683,50 @@ describe('the text kept of a resource', () => {
     await expect(getResource('uid-1', 'r1')).resolves.toMatchObject({
       textAt: 3,
     });
+  });
+
+  it('gives a link the last time its page was read again, in milliseconds', async () => {
+    vi.mocked(getDoc).mockResolvedValueOnce(
+      document('r1', {
+        type: 'link',
+        title: 'Talk',
+        source: 'link',
+        status: 'ready',
+        createdAt: at(1),
+        updatedAt: at(2),
+        textAt: at(5),
+        refresh: {
+          status: 'done',
+          startedAt: at(3),
+          claimedAt: at(4),
+          finishedAt: at(5),
+          changed: true,
+          itemsAdded: 2,
+          itemsRemoved: 1,
+        },
+      }) as never,
+    );
+
+    await expect(getResource('uid-1', 'r1')).resolves.toMatchObject({
+      refresh: { status: 'done', startedAt: 3, finishedAt: 5, changed: true },
+    });
+  });
+
+  it('keeps a resource whose `refresh` it does not understand, without it', async () => {
+    vi.mocked(getDoc).mockResolvedValueOnce(
+      document('r1', {
+        type: 'link',
+        title: 'Talk',
+        source: 'link',
+        status: 'ready',
+        createdAt: at(1),
+        updatedAt: at(2),
+        refresh: { status: 'queued', startedAt: at(3) },
+      }) as never,
+    );
+
+    const resource = await getResource('uid-1', 'r1');
+    expect(resource).toMatchObject({ id: 'r1', status: 'ready' });
+    expect(resource?.refresh).toBeUndefined();
   });
 });

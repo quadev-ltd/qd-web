@@ -110,6 +110,26 @@ Where it goes beyond the artboards, or stops short of them:
 | The job's file not arrived | "Waiting for the file", with removing as the way out                    | Not drawn                                                                 |
 | "Read the posting again"   | Not built                                                               | It comes with the backend's slice 4 (research doc 17)                     |
 
+## The posting read again (18 Oct 2026)
+
+Since research doc 17's slice 4 (quadev-backend #32), a job from a posting can be read again, as
+a link resource can (ADR 0007, "A page read again", for how the page follows it and says how it
+went).
+
+- **"Read the posting again"** ends "The job" on Details: "If the posting has changed. The new copy
+  replaces this one", and with a brief "and your brief will show as out of date." While it is
+  read, the copy stays, and the brief can still be prepared from it. A new copy raises the
+  application's revision, so the brief says the job changed; the title, the company and the role
+  stay.
+- **Over a text the candidate edited, the page asks first:** "Replace your edited text?" (not drawn;
+  worded as the remove dialogs), then sends `replaceEdited`. A `job-edited` refusal (edited in
+  another tab) opens the same question.
+- **"Try again" after a failed first reading,** next to "Paste the text instead", reads the posting
+  from the start; the page follows the job as when it was added.
+- **While the posting is read again its text cannot change** (`job-not-ready`), so "Edit the
+  application" leaves it out, as during a first reading. For a posting it says "Your copy of the
+  posting. Reading the posting again replaces it."
+
 ## Consequences
 
 - When research doc 17 is merged on the backend, "New application" loses its title field, offers

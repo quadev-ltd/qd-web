@@ -188,3 +188,45 @@ test('E5 and E6: a brief is prepared, goes out of date when the job changes, is 
     page.getByText(/Your profile changed since this brief\./),
   ).toBeVisible();
 });
+
+test('a posting read again (readJobPostingAgain): the same posting says so; over an edited text, asked first, then replaced', async ({
+  page,
+}) => {
+  const account = await createAccount({ interviewAssistant: true });
+  await signIn(page, account);
+
+  const panel = await newApplication(page);
+  await panel.getByText('Link', { exact: true }).click();
+  await panel
+    .getByLabel('Address of the posting')
+    .fill('https://careers.northwind.example/platform-engineer');
+  await panel.getByRole('button', { name: 'Add the job' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(FAKE_NAME);
+  await page.getByRole('link', { name: 'Details' }).click();
+  const job = page.getByRole('region', { name: 'The job' });
+  const readAgain = job.getByRole('button', {
+    name: 'Read the posting again',
+  });
+
+  // The same posting: the fake model gives the same copy for the same address
+  await readAgain.click();
+  await expect(job).toContainText(
+    'The posting hasn’t changed, so your copy stays as it is.',
+  );
+
+  // An edited text: the backend refuses without replaceEdited, so the page asks first
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const edit = page.getByRole('dialog', { name: 'Edit the application' });
+  await edit.getByLabel('Job description').fill('My own notes on the job.');
+  await edit.getByRole('button', { name: 'Save changes' }).click();
+  await expect(edit).toBeHidden();
+  await readAgain.click();
+  await page
+    .getByRole('dialog', { name: 'Replace your edited text?' })
+    .getByRole('button', { name: 'Replace my text' })
+    .click();
+  await expect(job).toContainText(
+    'The posting had changed, so this copy is new.',
+  );
+  await expect(job).not.toContainText('My own notes on the job.');
+});

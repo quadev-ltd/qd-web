@@ -242,6 +242,100 @@ test('a posting that cannot be read: "Paste the text instead", named in the same
   ).toBeVisible();
 });
 
+test('a posting read again: the same posting, a changed one that dates the brief, and an edited text replaced only once asked', async ({
+  page,
+}) => {
+  await openHome(page);
+  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  const panel = page.getByRole('dialog', { name: 'New application' });
+  await panel.getByText('Link', { exact: true }).click();
+  await panel
+    .getByLabel('Address of the posting')
+    .fill('https://careers.northwind.example/senior-backend-engineer');
+  await panel.getByRole('button', { name: 'Add the job' }).click();
+  await page.getByRole('button', { name: 'Prepare the brief' }).click();
+  await expect(
+    page.getByRole('region', { name: 'What the job asks for' }),
+  ).toBeVisible();
+
+  // The same posting: only the copy's date moves
+  await page.getByRole('link', { name: 'Details' }).click();
+  const job = page.getByRole('region', { name: 'The job' });
+  const readAgain = job.getByRole('button', {
+    name: 'Read the posting again',
+  });
+  await expect(job).toContainText(
+    'If the posting has changed. The new copy replaces this one, and your brief will show as out of date.',
+  );
+  await readAgain.click();
+  await expect(job).toContainText(
+    'The posting hasn’t changed, so your copy stays as it is.',
+  );
+
+  // A changed posting: a new copy, and the brief is out of date
+  await page.evaluate(() => window.qdPreviewProfile?.nextReread('changed'));
+  await readAgain.click();
+  await expect(job).toContainText(
+    'The posting had changed, so this copy is new. Your brief shows as out of date.',
+  );
+  await page.getByRole('link', { name: 'Brief' }).click();
+  await expect(
+    page.getByText('The job details changed since this brief was prepared.'),
+  ).toBeVisible();
+
+  // An edited text is replaced only once the candidate says so
+  await page.getByRole('link', { name: 'Details' }).click();
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const edit = page.getByRole('dialog', { name: 'Edit the application' });
+  await expect(
+    edit.getByText(
+      'Your copy of the posting. Reading the posting again replaces it.',
+    ),
+  ).toBeVisible();
+  await edit.getByLabel('Job description').fill('My own notes on the job.');
+  await edit.getByRole('button', { name: 'Save changes' }).click();
+  await expect(edit).toBeHidden();
+  await expect(job).toContainText('You changed this text.');
+  await readAgain.click();
+  const replace = page.getByRole('dialog', {
+    name: 'Replace your edited text?',
+  });
+  await replace.getByRole('button', { name: 'Cancel' }).click();
+  await expect(job).toContainText('My own notes on the job.');
+  await readAgain.click();
+  await replace.getByRole('button', { name: 'Replace my text' }).click();
+  await expect(replace).toBeHidden();
+  await expect(job).not.toContainText('My own notes on the job.');
+  await expect(job).not.toContainText('You changed this text.');
+});
+
+test('a posting that could not be read is tried again, and read', async ({
+  page,
+}) => {
+  await openHome(page);
+  await page.evaluate(() =>
+    window.qdPreviewProfile?.failNextJob('link-unreadable'),
+  );
+  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  const panel = page.getByRole('dialog', { name: 'New application' });
+  await panel.getByText('Link', { exact: true }).click();
+  await panel
+    .getByLabel('Address of the posting')
+    .fill('https://careers.northwind.example/platform-engineer');
+  await panel.getByRole('button', { name: 'Add the job' }).click();
+
+  const status = page.getByRole('status');
+  await expect(status).toContainText('We couldn’t read this page');
+  await status.getByRole('button', { name: 'Try again' }).click();
+
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Platform engineer' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Prepare the brief' }),
+  ).toBeVisible();
+});
+
 test('a job as a file: uploaded, read, named from the file, its source on Details', async ({
   page,
 }) => {

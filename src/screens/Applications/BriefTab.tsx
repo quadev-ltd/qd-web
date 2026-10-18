@@ -11,6 +11,7 @@ import {
 } from './BriefCards';
 import EditApplicationPanel from './EditApplicationPanel';
 import JobStatusPanel from './JobStatusPanel';
+import { useReadPostingAgain } from './useReadPostingAgain';
 
 import Icon from '@/components/Icon';
 import Spinner from '@/components/Spinner';
@@ -93,6 +94,8 @@ export const BriefTab: React.FC<{ application: JobApplication }> = ({
   const [pasting, setPasting] = useState(false);
   const { brief } = application;
   const items = useProfileItems(brief?.builtAt);
+  // After a failed first reading, a posting can be tried again; its text was never edited.
+  const tryAgain = useReadPostingAgain(application.id, false);
 
   // Today's count, for "3 of 10 left today": read again after each brief.
   useEffect(() => {
@@ -234,6 +237,13 @@ export const BriefTab: React.FC<{ application: JobApplication }> = ({
         <JobStatusPanel
           application={application}
           onPaste={() => setPasting(true)}
+          tryAgain={{
+            start: () => {
+              tryAgain.start();
+            },
+            busy: tryAgain.busy,
+            errorMessage: tryAgain.errorMessage,
+          }}
         />
         {pasting && (
           <EditApplicationPanel

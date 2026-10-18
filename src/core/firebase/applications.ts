@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore/lite';
 
 import { db } from './app';
-import { call, mapped, millis } from './interviewProfile';
+import { call, mapped, millis, refreshWithDates } from './interviewProfile';
 
 import logger from '@/core/logger';
 import {
@@ -23,13 +23,19 @@ import {
   JobApplicationSchema,
   PREPARE_APPLICATION_BRIEF,
   PrepareApplicationBriefResponseSchema,
+  READ_JOB_POSTING_AGAIN,
+  type ReadJobPostingAgainRequest,
   REMOVE_JOB_APPLICATION,
   RemoveJobApplicationResponseSchema,
   UPDATE_JOB_APPLICATION,
   type UpdateJobApplicationRequest,
   UpdateJobApplicationResponseSchema,
 } from '@/core/profile/applications';
-import { interviewProfilePath, usageDayPath } from '@/core/profile/contract';
+import {
+  interviewProfilePath,
+  ReadAgainResponseSchema,
+  usageDayPath,
+} from '@/core/profile/contract';
 import { type UploadTarget } from '@/core/profile/gateway';
 
 /** An application as the contract reads it: every Firestore Timestamp in milliseconds. */
@@ -42,7 +48,15 @@ const withDates = (id: string, data: DocumentData) => {
     createdAt: millis(data.createdAt),
     updatedAt: millis(data.updatedAt),
     ...(brief ? { brief: { ...brief, builtAt: millis(brief.builtAt) } } : {}),
-    ...(job ? { job: { ...job, takenAt: millis(job.takenAt) } } : {}),
+    ...(job
+      ? {
+          job: {
+            ...job,
+            takenAt: millis(job.takenAt),
+            ...refreshWithDates(job.refresh as DocumentData | undefined),
+          },
+        }
+      : {}),
   };
 };
 
@@ -126,6 +140,18 @@ export const prepareBrief = async (applicationId: string): Promise<void> => {
   await call(PREPARE_APPLICATION_BRIEF, PrepareApplicationBriefResponseSchema, {
     applicationId,
   });
+};
+
+/** Asks for a job's posting to be read again; the application then says how it goes. */
+export const readPostingAgain = async (
+  applicationId: string,
+  { replaceEdited = false }: { replaceEdited?: boolean } = {},
+): Promise<void> => {
+  const request: ReadJobPostingAgainRequest = {
+    applicationId,
+    ...(replaceEdited ? { replaceEdited: true } : {}),
+  };
+  await call(READ_JOB_POSTING_AGAIN, ReadAgainResponseSchema, request);
 };
 
 /** How many briefs the backend prepared for this user today (UTC). */

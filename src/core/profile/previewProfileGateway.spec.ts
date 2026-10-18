@@ -873,7 +873,7 @@ describe('previewProfileGateway', () => {
       ).resolves.toMatchObject({ job: { status: 'ready', edited: true } });
     });
 
-    it('does not change the job, nor prepare a brief, while the job is being read', async () => {
+    it('does not change the job, nor prepare a brief, while the job is being read (job-not-ready)', async () => {
       const { gateway } = await setUp();
       const { applicationId } = await gateway.createApplication(job);
 
@@ -881,9 +881,9 @@ describe('previewProfileGateway', () => {
         await codeOf(
           gateway.updateApplication({ applicationId, jobDescription: 'New' }),
         ),
-      ).toBe(ProfileErrorCode.Invalid);
+      ).toBe(ProfileErrorCode.Reading);
       expect(await codeOf(gateway.prepareBrief(applicationId))).toBe(
-        ProfileErrorCode.Invalid,
+        ProfileErrorCode.Reading,
       );
     });
 
@@ -1138,6 +1138,241 @@ describe('previewProfileGateway', () => {
         {
           kind: 'file',
         },
+      );
+    });
+  });
+
+  describe('a page read again (D78, research doc 17, slice 4)', () => {
+    const link = {
+      source: 'link',
+      type: 'link',
+      title: 'Talk',
+      url: 'https://talks.example/ledgers',
+    } as const;
+    const posting = {
+      job: { source: 'link', url: 'https://careers.northwind.example/sbe' },
+    } as const;
+
+    /** A link that was read, with its copy. */
+    const readLink = async () => {
+      const set = await setUp();
+      const { resourceId } = await set.gateway.createResource(link);
+      set.pass(PREVIEW_READ_MS);
+      await set.gateway.getResources(UID);
+      return { ...set, resourceId };
+    };
+
+    /** An application from a posting that was read. */
+    const readPosting = async () => {
+      const set = await setUp();
+      const { applicationId } = await set.gateway.createApplication(posting);
+      set.pass(PREVIEW_READ_MS);
+      await set.gateway.getApplications(UID);
+      return { ...set, applicationId };
+    };
+
+    it('reads a link again with its copy kept meanwhile; the same page only dates the copy', async () => {
+      const { gateway, pass, clock, resourceId } = await readLink();
+      const before = await gateway.getResourceText(UID, resourceId);
+      const revision = await gateway.getProfileRevision(UID);
+
+      await gateway.readLinkAgain(resourceId);
+      await expect(gateway.getResource(UID, resourceId)).resolves.toMatchObject(
+        {
+          status: 'ready',
+          refresh: { status: 'reading', startedAt: clock.time },
+        },
+      );
+      await expect(gateway.getResourceText(UID, resourceId)).resolves.toEqual(
+        before,
+      );
+      pass(PREVIEW_READ_MS);
+
+      await expect(gateway.getResource(UID, resourceId)).resolves.toMatchObject(
+        { refresh: { status: 'done', changed: false }, textAt: clock.time },
+      );
+      await expect(
+        gateway.getResourceText(UID, resourceId),
+      ).resolves.toMatchObject({ text: before?.text, takenAt: clock.time });
+      await expect(gateway.getProfileRevision(UID)).resolves.toBe(revision);
+      await expect(gateway.getExtractionsToday(UID)).resolves.toBe(2);
+    });
+
+    it('replaces the copy of a page that changed, and moves the profile’s revision', async () => {
+      const { gateway, pass, resourceId } = await readLink();
+      const revision = await gateway.getProfileRevision(UID);
+      gateway.controls.nextReread('changed');
+
+      await gateway.readLinkAgain(resourceId);
+      pass(PREVIEW_READ_MS);
+
+      await expect(gateway.getResource(UID, resourceId)).resolves.toMatchObject(
+        { refresh: { status: 'done', changed: true } },
+      );
+      expect((await gateway.getResourceText(UID, resourceId))?.text).toContain(
+        'Read again: the page had changed.',
+      );
+      await expect(gateway.getProfileRevision(UID)).resolves.toBe(revision + 1);
+    });
+
+    it('keeps the copy of a page that cannot be read again, and says why', async () => {
+      const { gateway, pass, resourceId } = await readLink();
+      const before = await gateway.getResourceText(UID, resourceId);
+      gateway.controls.nextReread('link-unreadable');
+
+      await gateway.readLinkAgain(resourceId);
+      pass(PREVIEW_READ_MS);
+
+      await expect(gateway.getResource(UID, resourceId)).resolves.toMatchObject(
+        {
+          status: 'ready',
+          refresh: { status: 'failed', failure: 'link-unreadable' },
+        },
+      );
+      await expect(gateway.getResourceText(UID, resourceId)).resolves.toEqual(
+        before,
+      );
+    });
+
+    it('reads a link whose first reading failed from the start, without `refresh`', async () => {
+      const { gateway, pass } = await setUp();
+      gateway.controls.failNext('link-unreadable');
+      const { resourceId } = await gateway.createResource(link);
+      pass(PREVIEW_READ_MS);
+      expect((await gateway.getResource(UID, resourceId))?.status).toBe(
+        'failed',
+      );
+
+      await gateway.readLinkAgain(resourceId);
+      const again = await gateway.getResource(UID, resourceId);
+      expect(again).toMatchObject({ status: 'processing' });
+      expect(again).not.toHaveProperty('failure');
+      expect(again).not.toHaveProperty('refresh');
+      pass(PREVIEW_READ_MS);
+
+      await expect(gateway.getResource(UID, resourceId)).resolves.toMatchObject(
+        { status: 'ready', textAt: expect.any(Number) },
+      );
+    });
+
+    it('refuses what the backend refuses: a reading going on, today’s limit, no such resource', async () => {
+      const { gateway, resourceId } = await readLink();
+
+      await gateway.readLinkAgain(resourceId);
+      expect(await codeOf(gateway.readLinkAgain(resourceId))).toBe(
+        ProfileErrorCode.Reading,
+      );
+      expect(await codeOf(gateway.readLinkAgain('nope'))).toBe(
+        ProfileErrorCode.NotFound,
+      );
+
+      const other = await readLink();
+      other.gateway.controls.setExtractionsToday(PROFILE_DAILY_EXTRACTIONS);
+      expect(await codeOf(other.gateway.readLinkAgain(other.resourceId))).toBe(
+        ProfileErrorCode.DailyLimit,
+      );
+    });
+
+    it('refuses to read a note again: it is not a link', async () => {
+      const { gateway, pass } = await setUp();
+      const { resourceId } = await gateway.createResource(note);
+      pass(PREVIEW_READ_MS);
+
+      expect(await codeOf(gateway.readLinkAgain(resourceId))).toBe(
+        ProfileErrorCode.Invalid,
+      );
+    });
+
+    it('reads a posting again: the same posting dates the copy, a changed one replaces the text and dates the brief', async () => {
+      const { gateway, pass, clock, applicationId } = await readPosting();
+      const read = await gateway.getApplication(UID, applicationId);
+
+      await gateway.readPostingAgain(applicationId);
+      await expect(
+        gateway.getApplication(UID, applicationId),
+      ).resolves.toMatchObject({
+        job: { status: 'ready', refresh: { status: 'reading' } },
+      });
+      pass(PREVIEW_READ_MS);
+      await expect(
+        gateway.getApplication(UID, applicationId),
+      ).resolves.toMatchObject({
+        jobDescription: read?.jobDescription,
+        revision: read?.revision,
+        job: {
+          takenAt: clock.time,
+          refresh: { status: 'done', changed: false },
+        },
+      });
+
+      gateway.controls.nextReread('changed');
+      await gateway.readPostingAgain(applicationId);
+      pass(PREVIEW_READ_MS);
+      const changed = await gateway.getApplication(UID, applicationId);
+      expect(changed).toMatchObject({
+        revision: (read?.revision ?? 0) + 1,
+        title: read?.title,
+        job: { refresh: { status: 'done', changed: true } },
+      });
+      expect(changed?.jobDescription).toContain('read again');
+    });
+
+    it('asks before replacing a text the candidate edited, then replaces it', async () => {
+      const { gateway, pass, applicationId } = await readPosting();
+      await gateway.updateApplication({
+        applicationId,
+        jobDescription: 'My own notes on the job.',
+      });
+
+      expect(await codeOf(gateway.readPostingAgain(applicationId))).toBe(
+        ProfileErrorCode.JobEdited,
+      );
+      await gateway.readPostingAgain(applicationId, { replaceEdited: true });
+      expect(
+        await codeOf(
+          gateway.updateApplication({ applicationId, jobDescription: 'New' }),
+        ),
+      ).toBe(ProfileErrorCode.Reading);
+      pass(PREVIEW_READ_MS);
+
+      const replaced = await gateway.getApplication(UID, applicationId);
+      expect(replaced?.job).toMatchObject({
+        edited: false,
+        refresh: { status: 'done', changed: true },
+      });
+      expect(replaced?.jobDescription).not.toBe('My own notes on the job.');
+    });
+
+    it('reads a posting whose first reading failed from the start', async () => {
+      const { gateway, pass } = await setUp();
+      gateway.controls.failNextJob('link-unreadable');
+      const { applicationId } = await gateway.createApplication(posting);
+      pass(PREVIEW_READ_MS);
+      await expect(
+        gateway.getApplication(UID, applicationId),
+      ).resolves.toMatchObject({ job: { status: 'failed' } });
+
+      await gateway.readPostingAgain(applicationId);
+      await expect(
+        gateway.getApplication(UID, applicationId),
+      ).resolves.toMatchObject({ job: { status: 'reading' } });
+      pass(PREVIEW_READ_MS);
+
+      const ready = await gateway.getApplication(UID, applicationId);
+      expect(ready?.job).toMatchObject({ status: 'ready' });
+      expect(ready?.job).not.toHaveProperty('refresh');
+      expect(ready?.jobDescription).toContain('Copy of the posting');
+    });
+
+    it('refuses to read again a job that is not from a link', async () => {
+      const { gateway, pass } = await setUp();
+      const { applicationId } = await gateway.createApplication({
+        job: { source: 'text', text: 'Go services in production.' },
+      });
+      pass(PREVIEW_READ_MS);
+
+      expect(await codeOf(gateway.readPostingAgain(applicationId))).toBe(
+        ProfileErrorCode.Invalid,
       );
     });
   });

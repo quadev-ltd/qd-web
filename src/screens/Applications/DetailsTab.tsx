@@ -1,4 +1,5 @@
-// The details of an application (A7): what it is, the job, "Edit" and "Remove".
+// The details of an application (A7): what it is, the job (a posting can be read again),
+// "Edit" and "Remove".
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -6,6 +7,8 @@ import { useNavigate } from 'react-router';
 import EditApplicationPanel from './EditApplicationPanel';
 import JobCard from './JobCard';
 import RemoveApplicationDialog from './RemoveApplicationDialog';
+import ReplaceEditedTextDialog from './ReplaceEditedTextDialog';
+import { useReadPostingAgain } from './useReadPostingAgain';
 
 import Icon from '@/components/Icon';
 import Button from '@/components/ui/Button';
@@ -36,6 +39,10 @@ export const DetailsTab: React.FC<{ application: JobApplication }> = ({
   const [editing, setEditing] = useState(false);
   const [removing, setRemoving] = useState(false);
   const posting = parseProfileLink(application.postingUrl ?? '');
+  const readAgain = useReadPostingAgain(
+    application.id,
+    application.job?.edited ?? false,
+  );
 
   return (
     <>
@@ -96,7 +103,16 @@ export const DetailsTab: React.FC<{ application: JobApplication }> = ({
               )}
             </dl>
           </Card>
-          {application.jobDescription && <JobCard application={application} />}
+          {application.jobDescription && (
+            <JobCard
+              application={application}
+              readAgain={
+                application.job?.source === 'link' && posting
+                  ? readAgain
+                  : undefined
+              }
+            />
+          )}
         </div>
 
         <Card
@@ -129,6 +145,7 @@ export const DetailsTab: React.FC<{ application: JobApplication }> = ({
           onClose={() => setEditing(false)}
         />
       )}
+      {readAgain.confirming && <ReplaceEditedTextDialog reread={readAgain} />}
       {removing && (
         <RemoveApplicationDialog
           applicationId={application.id}

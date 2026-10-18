@@ -384,6 +384,161 @@ describe('ResourceScreen', () => {
       expect(gateway.removeResource).toHaveBeenCalledExactlyOnceWith('r1');
       expect(store.getState().interviewProfile.resources).toEqual([]);
     });
+
+    it('is tried again from its panel: read from the start, and followed', async () => {
+      const gateway = createMockProfileGateway();
+      setUp(failed, {}, gateway);
+      // As the backend answers it: read from the start, from now.
+      gateway.getResource.mockResolvedValue({
+        ...failed,
+        status: 'processing',
+        failure: undefined,
+        updatedAt: NOW,
+      });
+
+      await userEvent.click(
+        screen.getByRole('button', { name: 'resource.tryAgainButton' }),
+      );
+
+      expect(gateway.readLinkAgain).toHaveBeenCalledExactlyOnceWith('r1');
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        'resource.readingTitle',
+      );
+    });
+
+    it('says today’s limit when trying again is refused for it', async () => {
+      const gateway = createMockProfileGateway();
+      gateway.readLinkAgain.mockRejectedValue(
+        new ProfileError(ProfileErrorCode.DailyLimit),
+      );
+      setUp(failed, {}, gateway);
+
+      await userEvent.click(
+        screen.getByRole('button', { name: 'resource.tryAgainButton' }),
+      );
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'resource.rereadLimitMessage',
+      );
+    });
+
+    it('offers no "Try again" for a file: it is read once', () => {
+      setUp(ready({ status: 'failed', failure: 'unsupported-file' }));
+
+      expect(
+        screen.queryByRole('button', { name: 'resource.tryAgainButton' }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('a link’s page read again', () => {
+    const link = ready({
+      type: 'link',
+      source: 'link',
+      title: 'Conference talk',
+      url: 'https://talks.example/ledgers',
+      contentType: 'text/uri-list',
+      textAt: DAYS_AGO,
+    });
+    const withCopy = () => {
+      const gateway = createMockProfileGateway();
+      gateway.getResourceText.mockResolvedValue({
+        text: 'Moving a ledger to event sourcing',
+        kind: 'page',
+        format: 'page',
+        takenAt: DAYS_AGO,
+        chars: 33,
+        truncated: false,
+      });
+      return gateway;
+    };
+
+    it('reads it again on request; the copy stays while it is read', async () => {
+      const gateway = withCopy();
+      setUp(link, {}, gateway);
+      await screen.findByText('Moving a ledger to event sourcing');
+      gateway.getResource.mockResolvedValue({
+        ...link,
+        refresh: { status: 'reading', startedAt: NOW },
+      });
+
+      await userEvent.click(
+        screen.getByRole('button', { name: 'resource.rereadPageButton' }),
+      );
+
+      expect(gateway.readLinkAgain).toHaveBeenCalledExactlyOnceWith('r1');
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        'resource.rereadingPageTitle',
+      );
+      expect(
+        screen.getByText('Moving a ledger to event sourcing'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'resource.rereadPageButton' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('says how the last reading again went, from the resource', async () => {
+      setUp(
+        {
+          ...link,
+          refresh: {
+            status: 'failed',
+            startedAt: NOW - 60_000,
+            finishedAt: NOW - 30_000,
+            failure: 'link-unreadable',
+          },
+        },
+        {},
+        withCopy(),
+      );
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'resource.pageGoneMessage',
+      );
+      expect(
+        screen.getByRole('button', { name: 'resource.rereadPageButton' }),
+      ).toBeInTheDocument();
+    });
+
+    it('offers a link read before copies were kept its first copy', () => {
+      setUp({ ...link, textAt: undefined });
+
+      const card = screen.getByRole('region', {
+        name: 'resource.pageTextTitle',
+      });
+      expect(card).toHaveTextContent('resource.pageNoCopyMeta');
+      expect(
+        within(card).getByRole('button', { name: 'resource.rereadPageButton' }),
+      ).toBeInTheDocument();
+    });
+
+    it('says when it could not start, and keeps the button', async () => {
+      const gateway = withCopy();
+      gateway.readLinkAgain.mockRejectedValue(
+        new ProfileError(ProfileErrorCode.Network),
+      );
+      setUp(link, {}, gateway);
+
+      await userEvent.click(
+        screen.getByRole('button', { name: 'resource.rereadPageButton' }),
+      );
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'resource.rereadStartFailedMessage',
+      );
+      expect(
+        screen.getByRole('button', { name: 'resource.rereadPageButton' }),
+      ).toBeEnabled();
+    });
+
+    it('offers nothing to read again for a note', async () => {
+      setUp(ready({ type: 'note', source: 'text', textAt: DAYS_AGO }));
+
+      expect(
+        screen.queryByRole('button', { name: 'resource.rereadPageButton' }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   describe('removing from the details', () => {

@@ -2,11 +2,14 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 
+import DetailsTab from './DetailsTab';
 import { changesOf, EditApplicationPanel } from './EditApplicationPanel';
 import JobCard from './JobCard';
 import NewApplicationPanel from './NewApplicationPanel';
 import RemoveApplicationDialog from './RemoveApplicationDialog';
+import { type ReadPostingAgain } from './useReadPostingAgain';
 
+import { type JobApplication } from '@/core/profile/applications';
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import { applicationFixture } from '@/testUtil/applicationFixtures';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
@@ -310,6 +313,35 @@ describe('EditApplicationPanel', () => {
   const save = () =>
     screen.getByRole('button', { name: 'applications.saveButton' });
 
+  it('leaves the job out while its posting is read again, and says a posting’s copy is replaced by reading it again', () => {
+    const posting = applicationFixture({
+      job: { source: 'link', status: 'ready', edited: false },
+    });
+    const { unmount } = renderProfilePage(
+      <EditApplicationPanel application={posting} onClose={vi.fn()} />,
+    );
+    expect(
+      screen.getByText('applications.jobCopyEditHint'),
+    ).toBeInTheDocument();
+    unmount();
+
+    renderProfilePage(
+      <EditApplicationPanel
+        application={{
+          ...posting,
+          job: {
+            ...posting.job!,
+            refresh: { status: 'reading', startedAt: Date.now() },
+          },
+        }}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(
+      screen.queryByRole('textbox', { name: 'applications.jobLabel' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('leaves the job out while it is being read, and saves the rest', async () => {
     const gateway = createMockProfileGateway();
     const reading = applicationFixture({
@@ -548,5 +580,175 @@ describe('JobCard', () => {
     );
 
     expect(screen.getByText('applications.jobPasted')).toBeInTheDocument();
+  });
+
+  describe('a posting read again', () => {
+    const readAgain = (overrides: Partial<ReadPostingAgain> = {}) => ({
+      start: vi.fn(() => Promise.resolve()),
+      confirming: false,
+      confirm: vi.fn(() => Promise.resolve()),
+      cancel: vi.fn(),
+      busy: false,
+      ...overrides,
+    });
+    const posting = (
+      overrides: Partial<NonNullable<JobApplication['job']>> = {},
+      brief = true,
+    ) =>
+      applicationFixture({
+        brief: brief
+          ? {
+              requirements: [],
+              questions: [],
+              applicationRevision: 1,
+              profileRevision: 0,
+              builtAt: 1,
+            }
+          : undefined,
+        postingUrl: 'https://careers.northwind.example/sbe',
+        job: {
+          source: 'link',
+          status: 'ready',
+          edited: false,
+          takenAt: 1,
+          ...overrides,
+        },
+      });
+
+    it('reads it again on request, saying what it does to the brief', async () => {
+      const reread = readAgain();
+      renderProfilePage(<JobCard application={posting()} readAgain={reread} />);
+
+      expect(
+        screen.getByText('applications.rereadPostingBriefHint'),
+      ).toBeInTheDocument();
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: 'applications.rereadPostingButton',
+        }),
+      );
+
+      expect(reread.start).toHaveBeenCalledOnce();
+    });
+
+    it('says the posting is being read again, and that the copy stays', () => {
+      renderProfilePage(
+        <JobCard
+          application={posting({
+            refresh: { status: 'reading', startedAt: Date.now() },
+          })}
+          readAgain={readAgain()}
+        />,
+      );
+
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'applications.rereadingPostingTitle',
+      );
+      expect(
+        screen.queryByRole('button', {
+          name: 'applications.rereadPostingButton',
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    it.each([
+      [{ changed: true }, true, 'applications.postingChangedBriefMessage'],
+      [{ changed: true }, false, 'applications.postingChangedMessage'],
+      [{ changed: false }, true, 'applications.postingUnchangedMessage'],
+      [
+        { status: 'failed' as const, failure: 'link-unreadable' as const },
+        true,
+        'applications.postingGoneBriefMessage',
+      ],
+      [
+        { status: 'failed' as const, failure: 'link-unreadable' as const },
+        false,
+        'applications.postingGoneMessage',
+      ],
+    ])('says how it went (%o, a brief: %s)', (refresh, brief, message) => {
+      renderProfilePage(
+        <JobCard
+          application={posting(
+            {
+              refresh: {
+                status: 'done',
+                startedAt: Date.now() - 60_000,
+                finishedAt: Date.now() - 30_000,
+                ...refresh,
+              },
+            },
+            brief,
+          )}
+          readAgain={readAgain()}
+        />,
+      );
+
+      expect(
+        screen.getByRole('region', { name: 'applications.jobTitle' }),
+      ).toHaveTextContent(message);
+    });
+
+    it('offers nothing to read again for a pasted job', () => {
+      renderProfilePage(<JobCard application={applicationFixture()} />);
+
+      expect(
+        screen.queryByRole('button', {
+          name: 'applications.rereadPostingButton',
+        }),
+      ).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe('DetailsTab, reading a posting again', () => {
+  const edited = applicationFixture({
+    postingUrl: 'https://careers.northwind.example/sbe',
+    job: { source: 'link', status: 'ready', edited: true, takenAt: 1 },
+  });
+  const setUp = (gateway = createMockProfileGateway()) =>
+    renderProfilePage(<DetailsTab application={edited} />, {
+      gateway,
+      applications: { uid: 'uid-1', status: 'loaded', applications: [edited] },
+    });
+
+  it('asks before replacing a text the candidate edited, then reads it again over it', async () => {
+    const gateway = createMockProfileGateway();
+    setUp(gateway);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'applications.rereadPostingButton' }),
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: 'applications.replaceDialogTitle',
+    });
+    expect(gateway.readPostingAgain).not.toHaveBeenCalled();
+    await userEvent.click(
+      within(dialog).getByRole('button', {
+        name: 'applications.replaceConfirmButton',
+      }),
+    );
+
+    expect(gateway.readPostingAgain).toHaveBeenCalledExactlyOnceWith(
+      edited.id,
+      { replaceEdited: true },
+    );
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+  });
+
+  it('leaves the text as it is on "Cancel"', async () => {
+    const gateway = createMockProfileGateway();
+    setUp(gateway);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'applications.rereadPostingButton' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'applications.cancelButton' }),
+    );
+
+    expect(
+      screen.queryByRole('dialog', { name: 'applications.replaceDialogTitle' }),
+    ).not.toBeInTheDocument();
+    expect(gateway.readPostingAgain).not.toHaveBeenCalled();
   });
 });
