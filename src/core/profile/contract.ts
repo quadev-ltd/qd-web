@@ -183,6 +183,7 @@ export const parseProfileLink = (value: string): string | undefined => {
 export const CREATE_PROFILE_RESOURCE = 'createProfileResource';
 export const UPDATE_SKILL_MAP_ITEM = 'updateSkillMapItem';
 export const REMOVE_PROFILE_RESOURCE = 'removeProfileResource';
+export const READ_PROFILE_LINK_AGAIN = 'readProfileLinkAgain';
 
 /** What `createProfileResource` takes. The title is 1 to PROFILE_TITLE_MAX_CHARS characters. */
 export type CreateProfileResourceRequest =
@@ -248,6 +249,15 @@ export const RemoveProfileResourceResponseSchema = z.object({
   itemsRemoved: z.number().int().nonnegative(),
 });
 
+/**
+ * What `readProfileLinkAgain` and `readJobPostingAgain` answer, at once: the reading goes on in
+ * the background, and the document says how it went.
+ */
+export const ReadAgainResponseSchema = z.object({
+  /** When the reading was asked for, ISO 8601. */
+  startedAt: z.string(),
+});
+
 /** `details.reason` of a callable error, when the code alone does not say enough. */
 export const CallableReason = {
   /** `permission-denied`: the `interviewAssistant` flag is off for the caller. */
@@ -256,6 +266,14 @@ export const CallableReason = {
   MaxResources: 'max-resources',
   /** `failed-precondition`: the account already holds APPLICATIONS_MAX applications. */
   MaxApplications: 'max-applications',
+  /** `failed-precondition`: a reading of it is going on, the first one or one again. */
+  AlreadyReading: 'already-reading',
+  /** `failed-precondition`: the job's text cannot change while it is being read. */
+  JobNotReady: 'job-not-ready',
+  /** `failed-precondition`: reading the posting again would replace text the candidate edited. */
+  JobEdited: 'job-edited',
+  /** `failed-precondition`: only a link, or a job from a link, can be read again. */
+  NotALink: 'not-a-link',
 } as const;
 
 // ---------- The documents the owner reads ----------
@@ -263,6 +281,73 @@ export const CallableReason = {
 // them, so nothing outside it holds a Firestore class.
 
 const timestamp = z.number().nullable().catch(null);
+
+/**
+ * The last time a page was read again (D78, research doc 17, slice 4), on a link resource or a
+ * job's posting, kept until the next time: going on (the old copy stays until it ends), done
+ * (`changed` says whether the copy was replaced), or failed (`failure`; the old copy is kept).
+ */
+export const PageRefreshSchema = z.object({
+  status: z.enum(['reading', 'done', 'failed']),
+  startedAt: timestamp,
+  finishedAt: timestamp.optional(),
+  changed: z.boolean().optional().catch(undefined),
+  failure: z.enum(PROFILE_RESOURCE_FAILURES).optional().catch('internal'),
+});
+export type PageRefresh = z.infer<typeof PageRefreshSchema>;
+
+/** A reading again that has not ended this long after it started was lost (the backend's rule). */
+export const PAGE_READING_STALE_MS = 10 * 60_000;
+
+/** The page is being read again, and the reading is not lost. */
+export const isRereading = (
+  refresh: PageRefresh | undefined,
+  now = Date.now(),
+): boolean =>
+  refresh?.status === 'reading' &&
+  now - (refresh.startedAt ?? now) < PAGE_READING_STALE_MS;
+
+/**
+ * How long the end of a reading again is said on the page. The document keeps it until the
+ * next time, but "this copy is new" a day later would say something that is no longer news.
+ */
+export const REREAD_OUTCOME_SHOWN_MS = 60 * 60_000;
+
+/** How a reading again ended, said by the page: a new copy, the same page, or why it failed. */
+export type RereadOutcome =
+  | { kind: 'changed' }
+  | { kind: 'unchanged' }
+  | { kind: 'gone' }
+  | { kind: 'quota' }
+  | { kind: 'error' };
+
+/** The end of the last reading again, while it is still news; `null` otherwise. */
+export const rereadOutcomeOf = (
+  refresh: PageRefresh | undefined,
+  now = Date.now(),
+): RereadOutcome | null => {
+  if (
+    !refresh ||
+    refresh.status === 'reading' ||
+    refresh.finishedAt === null ||
+    refresh.finishedAt === undefined ||
+    now - refresh.finishedAt > REREAD_OUTCOME_SHOWN_MS
+  ) {
+    return null;
+  }
+  if (refresh.status === 'done') {
+    return { kind: refresh.changed ? 'changed' : 'unchanged' };
+  }
+  switch (refresh.failure) {
+    case 'link-unreadable':
+    case 'empty':
+      return { kind: 'gone' };
+    case 'quota':
+      return { kind: 'quota' };
+    default:
+      return { kind: 'error' };
+  }
+};
 
 /** `users/{uid}/interviewProfile/main/resources/{id}`, with its id. */
 export const ProfileResourceSchema = z.object({
@@ -282,6 +367,8 @@ export const ProfileResourceSchema = z.object({
   itemCount: z.number().int().nonnegative().catch(0),
   /** When its text was kept (D78, research doc 17): there is a text to open. */
   textAt: timestamp.optional(),
+  /** A link only: the last time its page was read again. */
+  refresh: PageRefreshSchema.optional().catch(undefined),
   createdAt: timestamp,
   updatedAt: timestamp,
 });

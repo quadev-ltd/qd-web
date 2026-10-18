@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import Icon from '@/components/Icon';
 import Spinner from '@/components/Spinner';
+import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
 import { buttonClassName } from '@/components/ui/buttonStyles';
 import { jobStatusOf, type JobApplication } from '@/core/profile/applications';
@@ -26,6 +27,8 @@ export interface JobStatusPanelProps {
   application: Pick<JobApplication, 'job' | 'postingUrl'>;
   /** Opens the form where the job's text can be pasted instead. */
   onPaste: () => void;
+  /** A job from a link only: its posting can be read again from the start ("Try again"). */
+  tryAgain?: { start: () => void; busy: boolean; errorMessage?: string };
 }
 
 /**
@@ -35,6 +38,7 @@ export interface JobStatusPanelProps {
 export const JobStatusPanel: React.FC<JobStatusPanelProps> = ({
   application,
   onPaste,
+  tryAgain,
 }) => {
   const { t } = useTranslation();
   const status = jobStatusOf(application);
@@ -102,6 +106,22 @@ export const JobStatusPanel: React.FC<JobStatusPanelProps> = ({
         <Button size="small" onClick={onPaste}>
           {t('applications.pasteInsteadButton')}
         </Button>
+        {tryAgain && job?.source === 'link' && (
+          <Button
+            variant="secondary"
+            size="small"
+            disabled={tryAgain.busy}
+            aria-busy={tryAgain.busy}
+            onClick={tryAgain.start}
+            className="gap-2">
+            {tryAgain.busy ? (
+              <Spinner size="small" decorative />
+            ) : (
+              <Icon name="refresh" size={18} />
+            )}
+            {t('applications.tryAgainButton')}
+          </Button>
+        )}
         {posting && (
           <a
             href={posting}
@@ -117,6 +137,11 @@ export const JobStatusPanel: React.FC<JobStatusPanelProps> = ({
           </a>
         )}
       </div>
+      {tryAgain?.errorMessage && (
+        <Banner tone="danger" role="alert">
+          {tryAgain.errorMessage}
+        </Banner>
+      )}
     </div>
   );
 };

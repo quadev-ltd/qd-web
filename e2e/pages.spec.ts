@@ -299,9 +299,62 @@ test('a resource, ready, being read and failed, a link that was read, and the re
       name: 'engineering.fenwickpay.example/blog/ledger-event-sourcing',
     }),
   ).toBeVisible();
+  const copy = page.getByRole('region', { name: 'Copy of the page' });
+  await expect(copy).toContainText(/Taken on /);
+  await expectAccessibleAndNotTooWide(page);
+
+  // Read again, and the page could not be read: the copy is kept
+  await page.evaluate(() =>
+    window.qdPreviewProfile?.nextReread('link-unreadable'),
+  );
+  await copy.getByRole('button', { name: 'Read the page again' }).click();
+  await expect(copy).toContainText('Reading the page again…');
+  await expectAccessibleAndNotTooWide(page);
+  await expect(copy.getByRole('alert')).toContainText(
+    'We couldn’t read the page again',
+  );
+  await expectAccessibleAndNotTooWide(page);
+});
+
+test('a posting read again, its outcome and "Replace your edited text?": accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openHome(page);
+  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  const panel = page.getByRole('dialog', { name: 'New application' });
+  await panel.getByText('Link', { exact: true }).click();
+  await panel
+    .getByLabel('Address of the posting')
+    .fill('https://careers.northwind.example/senior-backend-engineer');
+  await panel.getByRole('button', { name: 'Add the job' }).click();
   await expect(
-    page.getByRole('region', { name: 'Copy of the page' }),
-  ).toContainText(/Taken on /);
+    page.getByRole('button', { name: 'Prepare the brief' }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Details' }).click();
+  const job = page.getByRole('region', { name: 'The job' });
+  await expect(job).toContainText('Read the posting again');
+  await expectAccessibleAndNotTooWide(page);
+
+  // Read again, and the posting is no longer online
+  await page.evaluate(() =>
+    window.qdPreviewProfile?.nextReread('link-unreadable'),
+  );
+  await job.getByRole('button', { name: 'Read the posting again' }).click();
+  await expect(job).toContainText('The posting is no longer online');
+  await expectAccessibleAndNotTooWide(page);
+
+  // Over an edited text, the question first
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const edit = page.getByRole('dialog', { name: 'Edit the application' });
+  await edit.getByLabel('Job description').fill('My own notes on the job.');
+  await edit.getByRole('button', { name: 'Save changes' }).click();
+  await expect(edit).toBeHidden();
+  await job.getByRole('button', { name: 'Read the posting again' }).click();
+  const replace = page.getByRole('dialog', {
+    name: 'Replace your edited text?',
+  });
+  await expect(replace).toBeVisible();
+  await expectInsideViewport(page, replace);
   await expectAccessibleAndNotTooWide(page);
 });
 

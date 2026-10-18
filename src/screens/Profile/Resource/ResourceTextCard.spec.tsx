@@ -1,7 +1,10 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { ResourceTextCard } from './ResourceTextCard';
+import {
+  ResourceTextCard,
+  type ResourceTextCardProps,
+} from './ResourceTextCard';
 
 import { type ProfileResourceText } from '@/core/profile/contract';
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
@@ -27,13 +30,22 @@ const kept = (overrides: Partial<ProfileResourceText> = {}) => ({
 });
 
 const setUp = (
-  resource: { source: 'text' | 'file' | 'link'; textAt?: number | null },
+  resource: Partial<ResourceTextCardProps['resource']> & {
+    source: 'text' | 'file' | 'link';
+  },
   gateway = createMockProfileGateway(),
+  readAgain?: ResourceTextCardProps['readAgain'],
 ) =>
-  renderProfilePage(<ResourceTextCard resource={{ id: 'r1', ...resource }} />, {
-    gateway,
-    interviewProfile: { uid: 'uid-1', status: 'loaded' },
-  });
+  renderProfilePage(
+    <ResourceTextCard
+      resource={{ id: 'r1', status: 'ready', ...resource }}
+      readAgain={readAgain}
+    />,
+    {
+      gateway,
+      interviewProfile: { uid: 'uid-1', status: 'loaded' },
+    },
+  );
 
 beforeEach(() => {
   vi.clearAllMocks();

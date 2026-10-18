@@ -49,6 +49,7 @@ describe('selectProfileGateway', () => {
       failNextBrief: expect.any(Function),
       failNextJob: expect.any(Function),
       setBriefsToday: expect.any(Function),
+      nextReread: expect.any(Function),
     });
     expect(createFirebaseProfileGateway).not.toHaveBeenCalled();
   });

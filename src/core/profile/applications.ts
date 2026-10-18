@@ -4,6 +4,8 @@
 import { z } from 'zod';
 
 import {
+  isRereading,
+  PageRefreshSchema,
   PROFILE_RESOURCE_FAILURES,
   PROFILE_UPLOAD_CONTENT_TYPES,
   type ProfileUploadContentType,
@@ -108,6 +110,11 @@ export const ApplicationJobSchema = z.object({
   edited: z.boolean().catch(false),
   /** The copy of a page was cut at JOB_DESCRIPTION_MAX_CHARS. */
   truncated: z.boolean().optional().catch(undefined),
+  /**
+   * A posting only: the last time its page was read again. A changed page replaced
+   * `jobDescription`, cleared `edited` and raised the application's `revision`.
+   */
+  refresh: PageRefreshSchema.optional().catch(undefined),
 });
 export type ApplicationJob = z.infer<typeof ApplicationJobSchema>;
 
@@ -139,6 +146,13 @@ export const CREATE_JOB_APPLICATION = 'createJobApplication';
 export const UPDATE_JOB_APPLICATION = 'updateJobApplication';
 export const REMOVE_JOB_APPLICATION = 'removeJobApplication';
 export const PREPARE_APPLICATION_BRIEF = 'prepareApplicationBrief';
+export const READ_JOB_POSTING_AGAIN = 'readJobPostingAgain';
+
+/** What `readJobPostingAgain` takes; `replaceEdited` only once the candidate said yes. */
+export interface ReadJobPostingAgainRequest {
+  applicationId: string;
+  replaceEdited?: true;
+}
 
 /** The job of a new application (D74, D76): pasted, a file to upload, or a posting's address. */
 export type NewJob =
@@ -242,3 +256,10 @@ export const isJobPending = (application: Pick<JobApplication, 'job'>) => {
   const status = jobStatusOf(application);
   return status === 'awaitingUpload' || status === 'reading';
 };
+
+/**
+ * The job's text cannot be changed now: it is being read, or its posting is being read again
+ * (the backend refuses with `job-not-ready`).
+ */
+export const isJobLocked = (application: Pick<JobApplication, 'job'>) =>
+  isJobPending(application) || isRereading(application.job?.refresh);

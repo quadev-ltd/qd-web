@@ -185,6 +185,86 @@ test('a link that is read: its address to open, the copy of its page, and "Remov
   ).toBeVisible();
 });
 
+test('a link’s page read again: the copy stays meanwhile, then the same page, a changed one, one taken down', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await page.getByRole('button', { name: 'Add something else' }).click();
+  await page.getByRole('button', { name: /Add a link/ }).click();
+  const form = page.getByRole('dialog', { name: 'Add a link' });
+  await expect(
+    form.getByText(/We keep a copy of it, which you can update later\./),
+  ).toBeVisible();
+  await form.getByLabel('Title').fill('Conference talk');
+  await form
+    .getByLabel('Address')
+    .fill('https://talks.example/ledgers-without-tears');
+  await form.getByRole('button', { name: 'Add to profile' }).click();
+  const row = page.getByRole('listitem').filter({ hasText: 'Conference talk' });
+  await expect(row.getByText('Ready', { exact: true })).toBeVisible();
+  await row.getByRole('link').click();
+  const copy = page.getByRole('region', { name: 'Copy of the page' });
+  const readAgain = copy.getByRole('button', { name: 'Read the page again' });
+  await expect(copy).toContainText(
+    'If the page has changed. The new copy replaces this one, and briefs that used it will show as out of date.',
+  );
+
+  // The same page: the copy stays, and only its date moves
+  await readAgain.click();
+  await expect(copy).toContainText('Reading the page again…');
+  await expect(copy).toContainText(/The copy from .* stays until the new one/);
+  await expect(copy).toContainText(
+    'The page hasn’t changed, so your copy stays as it is.',
+  );
+
+  // A page that changed: a new copy
+  await page.evaluate(() => window.qdPreviewProfile?.nextReread('changed'));
+  await readAgain.click();
+  await expect(copy).toContainText(
+    'The page had changed, so this copy is new. Briefs that used it will show as out of date.',
+  );
+  await expect(copy).toContainText('Read again: the page had changed.');
+
+  // A page taken down: the copy is kept
+  await page.evaluate(() =>
+    window.qdPreviewProfile?.nextReread('link-unreadable'),
+  );
+  await readAgain.click();
+  await expect(copy.getByRole('alert')).toContainText(
+    /We couldn’t read the page again: it may have been taken down or made private\. Your copy from .* is kept\./,
+  );
+  await expect(copy).toContainText('Read again: the page had changed.');
+});
+
+test('a link that could not be read is tried again once it is public, and read', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await page.evaluate(() =>
+    window.qdPreviewProfile?.failNext('link-unreadable'),
+  );
+  await page.getByRole('button', { name: 'Add something else' }).click();
+  await page.getByRole('button', { name: /Add a link/ }).click();
+  const form = page.getByRole('dialog', { name: 'Add a link' });
+  await form.getByLabel('Title').fill('Portfolio');
+  await form.getByLabel('Address').fill('https://maya.example/portfolio');
+  await form.getByRole('button', { name: 'Add to profile' }).click();
+  const row = page.getByRole('listitem').filter({ hasText: 'Portfolio' });
+  await expect(row).toContainText('Could not read this page');
+  await row.getByRole('link').click();
+
+  const panel = page
+    .getByRole('status')
+    .filter({ hasText: 'We couldn’t read this page' });
+  await expect(panel).toContainText('If you have made it public, try again.');
+  await panel.getByRole('button', { name: 'Try again' }).click();
+
+  await expect(
+    page.getByRole('region', { name: 'Copy of the page' }),
+  ).toContainText(/Taken on /);
+  await expect(page.getByText('Ready', { exact: true })).toBeVisible();
+});
+
 test('open a failed resource, read why, and remove it in the dialog: it is gone from the list', async ({
   page,
 }) => {
@@ -205,7 +285,7 @@ test('open a failed resource, read why, and remove it in the dialog: it is gone 
   const reason = page.getByRole('status');
   await expect(reason).toContainText('We couldn’t read this page');
   await expect(reason).toContainText(
-    'It may be private or need a sign-in. For LinkedIn, save your profile as a PDF and add the file.',
+    'It may be private or need a sign-in. If you have made it public, try again. For LinkedIn, save your profile as a PDF and add the file.',
   );
 
   // Asked first; Cancel changes nothing.

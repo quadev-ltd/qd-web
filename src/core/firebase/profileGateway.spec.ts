@@ -11,6 +11,7 @@ vi.mock('./interviewProfile', () => ({
   getResource: vi.fn(),
   getResources: vi.fn(),
   getResourceText: vi.fn(),
+  readLinkAgain: vi.fn(),
   removeItem: vi.fn(),
   removeResource: vi.fn(),
   updateItem: vi.fn(),
@@ -38,5 +39,6 @@ describe('the Firebase profile gateway', () => {
     expect(gateway.removeResource).toBe(profileModule.removeResource);
     expect(gateway.getFileUrl).toBe(profileModule.getFileUrl);
     expect(gateway.getResourceText).toBe(profileModule.getResourceText);
+    expect(gateway.readLinkAgain).toBe(profileModule.readLinkAgain);
   });
 });

@@ -16,6 +16,7 @@ export const createMockProfileGateway = (): Mocked<ProfileGateway> => ({
   updateItem: vi.fn(() => Promise.resolve()),
   removeItem: vi.fn(() => Promise.resolve()),
   removeResource: vi.fn(() => Promise.resolve({ itemsRemoved: 0 })),
+  readLinkAgain: vi.fn(() => Promise.resolve()),
   getFileUrl: vi.fn(() => Promise.resolve('https://files.example/document')),
   getResourceText: vi.fn(() => Promise.resolve(null)),
   getApplications: vi.fn(() => Promise.resolve([])),
@@ -27,6 +28,7 @@ export const createMockProfileGateway = (): Mocked<ProfileGateway> => ({
   updateApplication: vi.fn(() => Promise.resolve({ revision: 2 })),
   removeApplication: vi.fn(() => Promise.resolve()),
   prepareBrief: vi.fn(() => Promise.resolve()),
+  readPostingAgain: vi.fn(() => Promise.resolve()),
   getBriefsToday: vi.fn(() => Promise.resolve(0)),
 });
 

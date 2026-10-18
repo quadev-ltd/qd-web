@@ -1,5 +1,5 @@
 // One resource of the profile: where it is, what it is, the text kept of it (D78), its file to
-// download, and "Remove".
+// download, and "Remove". A link's page can be read again, or tried again after a failure.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -15,6 +15,7 @@ import { addedAt, contentOf, formatDay, shortAddress } from './resourceMeta';
 import ResourceStatusPanel from './ResourceStatusPanel';
 import ResourceTextCard from './ResourceTextCard';
 import { useFileUrl } from './useFileUrl';
+import { useReadLinkAgain } from './useReadLinkAgain';
 
 import Icon from '@/components/Icon';
 import SignedInShell from '@/components/layout/SignedInShell';
@@ -93,6 +94,7 @@ export const ResourceScreen: React.FC = () => {
 
   const resource = resources.find(({ id }) => id === resourceId);
   const fileUrl = useFileUrl(resource);
+  const readAgain = useReadLinkAgain(resourceId);
   const pending = resource ? isPending(resource) : false;
   // Only a resource that is still young or unfinished changes with the clock.
   useEffect(() => {
@@ -198,9 +200,23 @@ export const ResourceScreen: React.FC = () => {
             resource={resource}
             stuck={stuck}
             onRemove={() => setRemoving(true)}
+            tryAgain={
+              isLink
+                ? {
+                    start: () => {
+                      readAgain.start();
+                    },
+                    busy: readAgain.busy,
+                    errorMessage: readAgain.errorMessage,
+                  }
+                : undefined
+            }
           />
 
-          <ResourceTextCard resource={resource} />
+          <ResourceTextCard
+            resource={resource}
+            readAgain={isLink ? readAgain : undefined}
+          />
 
           <Card
             as="section"

@@ -77,4 +77,49 @@ describe('JobStatusPanel', () => {
       'applications.jobUnreadableTitle',
     );
   });
+
+  it('offers to try a posting again, and says why it could not start', async () => {
+    const start = vi.fn();
+    const { rerender } = render(
+      <JobStatusPanel
+        application={{
+          job: job({ status: 'failed', failure: 'link-unreadable' }),
+          postingUrl: 'https://northwind.example/jobs/1482',
+        }}
+        onPaste={vi.fn()}
+        tryAgain={{ start, busy: false }}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'applications.tryAgainButton' }),
+    );
+    expect(start).toHaveBeenCalledOnce();
+
+    rerender(
+      <JobStatusPanel
+        application={{
+          job: job({ status: 'failed', failure: 'link-unreadable' }),
+          postingUrl: 'https://northwind.example/jobs/1482',
+        }}
+        onPaste={vi.fn()}
+        tryAgain={{ start, busy: false, errorMessage: 'Not now.' }}
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Not now.');
+  });
+
+  it('offers no "Try again" for a file', () => {
+    render(
+      <JobStatusPanel
+        application={{ job: job({ source: 'file', status: 'failed' }) }}
+        onPaste={vi.fn()}
+        tryAgain={{ start: vi.fn(), busy: false }}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'applications.tryAgainButton' }),
+    ).not.toBeInTheDocument();
+  });
 });

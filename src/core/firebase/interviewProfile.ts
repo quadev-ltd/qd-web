@@ -33,6 +33,8 @@ import {
   type ProfileResourceText,
   ProfileResourceTextSchema,
   profileTextPath,
+  READ_PROFILE_LINK_AGAIN,
+  ReadAgainResponseSchema,
   REMOVE_PROFILE_RESOURCE,
   type RemoveProfileResourceRequest,
   RemoveProfileResourceResponseSchema,
@@ -67,6 +69,17 @@ const reasonOf = (error: unknown): unknown =>
     ? (error as { details?: { reason?: unknown } | null }).details?.reason
     : undefined;
 
+/** What each reason of a `failed-precondition` refusal means for the screens. */
+const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
+  [CallableReason.MaxResources]: ProfileErrorCode.MaxResources,
+  [CallableReason.MaxApplications]: ProfileErrorCode.MaxApplications,
+  [CallableReason.AlreadyReading]: ProfileErrorCode.Reading,
+  [CallableReason.JobNotReady]: ProfileErrorCode.Reading,
+  [CallableReason.JobEdited]: ProfileErrorCode.JobEdited,
+  // The pages only offer to read a link again.
+  [CallableReason.NotALink]: ProfileErrorCode.Invalid,
+};
+
 /**
  * What a Firebase error means for the profile screens. Firestore codes are bare
  * ("permission-denied"), the others carry their service ("functions/…", "storage/…").
@@ -87,11 +100,7 @@ export const toProfileError = (error: unknown): ProfileError => {
       return new ProfileError(ProfileErrorCode.DailyLimit);
     case 'functions/failed-precondition':
       return new ProfileError(
-        reasonOf(error) === CallableReason.MaxResources
-          ? ProfileErrorCode.MaxResources
-          : reasonOf(error) === CallableReason.MaxApplications
-            ? ProfileErrorCode.MaxApplications
-            : ProfileErrorCode.Unknown,
+        PRECONDITION_CODES[String(reasonOf(error))] ?? ProfileErrorCode.Unknown,
       );
     case 'functions/not-found':
     case 'storage/object-not-found':
@@ -138,12 +147,29 @@ export const mapped = async <T>(run: () => Promise<T>): Promise<T> => {
 export const millis = (value: unknown): number | null =>
   value instanceof Timestamp ? value.toMillis() : null;
 
+/** A page read again (`refresh`, on a link or a job), with its Timestamps in milliseconds. */
+export const refreshWithDates = (
+  refresh: DocumentData | undefined,
+): { refresh?: DocumentData } =>
+  refresh
+    ? {
+        refresh: {
+          ...refresh,
+          startedAt: millis(refresh.startedAt),
+          ...(refresh.finishedAt === undefined
+            ? {}
+            : { finishedAt: millis(refresh.finishedAt) }),
+        },
+      }
+    : {};
+
 const withDates = (id: string, data: DocumentData) => ({
   ...data,
   id,
   createdAt: millis(data.createdAt),
   updatedAt: millis(data.updatedAt),
   ...(data.textAt === undefined ? {} : { textAt: millis(data.textAt) }),
+  ...refreshWithDates(data.refresh as DocumentData | undefined),
 });
 
 /**
@@ -291,6 +317,11 @@ export const removeResource = async (
     resourceId,
   });
   return { itemsRemoved };
+};
+
+/** Asks for a link's page to be read again; the resource then says how it goes. */
+export const readLinkAgain = async (resourceId: string): Promise<void> => {
+  await call(READ_PROFILE_LINK_AGAIN, ReadAgainResponseSchema, { resourceId });
 };
 
 // ---------- The file ----------

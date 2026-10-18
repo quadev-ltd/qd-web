@@ -8,6 +8,7 @@ import {
   getBriefsToday,
   getProfileRevision,
   prepareBrief,
+  readPostingAgain,
   removeApplication,
   updateApplication,
 } from './applications';
@@ -211,6 +212,77 @@ describe('changing applications', () => {
     await expect(
       createApplication({ job: { source: 'text', text: 'Job' } }),
     ).rejects.toEqual(new ProfileError(ProfileErrorCode.MaxApplications));
+  });
+});
+
+describe('reading a posting again', () => {
+  const started = {
+    data: { applicationId: 'a9', startedAt: '2026-10-18T10:00:00.000Z' },
+  };
+
+  it('asks for it with readJobPostingAgain, and `replaceEdited` only once the candidate said yes', async () => {
+    callable.mockResolvedValue(started);
+
+    await readPostingAgain('a9');
+    await readPostingAgain('a9', { replaceEdited: true });
+
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'readJobPostingAgain',
+    );
+    expect(callable).toHaveBeenNthCalledWith(1, { applicationId: 'a9' });
+    expect(callable).toHaveBeenNthCalledWith(2, {
+      applicationId: 'a9',
+      replaceEdited: true,
+    });
+  });
+
+  it('says so when the candidate edited the text, so the page can ask', async () => {
+    callable.mockRejectedValue(
+      Object.assign(new Error('edited'), {
+        code: 'functions/failed-precondition',
+        details: { reason: 'job-edited' },
+      }),
+    );
+
+    await expect(readPostingAgain('a9')).rejects.toEqual(
+      new ProfileError(ProfileErrorCode.JobEdited),
+    );
+  });
+
+  it('reads the last time the posting was read again, in milliseconds', async () => {
+    vi.mocked(getDoc).mockResolvedValueOnce(
+      document('a1', {
+        title: 'Senior Backend Engineer',
+        postingUrl: 'https://careers.northwind.example/sbe',
+        job: {
+          source: 'link',
+          status: 'ready',
+          takenAt: at(5),
+          edited: false,
+          refresh: {
+            status: 'failed',
+            startedAt: at(3),
+            finishedAt: at(4),
+            failure: 'link-unreadable',
+          },
+        },
+        createdAt: at(1),
+        updatedAt: at(4),
+      }) as never,
+    );
+
+    await expect(getApplication('uid-1', 'a1')).resolves.toMatchObject({
+      job: {
+        takenAt: 5,
+        refresh: {
+          status: 'failed',
+          startedAt: 3,
+          finishedAt: 4,
+          failure: 'link-unreadable',
+        },
+      },
+    });
   });
 });
 

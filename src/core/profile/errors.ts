@@ -16,6 +16,10 @@ export const ProfileErrorCode = {
   MaxApplications: 'profile/max-applications',
   /** The resource or the item does not exist (any more). */
   NotFound: 'profile/not-found',
+  /** It is being read (the first time, or its page again), so it cannot change or start again. */
+  Reading: 'profile/reading',
+  /** Reading the posting again would replace the job's text that the candidate edited. */
+  JobEdited: 'profile/job-edited',
   /** The backend did not accept the request as it was sent. */
   Invalid: 'profile/invalid',
   /** Nobody is signed in, or the page could not prove where it comes from (App Check). */
@@ -54,6 +58,8 @@ const EXPECTED_CODES: ReadonlySet<string> = new Set([
   ProfileErrorCode.MaxResources,
   ProfileErrorCode.MaxApplications,
   ProfileErrorCode.NotFound,
+  ProfileErrorCode.Reading,
+  ProfileErrorCode.JobEdited,
   ProfileErrorCode.Network,
   ProfileErrorCode.UploadCancelled,
   ProfileErrorCode.Unavailable,

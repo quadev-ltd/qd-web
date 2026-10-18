@@ -193,3 +193,61 @@ test('the text kept of a resource: a note as added, a text file’s text and a l
   await expect(copy).toContainText(/Taken on /);
   await expect(copy).toContainText(/fake-/);
 });
+
+test('a link read again (readProfileLinkAgain): the trigger reads it in the background, the same page says so; a failed link is tried again from the start', async ({
+  page,
+}) => {
+  const account = await createAccount({ interviewAssistant: true });
+  await signIn(page, account);
+  await openProfile(page);
+
+  // A link that was read, read again: the fake model gives the same copy for the same address
+  await page.getByRole('button', { name: 'Add something else' }).click();
+  await page.getByRole('button', { name: /Add a link/ }).click();
+  const form = page.getByRole('dialog', { name: 'Add a link' });
+  await form.getByLabel('Title').fill('Conference talk');
+  await form
+    .getByLabel('Address')
+    .fill('https://talks.example/ledgers-without-tears');
+  await form.getByRole('button', { name: 'Add to profile' }).click();
+  const link = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Conference talk' });
+  await expect(link.getByText('Ready', { exact: true })).toBeVisible();
+  await link.getByRole('link').click();
+  const copy = page.getByRole('region', { name: 'Copy of the page' });
+  await expect(copy).toContainText(/fake-/);
+  await copy.getByRole('button', { name: 'Read the page again' }).click();
+  await expect(copy).toContainText(
+    'The page hasn’t changed, so your copy stays as it is.',
+  );
+
+  // A link that could not be read (a host under .invalid), tried again: read from the start
+  await page.goto('/profile');
+  await page.getByRole('button', { name: 'Add a resource' }).click();
+  await page.getByRole('button', { name: /Add a link/ }).click();
+  await form.getByLabel('Title').fill('Team wiki');
+  await form.getByLabel('Address').fill('https://wiki.invalid/maya');
+  await form.getByRole('button', { name: 'Add to profile' }).click();
+  const wiki = page.getByRole('listitem').filter({ hasText: 'Team wiki' });
+  await expect(wiki).toContainText('Could not read this page');
+  await wiki.getByRole('link').click();
+  const panel = page
+    .getByRole('status')
+    .filter({ hasText: 'We couldn’t read this page' });
+  const accepted = page.waitForResponse(
+    response =>
+      response.url().endsWith('/readProfileLinkAgain') &&
+      response.request().method() === 'POST',
+  );
+  await panel.getByRole('button', { name: 'Try again' }).click();
+  // Accepted, then read again by the trigger, which still cannot read it
+  expect((await accepted).status()).toBe(200);
+  await expect(
+    page
+      .getByRole('status')
+      .filter({ hasText: 'We couldn’t read this page' })
+      .getByRole('button', { name: 'Try again' }),
+  ).toBeEnabled();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});

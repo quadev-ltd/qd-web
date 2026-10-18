@@ -13,6 +13,7 @@ import {
 } from 'react';
 
 import { isJobPending, type JobApplication } from './applications';
+import { isRereading } from './contract';
 import { logProfileError } from './errors';
 import {
   RESOURCE_POLL_MS,
@@ -31,6 +32,10 @@ import {
   applicationsLoadStarted,
   profileRevisionRead,
 } from '@/core/state/slices/applicationsSlice';
+
+/** Followed while the backend works on its job: the first reading, or the posting again. */
+const isFollowed = (application: JobApplication, time = Date.now()) =>
+  isJobPending(application) || isRereading(application.job?.refresh, time);
 
 export interface ApplicationsActions {
   /** Reads the applications again (after "could not load"). */
@@ -130,10 +135,10 @@ export const ApplicationsProvider: React.FC<{ children: ReactNode }> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
 
-  // While the backend reads the job of an application, read it again every 2 seconds, for
-  // as long as a resource is followed (the backend gives a reading 3 minutes).
+  // While the backend reads the job of an application, or its posting again, read it again
+  // every 2 seconds, for as long as a resource is followed (a reading has 3 minutes).
   const pendingIds = applications
-    .filter(isJobPending)
+    .filter(application => isFollowed(application))
     .map(({ id }) => id)
     .join(',');
   useEffect(() => {
@@ -146,12 +151,14 @@ export const ApplicationsProvider: React.FC<{ children: ReactNode }> = ({
         return;
       }
       const time = Date.now();
-      const followed = latest.current.filter(
-        application =>
-          isJobPending(application) &&
-          time - (application.updatedAt ?? application.createdAt ?? 0) <
-            RESOURCE_WATCH_MS,
-      );
+      const followed = latest.current.filter(application => {
+        const since = isJobPending(application)
+          ? (application.updatedAt ?? application.createdAt ?? 0)
+          : (application.job?.refresh?.startedAt ?? 0);
+        return (
+          isFollowed(application, time) && time - since < RESOURCE_WATCH_MS
+        );
+      });
       if (followed.length === 0) {
         return;
       }

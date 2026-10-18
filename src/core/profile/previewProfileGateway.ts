@@ -15,6 +15,7 @@ import {
 } from './applications';
 import {
   type CreateProfileResourceRequest,
+  isRereading,
   parseProfileLink,
   PROFILE_DAILY_EXTRACTIONS,
   PROFILE_MAX_RESOURCES,
@@ -78,8 +79,8 @@ const fileTextOf = (title: string) =>
   `${title}\n\nThe text of the file, without its layout. In the real backend this is what was read from the PDF, the Word document or the text file.`;
 
 /** What the fake keeps of a link: no page is read here, so a copy that says what it stands for. */
-const pageTextOf = (url: string) =>
-  `${url}\n\nThe copy of the page, as the model read it: its main text, without the menu, the cookie notice or the footer.\n\nIn the real backend\n- headings are plain lines\n- and lists are lines like these.`;
+const pageTextOf = (url: string, again = false) =>
+  `${url}\n\nThe copy of the page, as the model read it: its main text, without the menu, the cookie notice or the footer.\n\nIn the real backend\n- headings are plain lines\n- and lists are lines like these.${again ? '\n\nRead again: the page had changed.' : ''}`;
 
 interface PreviewProfile {
   resources: StoredResource[];
@@ -95,6 +96,16 @@ interface PreviewProfile {
   jobReadings?: Record<string, JobReading>;
   /** The texts kept of the resources (D78), by resource. */
   texts?: Record<string, ProfileResourceText>;
+  /** The pages of links being read again, by resource. */
+  pageRereads?: Record<string, Reread>;
+  /** The postings of jobs being read again, by application. */
+  postingRereads?: Record<string, Reread>;
+}
+
+/** How the fake reads a page again: when it ends, and how. */
+interface Reread {
+  settlesAt: number;
+  outcome: ProfileResourceFailure | 'changed' | 'unchanged';
 }
 
 /** How the fake reads the job of an application (research doc 17). */
@@ -135,6 +146,11 @@ export interface PreviewProfileControls {
   failNextJob(reason: ProfileResourceFailure): void;
   /** How many briefs were already prepared today. */
   setBriefsToday(count: number): void;
+  /**
+   * The next page read again (a link or a posting) has changed, or cannot be read for this
+   * reason. Otherwise it says the same as before, as the backend's fake model does.
+   */
+  nextReread(outcome: ProfileResourceFailure | 'changed'): void;
 }
 
 /** How long the fake takes to prepare a brief; the real one takes 10 to 20 seconds. */
@@ -259,6 +275,40 @@ export const createPreviewProfileGateway = ({
 
   let nextBriefFailure: 'model' | 'quota' | null = null;
   let nextJobFailure: ProfileResourceFailure | null = null;
+  let nextRereadOutcome: ProfileResourceFailure | 'changed' | null = null;
+
+  /** How the next page read again ends: as the controls said, or as the backend's fake model. */
+  const rereadOutcome = (url: string): Reread['outcome'] => {
+    const outcome =
+      nextRereadOutcome ??
+      (isHttpsInvalidHost(url) ? 'link-unreadable' : 'unchanged');
+    nextRereadOutcome = null;
+    return outcome;
+  };
+
+  /** How a first reading started again after a failed one ends. */
+  const againOutcome = (url: string): ProfileResourceFailure | 'ready' => {
+    const forced = nextRereadOutcome;
+    nextRereadOutcome = null;
+    if (forced && forced !== 'changed') {
+      return forced;
+    }
+    return isHttpsInvalidHost(url) ? 'link-unreadable' : 'ready';
+  };
+
+  /** The readings again whose time has come, and the ones left. */
+  const dueRereads = (
+    rereads: Record<string, Reread> | undefined,
+    time: number,
+  ) => {
+    const all = Object.entries(rereads ?? {});
+    return {
+      ended: all.filter(([, { settlesAt }]) => settlesAt <= time),
+      left: Object.fromEntries(
+        all.filter(([, { settlesAt }]) => settlesAt > time),
+      ),
+    };
+  };
 
   /** The names a reading finds: from the first lines of a text, an address or a file's name. */
   const namesFrom = (
@@ -330,6 +380,46 @@ export const createPreviewProfileGateway = ({
       } else if (reading.source === 'file') {
         application.jobDescription = `Read from ${reading.from}. You will design and run services in production and mentor engineers on the team.`;
       }
+    }
+    // The postings read again: a new copy replaces the job's text and dates the brief.
+    const postings = dueRereads(profile.postingRereads, time);
+    for (const [applicationId, { settlesAt: at, outcome }] of postings.ended) {
+      changed = true;
+      const application = applicationsOf(profile).find(
+        ({ id }) => id === applicationId,
+      );
+      const job = application?.job;
+      if (!application || !job || job.refresh?.status !== 'reading') {
+        continue;
+      }
+      const { startedAt } = job.refresh;
+      if (outcome === 'changed' || outcome === 'unchanged') {
+        // A text the candidate edited differs from any copy: it is replaced.
+        const isNew = outcome === 'changed' || job.edited;
+        if (isNew) {
+          application.jobDescription = `Copy of the posting at ${application.postingUrl ?? ''}, read again. The team now also asks for experience of being on call.`;
+          job.edited = false;
+          application.revision += 1;
+          application.updatedAt = at;
+        }
+        job.takenAt = at;
+        job.refresh = {
+          status: 'done',
+          startedAt,
+          finishedAt: at,
+          changed: isNew,
+        };
+      } else {
+        job.refresh = {
+          status: 'failed',
+          startedAt,
+          finishedAt: at,
+          failure: outcome,
+        };
+      }
+    }
+    if (postings.ended.length > 0) {
+      profile.postingRereads = postings.left;
     }
     if (changed) {
       save();
@@ -469,12 +559,14 @@ export const createPreviewProfileGateway = ({
     profile: PreviewProfile,
     resource: StoredResource,
     at: number,
+    /** A link's page read again, which had changed. */
+    again = false,
   ) => {
     const text =
       resource.source === 'text'
         ? (resource.pasted ?? '')
         : resource.source === 'link'
-          ? pageTextOf(resource.url ?? '')
+          ? pageTextOf(resource.url ?? '', again)
           : fileTextOf(resource.title);
     profile.texts = {
       ...profile.texts,
@@ -532,6 +624,45 @@ export const createPreviewProfileGateway = ({
         resource.status = 'failed';
         resource.failure = resource.outcome;
       }
+    }
+    // The pages read again: a new copy replaces the text and moves the profile's revision.
+    const pages = dueRereads(profile.pageRereads, time);
+    for (const [resourceId, { settlesAt: at, outcome }] of pages.ended) {
+      changed = true;
+      const resource = profile.resources.find(({ id }) => id === resourceId);
+      if (!resource || resource.refresh?.status !== 'reading') {
+        continue;
+      }
+      const { startedAt } = resource.refresh;
+      resource.updatedAt = at;
+      if (outcome === 'changed' || outcome === 'unchanged') {
+        const kept = profile.texts?.[resourceId];
+        // A link read before copies were kept gets its first one.
+        const isNew = outcome === 'changed' || !kept;
+        if (isNew) {
+          keepText(profile, resource, at, outcome === 'changed');
+          touch(profile);
+        } else {
+          kept.takenAt = at;
+          resource.textAt = at;
+        }
+        resource.refresh = {
+          status: 'done',
+          startedAt,
+          finishedAt: at,
+          changed: isNew,
+        };
+      } else {
+        resource.refresh = {
+          status: 'failed',
+          startedAt,
+          finishedAt: at,
+          failure: outcome,
+        };
+      }
+    }
+    if (pages.ended.length > 0) {
+      profile.pageRereads = pages.left;
     }
     if (changed) {
       save();
@@ -643,6 +774,9 @@ export const createPreviewProfileGateway = ({
     },
     failNextJob: reason => {
       nextJobFailure = reason;
+    },
+    nextReread: outcome => {
+      nextRereadOutcome = outcome;
     },
     setBriefsToday: count => {
       currentProfile().briefsToday = count;
@@ -876,6 +1010,47 @@ export const createPreviewProfileGateway = ({
       save();
       return { itemsRemoved: before - profile.items.length };
     },
+    readLinkAgain: async resourceId => {
+      const profile = currentProfile();
+      const resource = profile.resources.find(({ id }) => id === resourceId);
+      if (!resource) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      if (resource.source !== 'link' || !resource.url) {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      const time = now();
+      if (
+        resource.status === 'awaitingUpload' ||
+        resource.status === 'processing' ||
+        isRereading(resource.refresh, time)
+      ) {
+        throw new ProfileError(ProfileErrorCode.Reading);
+      }
+      if (profile.extractionsToday >= PROFILE_DAILY_EXTRACTIONS) {
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+      }
+      profile.extractionsToday += 1;
+      if (resource.status === 'failed') {
+        // Read from the start, as when it was added.
+        delete resource.failure;
+        delete resource.refresh;
+        resource.outcome = againOutcome(resource.url);
+        resource.updatedAt = time;
+        startReading(resource);
+      } else {
+        resource.refresh = { status: 'reading', startedAt: time };
+        resource.updatedAt = time;
+        profile.pageRereads = {
+          ...profile.pageRereads,
+          [resourceId]: {
+            settlesAt: time + PREVIEW_READ_MS,
+            outcome: rereadOutcome(resource.url),
+          },
+        };
+      }
+      save();
+    },
 
     // No file exists here: the address leads nowhere on purpose.
     getFileUrl: async () => '#',
@@ -1012,9 +1187,15 @@ export const createPreviewProfileGateway = ({
       }
       if (changes.jobDescription !== undefined) {
         const job = text(changes.jobDescription, JOB_DESCRIPTION_MAX_CHARS);
-        // Not while the job is being read ("job-not-ready"), and never emptied.
-        if (!job || isJobPending(application)) {
+        if (!job) {
           throw new ProfileError(ProfileErrorCode.Invalid);
+        }
+        // Not while the job, or its posting again, is being read ("job-not-ready").
+        if (
+          isJobPending(application) ||
+          isRereading(application.job?.refresh, now())
+        ) {
+          throw new ProfileError(ProfileErrorCode.Reading);
         }
         application.jobDescription = job;
         if (application.job) {
@@ -1054,7 +1235,10 @@ export const createPreviewProfileGateway = ({
       if (!application) {
         throw new ProfileError(ProfileErrorCode.NotFound);
       }
-      if (application.job && application.job.status !== 'ready') {
+      if (isJobPending(application)) {
+        throw new ProfileError(ProfileErrorCode.Reading);
+      }
+      if (application.job?.status === 'failed') {
         throw new ProfileError(ProfileErrorCode.Invalid);
       }
       const failure = nextBriefFailure;
@@ -1073,6 +1257,56 @@ export const createPreviewProfileGateway = ({
       }
       application.brief = briefFor(profile, application);
       application.updatedAt = now();
+      save();
+    },
+    readPostingAgain: async (applicationId, { replaceEdited = false } = {}) => {
+      const profile = currentProfile();
+      const application = applicationsOf(profile).find(
+        ({ id }) => id === applicationId,
+      );
+      if (!application) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      const { job, postingUrl } = application;
+      if (job?.source !== 'link' || !postingUrl) {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      const time = now();
+      if (isJobPending(application) || isRereading(job.refresh, time)) {
+        throw new ProfileError(ProfileErrorCode.Reading);
+      }
+      if (job.status === 'ready' && job.edited && !replaceEdited) {
+        throw new ProfileError(ProfileErrorCode.JobEdited);
+      }
+      if (profile.extractionsToday >= PROFILE_DAILY_EXTRACTIONS) {
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+      }
+      profile.extractionsToday += 1;
+      if (job.status === 'failed') {
+        // Read from the start, as when it was added.
+        delete job.failure;
+        delete job.refresh;
+        job.status = 'reading';
+        application.updatedAt = time;
+        profile.jobReadings = {
+          ...profile.jobReadings,
+          [applicationId]: {
+            settlesAt: time + PREVIEW_READ_MS,
+            outcome: againOutcome(postingUrl),
+            source: 'link',
+            from: postingUrl,
+          },
+        };
+      } else {
+        job.refresh = { status: 'reading', startedAt: time };
+        profile.postingRereads = {
+          ...profile.postingRereads,
+          [applicationId]: {
+            settlesAt: time + PREVIEW_READ_MS,
+            outcome: rereadOutcome(postingUrl),
+          },
+        };
+      }
       save();
     },
     getBriefsToday: async uid => read(uid).briefsToday ?? 0,
