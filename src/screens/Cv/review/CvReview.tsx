@@ -5,6 +5,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import DownloadButton from '../download/DownloadButton';
+
 import CvDocument from './CvDocument';
 import {
   ChangeCard,
@@ -64,9 +66,15 @@ export interface CvReviewProps {
   version: CvVersion;
   /** The title of the CV it starts from. */
   cvTitle: string;
+  /** What the downloaded file is called, without its extension. */
+  fileTitle: string;
 }
 
-export const CvReview: React.FC<CvReviewProps> = ({ version, cvTitle }) => {
+export const CvReview: React.FC<CvReviewProps> = ({
+  version,
+  cvTitle,
+  fileTitle,
+}) => {
   const { t } = useTranslation();
   const { resources } = useInterviewProfile();
   const review = useCvReview(version.id);
@@ -179,6 +187,7 @@ export const CvReview: React.FC<CvReviewProps> = ({ version, cvTitle }) => {
                   .length,
               })}
             </p>
+            <DownloadButton version={version} fileTitle={fileTitle} />
           </Card>
           {version.target.kind === 'job' && (
             <Card

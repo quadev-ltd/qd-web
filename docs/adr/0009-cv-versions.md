@@ -66,12 +66,25 @@ are all merged (quadev-backend #33 to #36).
   send it?" with "Mark as sent" (one per application; "Not the one I sent" takes it back). "Save
   my answer to my profile too" is not there: the backend's slices leave it for later (doc 18).
 
+## The download (slice 14)
+
+- **Made in the browser** (doc 15 question 6, the backend plan's default), from `cvVersionText`,
+  once nothing is left to review (D75): "Download PDF", with an arrow for "Word (.docx)".
+- **One plain layout** that tracking systems read well (doc 13 question 35): the name, section
+  headings (a short line that ends no sentence), bullets for list lines, the other lines as they
+  are, on A4 pages (a UK CV, D80). The CV's text has no structure of its own, so this is a reading
+  of its lines, kept simple.
+- **Two libraries, loaded only when a file is made:** `pdf-lib` 1.17.1 (no `eval`, which the
+  Content-Security-Policy would refuse; standard fonts, so a character outside Western European
+  text is written "?") and `docx` 9.8.1 (the release of 28 Sep 2026, two weeks old or more). The
+  main file does not change.
+
 ## In this first slice, and what follows
 
 Slice 12 (this ADR's first part): the CV section in its three states, the panel, a version being
 made, failed and lost, a version made shown as its CV with what is left to review, and remove.
-Slice 13: the review, above. Then the download (PDF and Word, made in the browser from
-`cvVersionText`), and compare, restore and the application's CV tab (doc 15 §18).
+Slices 13 and 14: the review and the download, above. Then compare, restore and the
+application's CV tab (doc 15 §18).
 
 ## Not verified
 

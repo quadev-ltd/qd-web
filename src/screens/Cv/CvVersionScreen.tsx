@@ -272,7 +272,14 @@ export const CvVersionScreen: React.FC = () => {
     );
   } else {
     body = (
-      <CvReview version={version} cvTitle={startTitle(t, version, resources)} />
+      <CvReview
+        version={version}
+        cvTitle={startTitle(t, version, resources)}
+        fileTitle={t('cv.fileTitle', {
+          heading: versionHeading(t, version, applications),
+          date,
+        })}
+      />
     );
   }
 

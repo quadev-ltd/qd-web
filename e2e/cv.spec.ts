@@ -2,6 +2,8 @@
 // a browser. The fake makes a version a moment after it is asked for, with an answer that
 // quotes the CV, as the backend's offline answer does. The same use case against the backend's
 // code is in e2e-emulators/.
+import { readFileSync } from 'node:fs';
+
 import { expect, type Page, test } from '@playwright/test';
 
 import {
@@ -10,6 +12,14 @@ import {
   seedApplications,
   seedProfile,
 } from './support';
+
+/** Today as the pages write it, "18 Oct 2026". */
+const today = () =>
+  new Date().toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 
 const openCv = async (page: Page) => {
   await page
@@ -85,6 +95,31 @@ test('a general version: from the first screen, made in the background, reviewed
     'Built the reconciliation service and ran it.',
   );
   await expect(cv).toContainText('Nine engineers, for two years.');
+
+  // The download, made in the browser: a PDF, and Word under the arrow
+  const pdf = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download PDF' }).click();
+  const pdfFile = await pdf;
+  expect(pdfFile.suggestedFilename()).toBe(
+    `Data engineer, in general - CV - ${today()}.pdf`,
+  );
+  expect(
+    readFileSync(await pdfFile.path())
+      .subarray(0, 5)
+      .toString(),
+  ).toBe('%PDF-');
+  const word = page.waitForEvent('download');
+  await page
+    .getByRole('button', { name: 'Other formats: Word (.docx)' })
+    .click();
+  await page.getByRole('menuitem', { name: 'Word (.docx)' }).click();
+  const wordFile = await word;
+  expect(wordFile.suggestedFilename()).toMatch(/\.docx$/);
+  expect(
+    readFileSync(await wordFile.path())
+      .subarray(0, 2)
+      .toString(),
+  ).toBe('PK');
 
   // In the list under "General", then removed
   await page.getByRole('link', { name: 'CV', exact: true }).first().click();

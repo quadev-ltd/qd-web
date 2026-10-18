@@ -654,7 +654,13 @@
     "markSentButton": "Mark as sent",
     "sentChip": "Sent with your application",
     "unmarkSentButton": "Not the one I sent",
-    "markFailedMessage": "We couldn’t save this. Check your connection and try again."
+    "markFailedMessage": "We couldn’t save this. Check your connection and try again.",
+    "downloadPdfButton": "Download PDF",
+    "otherFormats": "Other formats: Word (.docx)",
+    "downloadWord": "Word (.docx)",
+    "makingFile": "Making the file…",
+    "downloadFailedMessage": "We couldn’t make the file. Try again.",
+    "fileTitle": "{{heading}} - CV - {{date}}"
   },
   "textPreview": {
     "showAll": "Show all",
