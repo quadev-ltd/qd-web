@@ -76,6 +76,7 @@ describe('FlagsProvider', () => {
     expect(result.current.flags).toEqual({
       smartInspection: false,
       interviewAssistant: false,
+      cvTool: false,
       aiDiagnostics: false,
     });
     expect(result.current.ready).toBe(true);

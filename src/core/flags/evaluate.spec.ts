@@ -26,6 +26,7 @@ describe('evaluate', () => {
     ).toEqual({
       smartInspection: false,
       interviewAssistant: true,
+      cvTool: false,
       aiDiagnostics: false,
     });
     expect(evaluateAll({}, {})).toEqual(DEFAULT_FLAGS);
@@ -36,6 +37,7 @@ describe('registry (mirror of @quadev/flags)', () => {
   it('has the backend flags, all off by default', () => {
     expect([...FLAG_KEYS].sort()).toEqual([
       'aiDiagnostics',
+      'cvTool',
       'interviewAssistant',
       'smartInspection',
     ]);

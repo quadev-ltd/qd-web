@@ -11,6 +11,8 @@ export interface MainNavProps {
   homePath: string;
   /** The interview profile. Its pages (a resource) keep it marked. */
   profilePath: string;
+  /** The CV section, for an account with the CV tool; its versions keep it marked. */
+  cvPath?: string;
   /** The account section of the home. */
   accountPath: string;
 }
@@ -19,6 +21,7 @@ export interface MainNavProps {
 export const MainNav: React.FC<MainNavProps> = ({
   homePath,
   profilePath,
+  cvPath,
   accountPath,
 }) => {
   const { t } = useTranslation();
@@ -40,6 +43,15 @@ export const MainNav: React.FC<MainNavProps> = ({
         className={({ isActive }) => (isActive ? `${LINK} bg-white/14` : LINK)}>
         {t('profile.title')}
       </NavLink>
+      {cvPath && (
+        <NavLink
+          to={cvPath}
+          className={({ isActive }) =>
+            isActive ? `${LINK} bg-white/14` : LINK
+          }>
+          {t('cv.title')}
+        </NavLink>
+      )}
       <Link to={accountPath} className={LINK}>
         {t('home.accountLink')}
       </Link>

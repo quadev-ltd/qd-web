@@ -21,3 +21,12 @@ export const APPLICATION_DETAILS_PATH = `${APPLICATION_PATH}/details`;
 
 export const applicationDetailsPath = (applicationId: string) =>
   `${applicationPath(applicationId)}/details`;
+
+/** The CV section (delivery 2b): the versions of the candidate's CVs. */
+export const CV_PATH = '/cv';
+
+/** One CV version: being made, could not be made, or made, with what it changes. */
+export const CV_VERSION_PATH = `${CV_PATH}/versions/:versionId`;
+
+export const cvVersionPath = (versionId: string) =>
+  `${CV_PATH}/versions/${encodeURIComponent(versionId)}`;

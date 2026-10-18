@@ -30,6 +30,13 @@ import {
   SKILL_MAP_ITEM_MAX_CHARS,
   type SkillMapItem,
 } from './contract';
+import {
+  CV_DAILY_VERSIONS,
+  CV_ROLE_MAX_CHARS,
+  CV_VERSIONS_MAX,
+  type CvVersion,
+  type CvVersionFailure,
+} from './cvVersions';
 import { ProfileError, ProfileErrorCode } from './errors';
 import { type ProfileGateway } from './gateway';
 import {
@@ -100,6 +107,12 @@ interface PreviewProfile {
   pageRereads?: Record<string, Reread>;
   /** The postings of jobs being read again, by application. */
   postingRereads?: Record<string, Reread>;
+  /** The CV versions (delivery 2b), the newest last. */
+  cvVersions?: CvVersion[];
+  /** The versions being made: when each ends, and how. */
+  cvMaking?: Record<string, { settlesAt: number; failure?: CvVersionFailure }>;
+  /** How many versions were made today. */
+  cvVersionsToday?: number;
 }
 
 /** How the fake reads a page again: when it ends, and how. */
@@ -151,10 +164,99 @@ export interface PreviewProfileControls {
    * reason. Otherwise it says the same as before, as the backend's fake model does.
    */
   nextReread(outcome: ProfileResourceFailure | 'changed'): void;
+  /** The next CV version cannot be made, for this reason. */
+  failNextCv(reason: CvVersionFailure): void;
+  /** How many CV versions were already made today. */
+  setCvVersionsToday(count: number): void;
 }
 
 /** How long the fake takes to prepare a brief; the real one takes 10 to 20 seconds. */
 export const PREVIEW_BRIEF_MS = 1200;
+/** How long the fake takes to make a CV version; the real one takes about a minute. */
+export const PREVIEW_CV_MS = 2000;
+
+/** The lines of a CV that say something: 20 characters at least, without their list mark. */
+const cvLines = (cv: string) =>
+  cv
+    .split('\n')
+    .map(line => line.replace(/^\s*(?:[-•*▪◦–]\s+)/, '').trim())
+    .filter(line => line.length >= 20);
+
+/**
+ * What the fake answers for a version, shaped as the backend's offline answer (research doc
+ * 18): every passage is a real line of the CV, every change has a source.
+ */
+const cvAnswerFor = (
+  cv: string,
+  firstItem: SkillMapItem | undefined,
+  jobDescription: string | undefined,
+): Pick<
+  CvVersion,
+  'findings' | 'changes' | 'questions' | 'unsupportedJobTerms'
+> => {
+  const lines = cvLines(cv);
+  const target = lines[1] ?? lines[0] ?? '';
+  const last = lines.at(-1) ?? '';
+  return {
+    findings: [
+      {
+        kind: 'results',
+        severity: 'medium',
+        passage: target,
+        text: 'Says what you did, not what came of it. A reader can’t check it.',
+      },
+      {
+        kind: 'structure',
+        severity: 'low',
+        passage: '',
+        text: 'The dates of your roles show the year only. A UK CV usually gives the month too.',
+      },
+    ],
+    changes: [
+      ...(target
+        ? [
+            {
+              id: 'c1',
+              action: 'rewrite' as const,
+              original: target,
+              after: '',
+              proposed: `${target.replace(/\.$/, '')}, which cut the time it took by half.`,
+              reason: 'Says what came of it, with the number your CV gives.',
+              sources: [{ kind: 'cv' as const }],
+              decision: 'open' as const,
+            },
+          ]
+        : []),
+      ...(firstItem && last
+        ? [
+            {
+              id: 'c2',
+              action: 'add' as const,
+              original: '',
+              after: last,
+              proposed: firstItem.text,
+              reason: 'Your profile shows it, and your CV didn’t say it.',
+              sources: [{ kind: 'item' as const, itemId: firstItem.id }],
+              decision: 'open' as const,
+            },
+          ]
+        : []),
+    ],
+    questions: last
+      ? [
+          {
+            id: 'q1',
+            passage: last,
+            text: 'How many people worked on this with you?',
+            status: 'open',
+          },
+        ]
+      : [],
+    unsupportedJobTerms: jobDescription
+      ? jobDescription.split(/\s+/).filter(Boolean).slice(0, 3)
+      : [],
+  };
+};
 
 /** Questions the fake asks for any job, with what kind each is. */
 const PREVIEW_QUESTIONS: [string, BriefQuestion['kind']][] = [
@@ -669,13 +771,58 @@ export const createPreviewProfileGateway = ({
     }
   };
 
+  /** Ends the CV versions whose making has come to an end. */
+  const settleCvVersions = (profile: PreviewProfile) => {
+    const time = now();
+    const making = Object.entries(profile.cvMaking ?? {});
+    const ended = making.filter(([, { settlesAt }]) => settlesAt <= time);
+    if (ended.length === 0) {
+      return;
+    }
+    for (const [versionId, { settlesAt, failure }] of ended) {
+      const version = profile.cvVersions?.find(({ id }) => id === versionId);
+      if (!version || version.status !== 'creating') {
+        continue;
+      }
+      version.updatedAt = settlesAt;
+      if (failure) {
+        version.status = 'failed';
+        version.failure = failure;
+        continue;
+      }
+      const job =
+        version.target.kind === 'job'
+          ? (() => {
+              const { applicationId } = version.target;
+              return applicationsOf(profile).find(
+                ({ id }) => id === applicationId,
+              );
+            })()
+          : undefined;
+      Object.assign(
+        version,
+        cvAnswerFor(version.cv, profile.items[0], job?.jobDescription),
+      );
+      version.status = 'ready';
+      version.readyAt = settlesAt;
+      profile.cvVersionsToday = (profile.cvVersionsToday ?? 0) + 1;
+    }
+    profile.cvMaking = Object.fromEntries(
+      making.filter(([, { settlesAt }]) => settlesAt > time),
+    );
+    save();
+  };
+
   const read = (uid: string): PreviewProfile => {
     lastReadUid = uid;
     const profile = profileOf(uid);
     settle(profile);
     settleJobs(profile);
+    settleCvVersions(profile);
     return profile;
   };
+
+  let nextCvFailure: CvVersionFailure | null = null;
 
   const currentUid = (): string => {
     const uid = signedInUid() ?? lastReadUid;
@@ -777,6 +924,13 @@ export const createPreviewProfileGateway = ({
     },
     nextReread: outcome => {
       nextRereadOutcome = outcome;
+    },
+    failNextCv: reason => {
+      nextCvFailure = reason;
+    },
+    setCvVersionsToday: count => {
+      currentProfile().cvVersionsToday = count;
+      save();
     },
     setBriefsToday: count => {
       currentProfile().briefsToday = count;
@@ -1310,6 +1464,97 @@ export const createPreviewProfileGateway = ({
       save();
     },
     getBriefsToday: async uid => read(uid).briefsToday ?? 0,
+
+    getCvVersions: async uid =>
+      structuredClone(read(uid).cvVersions ?? []).sort(
+        (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0),
+      ),
+    getCvVersion: async (uid, versionId) => {
+      const found = read(uid).cvVersions?.find(({ id }) => id === versionId);
+      return found ? structuredClone(found) : null;
+    },
+    createCvVersion: async ({ resourceId, target, length = 'same' }) => {
+      const profile = currentProfile();
+      const resource = profile.resources.find(({ id }) => id === resourceId);
+      if (!resource) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      if (resource.type !== 'cv') {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      const cv = profile.texts?.[resourceId]?.text;
+      if (!cv) {
+        throw new ProfileError(ProfileErrorCode.NoCvText);
+      }
+      let role: string | undefined;
+      if (target.kind === 'job') {
+        const application = applicationsOf(profile).find(
+          ({ id }) => id === target.applicationId,
+        );
+        if (!application) {
+          throw new ProfileError(ProfileErrorCode.NotFound);
+        }
+        if (isJobPending(application)) {
+          throw new ProfileError(ProfileErrorCode.Reading);
+        }
+        if (!application.jobDescription) {
+          throw new ProfileError(ProfileErrorCode.Invalid);
+        }
+      } else {
+        role = target.role?.trim() || undefined;
+        if (role && role.length > CV_ROLE_MAX_CHARS) {
+          throw new ProfileError(ProfileErrorCode.Invalid);
+        }
+      }
+      if ((profile.cvVersions ?? []).length >= CV_VERSIONS_MAX) {
+        throw new ProfileError(ProfileErrorCode.MaxCvVersions);
+      }
+      if ((profile.cvVersionsToday ?? 0) >= CV_DAILY_VERSIONS) {
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+      }
+      const at = now();
+      const version: CvVersion = {
+        id: newId('version'),
+        target:
+          target.kind === 'job'
+            ? { kind: 'job', applicationId: target.applicationId }
+            : { kind: 'general', ...(role ? { role } : {}) },
+        resourceId,
+        length,
+        status: 'creating',
+        cv,
+        findings: [],
+        changes: [],
+        questions: [],
+        unsupportedJobTerms: [],
+        profileRevision: profile.revision ?? 0,
+        createdAt: at,
+        updatedAt: at,
+      };
+      profile.cvVersions = [...(profile.cvVersions ?? []), version];
+      profile.cvMaking = {
+        ...profile.cvMaking,
+        [version.id]: {
+          settlesAt: at + PREVIEW_CV_MS,
+          ...(nextCvFailure ? { failure: nextCvFailure } : {}),
+        },
+      };
+      nextCvFailure = null;
+      save();
+      // As the backend answers once it is asked to: the version says how it goes.
+      return { versionId: version.id, status: 'creating' };
+    },
+    removeCvVersion: async versionId => {
+      const profile = currentProfile();
+      if (!profile.cvVersions?.some(({ id }) => id === versionId)) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      profile.cvVersions = profile.cvVersions.filter(
+        ({ id }) => id !== versionId,
+      );
+      save();
+    },
+    getCvVersionsToday: async uid => read(uid).cvVersionsToday ?? 0,
 
     removeApplication: async applicationId => {
       const profile = currentProfile();

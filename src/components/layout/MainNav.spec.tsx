@@ -69,4 +69,31 @@ describe('MainNav', () => {
       expect(link).not.toHaveAttribute('aria-current');
     }
   });
+
+  it.each(['/cv', '/cv/versions/v1'])(
+    'links to the CV section for an account with the CV tool, current at %s',
+    route => {
+      renderWithProviders(
+        <MainNav
+          homePath="/home"
+          profilePath="/profile"
+          cvPath="/cv"
+          accountPath="/home#account"
+        />,
+        { route },
+      );
+
+      const cv = screen.getByRole('link', { name: 'cv.title' });
+      expect(cv).toHaveAttribute('href', '/cv');
+      expect(cv).toHaveAttribute('aria-current', 'page');
+    },
+  );
+
+  it('has no CV link without the CV tool', () => {
+    renderNav('/home');
+
+    expect(
+      screen.queryByRole('link', { name: 'cv.title' }),
+    ).not.toBeInTheDocument();
+  });
 });

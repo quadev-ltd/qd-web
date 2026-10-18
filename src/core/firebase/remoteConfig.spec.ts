@@ -50,6 +50,7 @@ describe('the flags from Remote Config', () => {
     expect(remoteConfig.defaultConfig).toEqual({
       smartInspection: false,
       interviewAssistant: false,
+      cvTool: false,
       aiDiagnostics: false,
     });
   });
@@ -91,7 +92,12 @@ describe('the flags from Remote Config', () => {
         .mocked(getValue)
         .mock.calls.map(([, key]) => key)
         .sort(),
-    ).toEqual(['aiDiagnostics', 'interviewAssistant', 'smartInspection']);
+    ).toEqual([
+      'aiDiagnostics',
+      'cvTool',
+      'interviewAssistant',
+      'smartInspection',
+    ]);
   });
 
   it('passes a failed fetch on', async () => {

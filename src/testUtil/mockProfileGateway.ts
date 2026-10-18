@@ -30,6 +30,13 @@ export const createMockProfileGateway = (): Mocked<ProfileGateway> => ({
   prepareBrief: vi.fn(() => Promise.resolve()),
   readPostingAgain: vi.fn(() => Promise.resolve()),
   getBriefsToday: vi.fn(() => Promise.resolve(0)),
+  getCvVersions: vi.fn(() => Promise.resolve([])),
+  getCvVersion: vi.fn(() => Promise.resolve(null)),
+  createCvVersion: vi.fn(() =>
+    Promise.resolve({ versionId: 'version-1', status: 'creating' as const }),
+  ),
+  removeCvVersion: vi.fn(() => Promise.resolve()),
+  getCvVersionsToday: vi.fn(() => Promise.resolve(0)),
 });
 
 export default createMockProfileGateway;

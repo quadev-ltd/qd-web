@@ -25,6 +25,8 @@ import { env } from '@/core/env';
 import {
   APPLICATION_DETAILS_PATH,
   APPLICATION_PATH,
+  CV_PATH,
+  CV_VERSION_PATH,
   PROFILE_PATH,
   RESOURCE_PATH,
 } from '@/core/profile/paths';
@@ -145,6 +147,28 @@ const accountRoutes: RouteObject[] = [
                   Component: (
                     await import('@/screens/Applications/ApplicationScreen')
                   ).ApplicationDetailsScreen,
+                }),
+              },
+            ],
+          },
+          // CV versions (delivery 2b): behind the `cvTool` flag as well, with the
+          // applications (a version can be for one of them) and the versions.
+          {
+            lazy: async () => ({
+              Component: (await import('@/screens/Cv/CvRoutes')).CvRoutes,
+            }),
+            children: [
+              {
+                path: CV_PATH,
+                lazy: async () => ({
+                  Component: (await import('@/screens/Cv/CvScreen')).CvScreen,
+                }),
+              },
+              {
+                path: CV_VERSION_PATH,
+                lazy: async () => ({
+                  Component: (await import('@/screens/Cv/CvVersionScreen'))
+                    .CvVersionScreen,
                 }),
               },
             ],

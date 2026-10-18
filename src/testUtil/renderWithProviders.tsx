@@ -17,6 +17,10 @@ import {
   initialApplicationsState,
 } from '@/core/state/slices/applicationsSlice';
 import {
+  type CvVersionsState,
+  initialCvVersionsState,
+} from '@/core/state/slices/cvVersionsSlice';
+import {
   type ExitState,
   initialExitState,
 } from '@/core/state/slices/exitSlice';
@@ -43,6 +47,8 @@ interface Options {
   interviewProfile?: Partial<InterviewProfileState>;
   /** The job applications as already read, on top of the initial state (not read). */
   applications?: Partial<ApplicationsState>;
+  /** The CV versions as already read, on top of the initial state (not read). */
+  cvVersions?: Partial<CvVersionsState>;
   /** The auth gateway the component calls. By default sign-in is unavailable. */
   gateway?: AuthGateway;
   /** The profile gateway the component calls. By default the profile is unavailable. */
@@ -63,6 +69,7 @@ const createProviders = ({
   exit,
   interviewProfile,
   applications,
+  cvVersions,
   gateway = unavailableGateway,
   profileGateway = unavailableProfileGateway,
   flags,
@@ -73,6 +80,7 @@ const createProviders = ({
     exit: { ...initialExitState, ...exit },
     interviewProfile: { ...initialInterviewProfileState, ...interviewProfile },
     applications: { ...initialApplicationsState, ...applications },
+    cvVersions: { ...initialCvVersionsState, ...cvVersions },
   });
   const flagsState = {
     flags: { ...DEFAULT_FLAGS, ...flags },

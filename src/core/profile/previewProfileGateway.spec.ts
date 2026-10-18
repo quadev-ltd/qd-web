@@ -3,12 +3,14 @@ import {
   PROFILE_MAX_RESOURCES,
   PROFILE_UPLOAD_MAX_BYTES,
 } from './contract';
+import { CV_DAILY_VERSIONS } from './cvVersions';
 import { ProfileErrorCode } from './errors';
 import { PREVIEW_FACTS } from './previewProfileData';
 import {
   createPreviewProfileGateway,
   exposePreviewProfileControls,
   PREVIEW_BRIEF_MS,
+  PREVIEW_CV_MS,
   PREVIEW_READ_MS,
   type PreviewProfileStorage,
 } from './previewProfileGateway';
@@ -1375,5 +1377,141 @@ describe('previewProfileGateway', () => {
         ProfileErrorCode.Invalid,
       );
     });
+  });
+});
+
+describe('previewProfileGateway, CV versions (delivery 2b)', () => {
+  /** A profile of the designs, its CV with its text, and an application with its job. */
+  const seeded = async () => {
+    const set = await setUp();
+    set.gateway.controls.seed();
+    const cv = (await set.gateway.getResources(UID)).find(
+      ({ type, textAt }) => type === 'cv' && textAt,
+    )!;
+    const { applicationId } = await set.gateway.createApplication({
+      job: {
+        source: 'text',
+        text: 'Senior Backend Engineer\nNorthwind Logistics\nGo services in production.',
+      },
+    });
+    set.pass(PREVIEW_READ_MS);
+    await set.gateway.getApplications(UID);
+    return { ...set, cv, applicationId };
+  };
+
+  it('makes a version in the background: creating at once, then ready with an answer that quotes the CV', async () => {
+    const { gateway, pass, cv, applicationId } = await seeded();
+
+    const { versionId, status } = await gateway.createCvVersion({
+      resourceId: cv.id,
+      target: { kind: 'job', applicationId },
+    });
+    expect(status).toBe('creating');
+    await expect(gateway.getCvVersion(UID, versionId)).resolves.toMatchObject({
+      status: 'creating',
+      length: 'same',
+      changes: [],
+    });
+    pass(PREVIEW_CV_MS);
+
+    const version = (await gateway.getCvVersion(UID, versionId))!;
+    expect(version.status).toBe('ready');
+    for (const passage of [
+      ...version.findings.map(({ passage: quoted }) => quoted),
+      ...version.changes.map(({ original, after }) => original || after),
+      ...version.questions.map(({ passage: quoted }) => quoted),
+    ]) {
+      expect(version.cv).toContain(passage);
+    }
+    expect(version.changes.map(({ action }) => action)).toEqual([
+      'rewrite',
+      'add',
+    ]);
+    expect(version.changes[1]?.sources[0]).toMatchObject({ kind: 'item' });
+    expect(version.unsupportedJobTerms).toEqual([
+      'Senior',
+      'Backend',
+      'Engineer',
+    ]);
+    await expect(gateway.getCvVersionsToday(UID)).resolves.toBe(1);
+  });
+
+  it('makes a general version with its role, and lists the newest first', async () => {
+    const { gateway, pass, cv } = await seeded();
+    const { versionId: first } = await gateway.createCvVersion({
+      resourceId: cv.id,
+      target: { kind: 'general' },
+    });
+    pass(1000);
+    const { versionId: second } = await gateway.createCvVersion({
+      resourceId: cv.id,
+      target: { kind: 'general', role: '  Data engineer  ' },
+      length: 'one-page',
+    });
+
+    const versions = await gateway.getCvVersions(UID);
+    expect(versions.map(({ id }) => id)).toEqual([second, first]);
+    expect(versions[0]).toMatchObject({
+      target: { kind: 'general', role: 'Data engineer' },
+      length: 'one-page',
+      unsupportedJobTerms: [],
+    });
+  });
+
+  it('fails a version on request, and removes one', async () => {
+    const { gateway, pass, cv } = await seeded();
+    gateway.controls.failNextCv('model');
+    const { versionId } = await gateway.createCvVersion({
+      resourceId: cv.id,
+      target: { kind: 'general' },
+    });
+    pass(PREVIEW_CV_MS);
+
+    await expect(gateway.getCvVersion(UID, versionId)).resolves.toMatchObject({
+      status: 'failed',
+      failure: 'model',
+    });
+    await expect(gateway.getCvVersionsToday(UID)).resolves.toBe(0);
+    await gateway.removeCvVersion(versionId);
+    await expect(gateway.getCvVersion(UID, versionId)).resolves.toBeNull();
+    expect(await codeOf(gateway.removeCvVersion(versionId))).toBe(
+      ProfileErrorCode.NotFound,
+    );
+  });
+
+  it('refuses what the backend refuses: not a CV, a CV without its text, no such job, today’s limit', async () => {
+    const { gateway, cv } = await seeded();
+    const note = (await gateway.getResources(UID)).find(
+      ({ type }) => type === 'note',
+    )!;
+    const general = { kind: 'general' } as const;
+
+    expect(
+      await codeOf(
+        gateway.createCvVersion({ resourceId: note.id, target: general }),
+      ),
+    ).toBe(ProfileErrorCode.Invalid);
+    expect(
+      await codeOf(
+        gateway.createCvVersion({
+          resourceId: cv.id,
+          target: { kind: 'job', applicationId: 'nope' },
+        }),
+      ),
+    ).toBe(ProfileErrorCode.NotFound);
+    gateway.controls.setCvVersionsToday(CV_DAILY_VERSIONS);
+    expect(
+      await codeOf(
+        gateway.createCvVersion({ resourceId: cv.id, target: general }),
+      ),
+    ).toBe(ProfileErrorCode.DailyLimit);
+
+    const fresh = await setUp();
+    const { resourceId } = await fresh.gateway.createResource(cvFile);
+    expect(
+      await codeOf(
+        fresh.gateway.createCvVersion({ resourceId, target: general }),
+      ),
+    ).toBe(ProfileErrorCode.NoCvText);
   });
 });

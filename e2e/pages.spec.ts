@@ -358,6 +358,67 @@ test('a posting read again, its outcome and "Replace your edited text?": accessi
   await expectAccessibleAndNotTooWide(page);
 });
 
+test('CV versions: no CV, no version yet, the panel, being made, made, the list and the remove dialog: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openProfile(page);
+  const cv = () =>
+    page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'CV', exact: true })
+      .click();
+
+  // No CV in the profile
+  await cv();
+  await expect(
+    page.getByRole('heading', { name: 'Add your CV first' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // No version yet, and the panel
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'Profile' })
+    .click();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Profile' }),
+  ).toBeVisible();
+  await seedProfile(page);
+  await cv();
+  await expect(
+    page.getByRole('button', { name: 'Improve my CV' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await page.getByRole('button', { name: 'Choose a job' }).click();
+  const panel = page.getByRole('dialog', { name: 'New CV version' });
+  await panel.getByRole('button', { name: /More options/ }).click();
+  await expect(panel.getByText('Length')).toBeVisible();
+  await expectInsideViewport(page, panel);
+  await expectAccessibleAndNotTooWide(page);
+  await panel.getByRole('button', { name: 'Close' }).click();
+
+  // Being made, then made
+  await page.getByRole('button', { name: 'Improve my CV' }).click();
+  await page
+    .getByRole('dialog', { name: 'Improve your CV in general' })
+    .getByRole('button', { name: 'Create the version' })
+    .click();
+  await expect(page.getByRole('status')).toContainText('Creating your version');
+  await expectAccessibleAndNotTooWide(page);
+  await expect(page.getByRole('region', { name: 'Your CV' })).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // The remove dialog, then the list
+  await page.getByRole('button', { name: 'Remove this version' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Remove this version?' });
+  await expectInsideViewport(page, dialog);
+  await expectAccessibleAndNotTooWide(page);
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await cv();
+  await expect(page.getByRole('region', { name: 'General' })).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+});
+
 test('add a resource, in its three forms and with their messages: accessible and no horizontal scroll', async ({
   page,
 }) => {

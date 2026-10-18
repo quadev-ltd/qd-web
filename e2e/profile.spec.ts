@@ -330,8 +330,8 @@ test('the home starts with "Add your CV", and leads to it once it is in the prof
       'Everything else builds on it. We read it once and use it for every job you apply for.',
     ),
   ).toBeVisible();
-  // Of the three paths, the two that are not built yet say so.
-  await expect(page.getByText('Coming soon')).toHaveCount(2);
+  // Of the three paths, practice is not built yet and says so; the CV tool is on.
+  await expect(page.getByText('Coming soon')).toHaveCount(1);
   await expect(page.getByText('Available', { exact: true })).toHaveCount(0);
 
   // "Add your CV" leads to the profile, with its panel open

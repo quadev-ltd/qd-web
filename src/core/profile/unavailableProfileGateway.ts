@@ -31,6 +31,11 @@ export const unavailableProfileGateway: ProfileGateway = {
   prepareBrief: unavailable,
   readPostingAgain: unavailable,
   getBriefsToday: unavailable,
+  getCvVersions: unavailable,
+  getCvVersion: unavailable,
+  createCvVersion: unavailable,
+  removeCvVersion: unavailable,
+  getCvVersionsToday: unavailable,
 };
 
 export default unavailableProfileGateway;
