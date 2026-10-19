@@ -2,7 +2,10 @@
 // then the version is read again, so the page shows what the backend keeps.
 import { useState } from 'react';
 
-import { type CvChangeDecisionRequest } from '@/core/profile/cvVersions';
+import {
+  type CvChangeDecisionRequest,
+  type ReviseCvLineRequest,
+} from '@/core/profile/cvVersions';
 import { useCvVersionsActions } from '@/core/profile/CvVersionsProvider';
 import { logProfileError } from '@/core/profile/errors';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
@@ -24,6 +27,8 @@ export interface CvReview {
   /** With no answer, the question is skipped. */
   answer: (questionId: string, answer?: string) => Promise<boolean>;
   markSent: (sent: boolean) => Promise<boolean>;
+  /** A line or role of a written version edited, removed or restored; busy as its id. */
+  revise: (request: ReviseCvLineRequest) => Promise<boolean>;
 }
 
 export const useCvReview = (versionId: string): CvReview => {
@@ -67,6 +72,10 @@ export const useCvReview = (versionId: string): CvReview => {
     markSent: sent =>
       run(SENT, 'markCvVersionSent', () =>
         gateway.markCvVersionSent(versionId, sent),
+      ),
+    revise: request =>
+      run(request.lineId, 'reviseCvLine', () =>
+        gateway.reviseCvLine(versionId, request),
       ),
   };
 };

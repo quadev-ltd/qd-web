@@ -38,13 +38,21 @@ import {
   type CvDetails,
   type CvDetailsField,
 } from './cvDetails';
-import { type CvDocument, type CvEntry, type CvLine } from './cvDocument';
+import {
+  type CvDocument,
+  cvDocumentLines,
+  type CvEntry,
+  type CvEntryFields,
+  type CvLine,
+} from './cvDocument';
 import {
   CV_DAILY_VERSIONS,
+  CV_FIELD_MAX_CHARS,
   CV_LINE_MAX_CHARS,
   CV_ROLE_MAX_CHARS,
   CV_VERSIONS_MAX,
   type CvEditVersion,
+  type CvStatement,
   type CvVersion,
   type CvVersionFailure,
   type CvVersionTarget,
@@ -131,6 +139,8 @@ interface PreviewProfile {
   cvVersionsToday?: number;
   /** The CV's details (doc 19 §3.1); none until a field is filled. */
   cvDetails?: CvDetails;
+  /** The document a version being written again starts from, by the new version. */
+  cvRewrites?: Record<string, CvDocument>;
 }
 
 /** How the fake reads a page again: when it ends, and how. */
@@ -392,6 +402,61 @@ const cvWriteAnswerFor = (
       : [],
     dropped: { lines: 1, numbers: 0, names: 0 },
   };
+};
+
+/**
+ * Written again (doc 19 §3.3), as the backend's checks keep it: what the candidate removed stays
+ * out, what they edited stays in their words, and each answer becomes a line of the first role,
+ * citing it. The questions answered are not asked again.
+ */
+const rewriteFrom = (version: CvWrittenVersion, before: CvDocument) => {
+  const document = version.document!;
+  const removed = new Set(
+    cvDocumentLines(before)
+      .filter(({ line }) => line.state === 'removed')
+      .map(({ line }) => line.proposed),
+  );
+  const edited = new Map(
+    cvDocumentLines(before)
+      .filter(({ line }) => line.state === 'edited')
+      .map(({ line }) => [line.proposed, line.text]),
+  );
+  const keep = (lines: CvLine[]) =>
+    lines
+      .filter(line => !removed.has(line.proposed))
+      .map(line => {
+        const text = edited.get(line.proposed);
+        return text ? { ...line, text, state: 'edited' as const } : line;
+      });
+  document.summary = keep(document.summary);
+  document.skills = keep(document.skills);
+  for (const entry of [...document.experience, ...document.projects]) {
+    entry.bullets = keep(entry.bullets);
+  }
+  const answers = version.statements.filter(({ kind }) => kind === 'answer');
+  const lines = cvDocumentLines(document).length;
+  const [first] = document.experience;
+  answers.forEach((answer, index) => {
+    const line: CvLine = {
+      id: `l${lines + index + 1}`,
+      text: answer.text,
+      sources: [{ kind: 'statement', id: answer.id }],
+      state: 'written',
+      proposed: answer.text,
+    };
+    if (first) {
+      first.bullets.push(line);
+    } else {
+      document.summary.push(line);
+    }
+  });
+  version.questions = [];
+  if (answers.length > 0) {
+    version.notes = [
+      `Used your ${answers.length === 1 ? 'answer' : `${answers.length} answers`}, each where it belongs.`,
+      ...version.notes,
+    ];
+  }
 };
 
 /** Questions the fake asks for any job, with what kind each is. */
@@ -979,6 +1044,12 @@ export const createPreviewProfileGateway = ({
           ? cvWriteAnswerFor(profile.items, job?.jobDescription)
           : cvAnswerFor(version.cv, profile.items[0], job?.jobDescription),
       );
+      const before = profile.cvRewrites?.[versionId];
+      if (isWrittenVersion(version) && version.document && before) {
+        rewriteFrom(version, before);
+        const { [versionId]: _done, ...rest } = profile.cvRewrites ?? {};
+        profile.cvRewrites = rest;
+      }
       version.status = 'ready';
       version.readyAt = settlesAt;
       profile.cvVersionsToday = (profile.cvVersionsToday ?? 0) + 1;
@@ -1937,6 +2008,133 @@ export const createPreviewProfileGateway = ({
       profile.cvVersions = [...(profile.cvVersions ?? []), copy];
       save();
       return { versionId: copy.id };
+    },
+    reviseCvLine: async (versionId, request) => {
+      const version = readyVersion(versionId);
+      if (!isWrittenVersion(version) || !version.document) {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      const { document } = version;
+      const { lineId, action } = request;
+      if (lineId.startsWith('e')) {
+        const entry = [...document.experience, ...document.projects].find(
+          ({ id }) => id === lineId,
+        );
+        if (!entry) {
+          throw new ProfileError(ProfileErrorCode.NotFound);
+        }
+        if (action === 'edit') {
+          if (!('fields' in request)) {
+            throw new ProfileError(ProfileErrorCode.Invalid);
+          }
+          const fields = Object.entries(request.fields).filter(
+            ([, value]) => value !== undefined,
+          );
+          if (
+            fields.length === 0 ||
+            fields.some(
+              ([, value]) => value!.trim().length > CV_FIELD_MAX_CHARS,
+            )
+          ) {
+            throw new ProfileError(ProfileErrorCode.Invalid);
+          }
+          for (const [field, value] of fields) {
+            entry[field as keyof CvEntryFields] = value!.trim();
+          }
+          entry.state = 'edited';
+        } else if (action === 'remove') {
+          entry.state = 'removed';
+        } else {
+          Object.assign(entry, entry.proposedFields, { state: 'written' });
+        }
+      } else {
+        const line = cvDocumentLines(document).find(
+          ({ line: { id } }) => id === lineId,
+        )?.line;
+        if (!line) {
+          throw new ProfileError(ProfileErrorCode.NotFound);
+        }
+        if (action === 'edit') {
+          const text = 'text' in request ? request.text.trim() : '';
+          if (!text || text.length > CV_LINE_MAX_CHARS) {
+            throw new ProfileError(ProfileErrorCode.Invalid);
+          }
+          line.text = text;
+          line.state = 'edited';
+        } else if (action === 'remove') {
+          line.state = 'removed';
+        } else {
+          line.text = line.proposed;
+          line.state = 'written';
+        }
+      }
+      version.updatedAt = now();
+      save();
+    },
+    rewriteCvVersion: async versionId => {
+      const profile = currentProfile();
+      const version = readyVersion(versionId);
+      if (!isWrittenVersion(version) || !version.document) {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      if ((profile.cvVersions ?? []).length >= CV_VERSIONS_MAX) {
+        throw new ProfileError(ProfileErrorCode.MaxCvVersions);
+      }
+      if ((profile.cvVersionsToday ?? 0) >= CV_DAILY_VERSIONS) {
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+      }
+      // The candidate's answers and edits become statements the new one cites.
+      const statements: CvStatement[] = [];
+      for (const question of version.questions) {
+        if (question.status === 'answered' && question.answer) {
+          statements.push({
+            id: `A${statements.length + 1}`,
+            kind: 'answer',
+            question: question.text,
+            text: question.answer,
+          });
+        }
+      }
+      for (const { line } of cvDocumentLines(version.document)) {
+        if (line.state === 'edited') {
+          statements.push({
+            id: `A${statements.length + 1}`,
+            kind: 'edit',
+            text: line.text,
+          });
+        }
+      }
+      const at = now();
+      const written: CvWrittenVersion = {
+        id: newId('version'),
+        mode: 'write',
+        target: structuredClone(version.target),
+        pages: version.pages,
+        status: 'creating',
+        notes: [],
+        questions: [],
+        unsupportedJobTerms: [],
+        statements,
+        rewrittenFrom: version.id,
+        profileRevision: profile.revision ?? 0,
+        createdAt: at,
+        updatedAt: at,
+      };
+      profile.cvVersions = [...(profile.cvVersions ?? []), written];
+      profile.cvRewrites = {
+        ...profile.cvRewrites,
+        [written.id]: structuredClone(version.document),
+      };
+      profile.cvMaking = {
+        ...profile.cvMaking,
+        [written.id]: {
+          settlesAt: at + PREVIEW_CV_MS,
+          ...(nextCvFailure ? { failure: nextCvFailure } : {}),
+        },
+      };
+      nextCvFailure = null;
+      save();
+      return { versionId: written.id };
     },
     markCvVersionSent: async (versionId, sent) => {
       const profile = currentProfile();

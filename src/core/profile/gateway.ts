@@ -20,6 +20,7 @@ import {
   type CvChangeDecisionRequest,
   type CvVersion,
   type CvVersionStatus,
+  type ReviseCvLineRequest,
 } from './cvVersions';
 
 /** Where a file goes, as `createResource` answers for a file. */
@@ -212,6 +213,17 @@ export interface ProfileGateway {
    * The version copied does not change. Resolves the copy's id.
    */
   copyCvVersion(versionId: string): Promise<{ versionId: string }>;
+  /**
+   * Revises one line or one role of a written version (D83): edits it in the candidate's words,
+   * removes it (kept, to be restored), or restores what was written.
+   */
+  reviseCvLine(versionId: string, request: ReviseCvLineRequest): Promise<void>;
+  /**
+   * "Write again": a new written version for the same target and length, from the profile as it
+   * is now, the answers, and the lines edited and removed. Made in the background, like a new
+   * one; the version written again from doesn't change. Resolves the new one's id.
+   */
+  rewriteCvVersion(versionId: string): Promise<{ versionId: string }>;
 
   // ---------- The CV's details (doc 19 §3.1) ----------
 

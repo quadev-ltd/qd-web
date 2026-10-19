@@ -1,7 +1,8 @@
 // A written CV (C3, doc 13 §20.1): "What we did and why" across the top, the CV with where each
 // line comes from, and beside it the download (always there: nothing has to be decided first),
-// "Did you send it?" for a job, the writer's questions and the job's words the profile doesn't
-// show. At phone width the parts stack.
+// "Did you send it?" for a job, the writer's questions with "Write again", and the job's words the
+// profile doesn't show. A line or role opened shows beside the CV (over it at phone width), and
+// "What we did and why" closes meanwhile. At phone width the parts stack.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,21 +13,59 @@ import SentCard from '../review/SentCard';
 import { useCvReview } from '../review/useCvReview';
 import useItems from '../review/useItems';
 
+import LinePanel, { type Opened } from './LinePanel';
 import WrittenCv from './WrittenCv';
 import { aboutPages, isLongerThanAsked } from './writtenMeta';
+import WrittenQuestions from './WrittenQuestions';
 
 import Icon from '@/components/Icon';
 import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import Chip from '@/components/ui/Chip';
-import { type CvDocument } from '@/core/profile/cvDocument';
+import SidePanel from '@/components/ui/SidePanel';
+import useMediaQuery from '@/components/useMediaQuery';
+import {
+  CV_SECTION_KEYS,
+  type CvDocument,
+  type CvLine,
+} from '@/core/profile/cvDocument';
 import { type CvWrittenVersion } from '@/core/profile/cvVersions';
 import { useCvVersions } from '@/core/profile/CvVersionsProvider';
 import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
 
 /** Notes shown before "Show all". */
 const NOTES_SHOWN = 3;
+
+/** The line or role with this id, as the version now has it, with where it is. */
+const findOpened = (
+  document: CvDocument,
+  id: string | undefined,
+): Opened | undefined => {
+  if (!id) {
+    return undefined;
+  }
+  for (const section of CV_SECTION_KEYS) {
+    if (section === 'experience' || section === 'projects') {
+      for (const entry of document[section]) {
+        if (entry.id === id) {
+          return { kind: 'entry', entry, section };
+        }
+        const line = entry.bullets.find(bullet => bullet.id === id);
+        if (line) {
+          return { kind: 'line', line, entry, section };
+        }
+      }
+    } else {
+      const line: CvLine | undefined = document[section].find(
+        candidate => candidate.id === id,
+      );
+      if (line) {
+        return { kind: 'line', line, section };
+      }
+    }
+  }
+  return undefined;
+};
 
 export interface WrittenReviewProps {
   version: CvWrittenVersion & { document: CvDocument };
@@ -49,18 +88,35 @@ export const WrittenReview: React.FC<WrittenReviewProps> = ({
   const [sources, setSources] = useState(true);
   const [allNotes, setAllNotes] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [openedId, setOpenedId] = useState<string>();
+  const wide = useMediaQuery('(min-width: 768px)');
 
-  const { document, notes, questions } = version;
+  const { document, notes } = version;
+  const opened = findOpened(document, openedId);
+  const context = {
+    items,
+    resources,
+    statements: version.statements,
+    writtenAgainDay,
+  };
+  const panel = opened && (
+    <LinePanel
+      // A new line opened starts afresh.
+      key={openedId}
+      opened={opened}
+      context={context}
+      review={review}
+    />
+  );
   const dropped = version.dropped
     ? version.dropped.lines + version.dropped.numbers + version.dropped.names
     : 0;
   const sent = version.sentAt !== undefined && version.sentAt !== null;
   const longer = isLongerThanAsked(document, version.pages);
-  const open = questions.filter(({ status }) => status === 'open');
 
   return (
     <div className="flex flex-col gap-5">
-      {(notes.length > 0 || dropped > 0) && (
+      {!opened && (notes.length > 0 || dropped > 0) && (
         <Card
           as="section"
           elevation="raised"
@@ -136,18 +192,41 @@ export const WrittenReview: React.FC<WrittenReviewProps> = ({
             document={document}
             details={details}
             sources={sources}
-            context={{
-              items,
-              resources,
-              statements: version.statements,
-              writtenAgainDay,
-            }}
+            context={context}
             onEditDetails={() => setDetailsOpen(true)}
+            openedId={openedId}
+            onOpen={next =>
+              setOpenedId(next.kind === 'line' ? next.line.id : next.entry.id)
+            }
+            onRestore={id => {
+              review.revise({ lineId: id, action: 'restore' });
+            }}
+            busy={review.busy}
           />
         </div>
         <aside
           aria-label={t('cv.writtenAside')}
           className="flex min-w-0 flex-[1_1_340px] flex-col gap-3.5">
+          {wide && panel && (
+            <Card
+              as="section"
+              elevation="raised"
+              aria-label={
+                opened.kind === 'line' ? t('cv.thisLine') : t('cv.thisRole')
+              }
+              className="gap-3 border-2 border-primary p-4">
+              <div className="flex justify-end">
+                <Button
+                  variant="quiet"
+                  size="small"
+                  aria-label={t('cv.closeLineLabel')}
+                  onClick={() => setOpenedId(undefined)}>
+                  <Icon name="x" size={18} />
+                </Button>
+              </div>
+              {panel}
+            </Card>
+          )}
           <Card
             as="section"
             elevation="raised"
@@ -173,62 +252,17 @@ export const WrittenReview: React.FC<WrittenReviewProps> = ({
           {version.target.kind === 'job' && (
             <SentCard sent={sent} review={review} />
           )}
-          {questions.length > 0 && (
-            <Card
-              as="section"
-              elevation="raised"
-              aria-labelledby="cv-questions"
-              className="gap-3 p-5">
-              <h2
-                id="cv-questions"
-                className="font-display text-[18px] leading-tight font-semibold">
-                {t('cv.writtenQuestionsTitle', { count: questions.length })}
-              </h2>
-              <p className="text-[15px] leading-normal text-muted">
-                {t('cv.writtenQuestionsText')}
-              </p>
-              <ol className="flex flex-col">
-                {questions.map((question, index) => (
-                  <li
-                    key={question.id}
-                    className="flex flex-col gap-1.5 border-border-faint py-3 not-first:border-t">
-                    <p className="text-[15px] leading-normal font-medium">
-                      <span className="sr-only">
-                        {t('cv.questionNumber', { number: index + 1 })}{' '}
-                      </span>
-                      {question.text}
-                    </p>
-                    {question.status === 'answered' && question.answer ? (
-                      <p className="text-sm leading-normal text-muted">
-                        {t('cv.yourAnswerWas', { answer: question.answer })}
-                      </p>
-                    ) : (
-                      <span className="flex">
-                        <Chip
-                          tone={
-                            question.status === 'skipped' ? 'neutral' : 'info'
-                          }>
-                          {t(
-                            question.status === 'skipped'
-                              ? 'cv.questionSkipped'
-                              : 'cv.questionNotAnswered',
-                          )}
-                        </Chip>
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ol>
-              {open.length > 0 && (
-                <p className="sr-only">
-                  {t('cv.questionsOpen', { count: open.length })}
-                </p>
-              )}
-            </Card>
-          )}
+          <WrittenQuestions version={version} review={review} />
           <TermsCard terms={version.unsupportedJobTerms} />
         </aside>
       </div>
+      {!wide && panel && (
+        <SidePanel
+          title={opened.kind === 'line' ? t('cv.thisLine') : t('cv.thisRole')}
+          onClose={() => setOpenedId(undefined)}>
+          {panel}
+        </SidePanel>
+      )}
       {detailsOpen && <CvDetailsPanel onClose={() => setDetailsOpen(false)} />}
     </div>
   );

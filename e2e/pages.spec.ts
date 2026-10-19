@@ -416,6 +416,47 @@ test('CV versions: nothing in the profile, no version yet, the panel, the detail
   ).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
 
+  // A line opened and edited, a role's heading, beside the CV or over it on a phone
+  const written = page.getByRole('article', { name: 'Your CV' });
+  const opened = page
+    .getByRole('region', { name: /^This (line|role)$/ })
+    .or(page.getByRole('dialog', { name: /^This (line|role)$/ }));
+  const closeOpened = async () => {
+    const dialog = page.getByRole('dialog');
+    if (await dialog.isVisible()) {
+      await dialog.getByRole('button', { name: 'Close' }).click();
+    }
+  };
+  await written
+    .getByRole('button', { name: /Led the on-call redesign/ })
+    .click();
+  await expect(opened).toContainText('Where it says this');
+  await expectAccessibleAndNotTooWide(page);
+  await opened.getByRole('button', { name: 'Edit' }).click();
+  await expect(opened.getByLabel('Your wording')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await opened.getByRole('button', { name: 'Cancel' }).click();
+  await opened.getByRole('button', { name: 'Remove this line' }).click();
+  await closeOpened();
+  await expect(written).toContainText('Line removed by you');
+  await expectAccessibleAndNotTooWide(page);
+  await written
+    .getByRole('button', { name: /Senior Backend Engineer · Fenwick Pay/ })
+    .click();
+  await opened.getByRole('button', { name: 'Edit' }).click();
+  await expect(opened.getByLabel('To')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await opened.getByRole('button', { name: 'Cancel' }).click();
+  await closeOpened();
+
+  // Written again: from the version before, with what was removed left out
+  await page.getByRole('button', { name: 'Write again' }).click();
+  await expect(
+    page.getByText(/^Written again from the version of/),
+  ).toBeVisible();
+  await expect(written).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
   // The remove dialog, then the list
   await page.getByRole('button', { name: 'Remove this version' }).click();
   const dialog = page.getByRole('dialog', { name: 'Remove this version?' });

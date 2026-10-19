@@ -20,6 +20,8 @@ import {
   getCvVersionsToday,
   markCvVersionSent,
   removeCvVersion,
+  reviseCvLine,
+  rewriteCvVersion,
 } from './cvVersions';
 import {
   createResource,
@@ -77,6 +79,8 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   answerCvQuestion,
   markCvVersionSent,
   copyCvVersion,
+  reviseCvLine,
+  rewriteCvVersion,
   getCvDetails,
   updateCvDetails,
 });
