@@ -53,6 +53,7 @@ describe('selectProfileGateway', () => {
       failNextCv: expect.any(Function),
       setCvVersionsToday: expect.any(Function),
       createEditVersion: expect.any(Function),
+      setUsageLimits: expect.any(Function),
     });
     expect(createFirebaseProfileGateway).not.toHaveBeenCalled();
   });

@@ -97,6 +97,65 @@ export const createAccount = async ({
   return { uid, email, password: PASSWORD };
 };
 
+/** A user's override of one service's daily calls, as quadev-backend's set-limit writes it. */
+export const setUsageLimit = async (
+  uid: string,
+  service: string,
+  maxCallsPerDay: number,
+) => {
+  await send(
+    'PATCH',
+    `${DOCUMENTS}/usageLimits/${uid}`,
+    {
+      fields: {
+        services: {
+          mapValue: {
+            fields: {
+              [service]: {
+                mapValue: {
+                  fields: {
+                    maxCallsPerDay: { integerValue: String(maxCallsPerDay) },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    OWNER,
+  );
+};
+
+/** How many calls of one service the user made today (UTC), as the backend's meter counts them. */
+export const setUsageToday = async (
+  uid: string,
+  service: string,
+  calls: number,
+) => {
+  const day = new Date().toISOString().slice(0, 10);
+  await send(
+    'PATCH',
+    `${DOCUMENTS}/usage/${uid}/days/${day}`,
+    {
+      fields: {
+        services: {
+          mapValue: {
+            fields: {
+              [service]: {
+                mapValue: {
+                  fields: { calls: { integerValue: String(calls) } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    OWNER,
+  );
+};
+
 /** Signs in with the form, as a user does, and waits for the signed-in home. */
 export const signIn = async (page: Page, { email, password }: TestAccount) => {
   await page.goto('/sign-in');

@@ -16,6 +16,12 @@ import { type CvVersion, isCreating } from './cvVersions';
 import { logProfileError } from './errors';
 import { RESOURCE_POLL_MS } from './InterviewProfileProvider';
 import { useProfileGateway } from './ProfileGatewayProvider';
+import {
+  CV_VERSION_DAILY_LIMIT,
+  effectiveLimits,
+  serviceOverride,
+  USAGE_SERVICES,
+} from './usageLimits';
 
 import { useSessionUser } from '@/core/session/hooks';
 import { useAppDispatch, useAppSelector } from '@/core/state/hooks';
@@ -86,12 +92,13 @@ export const CvVersionsProvider: React.FC<{ children: ReactNode }> = ({
     }
     dispatch(cvVersionsLoadStarted(uid));
     try {
-      const [loaded, madeToday] = await Promise.all([
+      const [loaded, madeToday, limits] = await Promise.all([
         gateway.getCvVersions(uid),
         // Only used to say "4 of 5 left today": the backend refuses anyway.
         gateway.getCvVersionsToday(uid).catch(() => null),
+        gateway.getUsageLimits(uid).catch(() => null),
       ]);
-      dispatch(cvVersionsLoaded({ uid, versions: loaded, madeToday }));
+      dispatch(cvVersionsLoaded({ uid, versions: loaded, madeToday, limits }));
     } catch (error) {
       logProfileError('getCvVersions', error, uid);
       dispatch(cvVersionsLoadFailed(uid));
@@ -117,7 +124,11 @@ export const CvVersionsProvider: React.FC<{ children: ReactNode }> = ({
       return;
     }
     try {
-      dispatch(cvVersionsTodayRead(await gateway.getCvVersionsToday(uid)));
+      const [madeToday, limits] = await Promise.all([
+        gateway.getCvVersionsToday(uid),
+        gateway.getUsageLimits(uid).catch(() => null),
+      ]);
+      dispatch(cvVersionsTodayRead({ madeToday, limits }));
     } catch {
       // The count on screen stays; the backend refuses a version over the limit anyway.
     }
@@ -209,6 +220,18 @@ export const CvVersionsProvider: React.FC<{ children: ReactNode }> = ({
 };
 
 export const useCvVersions = () => useAppSelector(selectCvVersions);
+
+/**
+ * How many CV versions the user can have made today: their override (`usageLimits/{uid}`) on
+ * top of the default, capped at the ceiling, as the backend counts it.
+ */
+export const useCvDailyLimit = (): number => {
+  const { limits } = useAppSelector(selectCvVersions);
+  return effectiveLimits(
+    CV_VERSION_DAILY_LIMIT,
+    serviceOverride(limits, USAGE_SERVICES.cvVersion),
+  ).maxCallsPerDay;
+};
 
 export const useCvVersionsActions = (): CvVersionsActions =>
   useContext(CvVersionsContext);

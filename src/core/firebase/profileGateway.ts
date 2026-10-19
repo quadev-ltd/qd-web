@@ -37,6 +37,7 @@ import {
   updateItem,
   uploadFile,
 } from './interviewProfile';
+import { getUsageLimits } from './usageLimits';
 
 import { type ProfileGateway } from '@/core/profile/gateway';
 
@@ -81,6 +82,7 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   copyCvVersion,
   reviseCvLine,
   rewriteCvVersion,
+  getUsageLimits,
   getCvDetails,
   updateCvDetails,
 });

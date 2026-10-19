@@ -6,6 +6,7 @@ import { CvScreen } from './CvScreen';
 
 import { type CvVersion } from '@/core/profile/cvVersions';
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
+import { type StoredUsageLimits } from '@/core/profile/usageLimits';
 import { applicationFixture } from '@/testUtil/applicationFixtures';
 import {
   cvDetailsFixture,
@@ -41,12 +42,14 @@ const setUp = ({
   versions = [],
   applications = [job],
   madeToday = 1,
+  limits = null,
   gateway = createMockProfileGateway(),
 }: {
   resources?: ReturnType<typeof resourceFixture>[];
   versions?: CvVersion[];
   applications?: ReturnType<typeof applicationFixture>[];
   madeToday?: number | null;
+  limits?: StoredUsageLimits | null;
   gateway?: ReturnType<typeof createMockProfileGateway>;
 } = {}) =>
   renderCvPage(
@@ -58,7 +61,13 @@ const setUp = ({
       gateway,
       interviewProfile: { uid: 'uid-1', status: 'loaded', resources },
       applications: { uid: 'uid-1', status: 'loaded', applications },
-      cvVersions: { uid: 'uid-1', status: 'loaded', versions, madeToday },
+      cvVersions: {
+        uid: 'uid-1',
+        status: 'loaded',
+        versions,
+        madeToday,
+        limits,
+      },
     },
   );
 
@@ -278,6 +287,39 @@ describe('CvScreen', () => {
       expect(await within(panel).findByRole('alert')).toHaveTextContent(
         'cv.noItemsMessage',
       );
+    });
+
+    it('counts today’s versions against the user’s own limit', async () => {
+      setUp({
+        versions: [cvVersionFixture()],
+        madeToday: 5,
+        limits: { services: { cvVersion: { maxCallsPerDay: 20 } } },
+      });
+      const panel = await openPanel();
+
+      expect(
+        within(panel).queryByText('cv.limitMessage'),
+      ).not.toBeInTheDocument();
+      expect(within(panel).getByText('cv.takesMinute')).toBeInTheDocument();
+      expect(
+        within(panel).getByRole('button', { name: 'cv.createButton' }),
+      ).toBeEnabled();
+    });
+
+    it('says writing CVs is not available when the user’s limit is 0', async () => {
+      setUp({
+        versions: [cvVersionFixture()],
+        madeToday: 0,
+        limits: { services: { cvVersion: { maxCallsPerDay: 0 } } },
+      });
+      const panel = await openPanel();
+
+      expect(
+        within(panel).getByText('cv.limitNoneMessage'),
+      ).toBeInTheDocument();
+      expect(
+        within(panel).getByRole('button', { name: 'cv.createButton' }),
+      ).toBeDisabled();
     });
 
     it('offers no job without its text, and says so', async () => {

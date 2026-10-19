@@ -17,13 +17,17 @@ import {
   type CvHeaderDetails,
   type CvPageCount,
 } from './cvDocument';
+import { CV_VERSION_DAILY_LIMIT } from './usageLimits';
 
 // ---------- Limits ----------
 
 /** Versions one user can hold, failed ones included. */
 export const CV_VERSIONS_MAX = 50;
-/** Versions one user can have made in a day (UTC); the backend also caps their cost. */
-export const CV_DAILY_VERSIONS = 5;
+/**
+ * Versions a user can have made in a day (UTC) without an override (`usageLimits/{uid}`); the
+ * backend also caps their cost.
+ */
+export const CV_DAILY_VERSIONS = CV_VERSION_DAILY_LIMIT.maxCallsPerDay;
 /** The service name the backend counts versions under, in `usage/{uid}/days/{date}`. */
 export const CV_SERVICE = 'cvVersion';
 /** Longest role a general version is aimed at. */

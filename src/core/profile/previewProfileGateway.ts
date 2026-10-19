@@ -46,7 +46,6 @@ import {
   type CvLine,
 } from './cvDocument';
 import {
-  CV_DAILY_VERSIONS,
   CV_FIELD_MAX_CHARS,
   CV_LINE_MAX_CHARS,
   CV_ROLE_MAX_CHARS,
@@ -69,6 +68,13 @@ import {
   PREVIEW_SEED_APPLICATIONS,
   type PreviewFact,
 } from './previewProfileData';
+import {
+  CV_VERSION_DAILY_LIMIT,
+  effectiveLimits,
+  serviceOverride,
+  type StoredUsageLimits,
+  USAGE_SERVICES,
+} from './usageLimits';
 
 import { PREVIEW_GATEWAY_MARKER } from '@/core/auth/previewGateway';
 
@@ -141,6 +147,8 @@ interface PreviewProfile {
   cvDetails?: CvDetails;
   /** The document a version being written again starts from, by the new version. */
   cvRewrites?: Record<string, CvDocument>;
+  /** The overrides of the daily limits (`usageLimits/{uid}`); none for the defaults. */
+  usageLimits?: StoredUsageLimits;
 }
 
 /** How the fake reads a page again: when it ends, and how. */
@@ -201,6 +209,8 @@ export interface PreviewProfileControls {
    * background like any other. The pages no longer ask for one; their review stays. Resolves its id.
    */
   createEditVersion(target?: CvVersionTarget): Promise<string>;
+  /** Sets the account's overrides of the daily limits, as set-limit does; `null` removes them. */
+  setUsageLimits(services: StoredUsageLimits['services'] | null): void;
 }
 
 /** How long the fake takes to prepare a brief; the real one takes 10 to 20 seconds. */
@@ -458,6 +468,13 @@ const rewriteFrom = (version: CvWrittenVersion, before: CvDocument) => {
     ];
   }
 };
+
+/** The CV versions this account can have made today: its override on top of the default. */
+const cvDailyLimit = (profile: PreviewProfile) =>
+  effectiveLimits(
+    CV_VERSION_DAILY_LIMIT,
+    serviceOverride(profile.usageLimits, USAGE_SERVICES.cvVersion),
+  ).maxCallsPerDay;
 
 /** Questions the fake asks for any job, with what kind each is. */
 const PREVIEW_QUESTIONS: [string, BriefQuestion['kind']][] = [
@@ -1203,6 +1220,15 @@ export const createPreviewProfileGateway = ({
     },
     // Set once the gateway exists, below: it asks the gateway for the version.
     createEditVersion: () => Promise.reject(new Error('Not ready')),
+    setUsageLimits: services => {
+      const profile = currentProfile();
+      if (services) {
+        profile.usageLimits = { services };
+      } else {
+        delete profile.usageLimits;
+      }
+      save();
+    },
     setBriefsToday: count => {
       currentProfile().briefsToday = count;
       save();
@@ -1803,7 +1829,7 @@ export const createPreviewProfileGateway = ({
       if ((profile.cvVersions ?? []).length >= CV_VERSIONS_MAX) {
         throw new ProfileError(ProfileErrorCode.MaxCvVersions);
       }
-      if ((profile.cvVersionsToday ?? 0) >= CV_DAILY_VERSIONS) {
+      if ((profile.cvVersionsToday ?? 0) >= cvDailyLimit(profile)) {
         throw new ProfileError(ProfileErrorCode.DailyLimit);
       }
       const at = now();
@@ -1861,6 +1887,10 @@ export const createPreviewProfileGateway = ({
       save();
     },
     getCvVersionsToday: async uid => read(uid).cvVersionsToday ?? 0,
+    getUsageLimits: async uid => {
+      const limits = read(uid).usageLimits;
+      return limits ? structuredClone(limits) : null;
+    },
     getCvDetails: async uid => {
       const details = read(uid).cvDetails;
       return details ? structuredClone(details) : null;
@@ -2080,7 +2110,7 @@ export const createPreviewProfileGateway = ({
       if ((profile.cvVersions ?? []).length >= CV_VERSIONS_MAX) {
         throw new ProfileError(ProfileErrorCode.MaxCvVersions);
       }
-      if ((profile.cvVersionsToday ?? 0) >= CV_DAILY_VERSIONS) {
+      if ((profile.cvVersionsToday ?? 0) >= cvDailyLimit(profile)) {
         throw new ProfileError(ProfileErrorCode.DailyLimit);
       }
       // The candidate's answers and edits become statements the new one cites.

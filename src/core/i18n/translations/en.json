@@ -820,7 +820,8 @@
     "writtenAgainFromAnswers_one": "Written again from the version of {{date}}, with {{count}} of your answers. That version is still in your list.",
     "writtenAgainFromAnswers_other": "Written again from the version of {{date}}, with {{count}} of your answers. That version is still in your list.",
     "openVersionOf": "Open the version of {{date}}",
-    "closeLineLabel": "Close this line"
+    "closeLineLabel": "Close this line",
+    "limitNoneMessage": "Writing CVs isn’t available on your account at the moment."
   },
   "textPreview": {
     "showAll": "Show all",
