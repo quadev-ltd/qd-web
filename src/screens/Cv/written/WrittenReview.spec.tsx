@@ -5,6 +5,7 @@ import { WrittenReview } from './WrittenReview';
 
 import { type CvDocument } from '@/core/profile/cvDocument';
 import { type CvWrittenVersion } from '@/core/profile/cvVersions';
+import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import {
   cvDetailsFixture,
   writtenDocumentFixture,
@@ -51,6 +52,9 @@ const setUp = (
   );
   return gateway;
 };
+
+const aside = () =>
+  screen.getByRole('complementary', { name: 'cv.writtenAside' });
 
 const ready = (overrides: Partial<CvWrittenVersion> = {}) =>
   writtenVersionFixture(overrides) as CvWrittenVersion & {
@@ -154,7 +158,9 @@ describe('WrittenReview', () => {
       name: 'cv.writtenQuestionsTitle',
     });
     expect(questions).toHaveTextContent('Have you run Kafka at high volume?');
-    expect(questions).toHaveTextContent('cv.questionNotAnswered');
+    expect(
+      within(questions).getByRole('textbox', { name: /cv.yourAnswer/ }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('region', { name: 'cv.termsTitle' }),
     ).toHaveTextContent('running Kafka at scale');
@@ -178,5 +184,221 @@ describe('WrittenReview', () => {
     expect(
       screen.getByRole('dialog', { name: 'cv.detailsTitle' }),
     ).toBeInTheDocument();
+  });
+
+  describe('a line or a role opened', () => {
+    it('shows the line beside the CV, with the words of each item it cites, and closes the notes', async () => {
+      setUp(ready());
+
+      await userEvent.click(
+        within(cv()).getByRole('button', { name: /Moved the payments ledger/ }),
+      );
+
+      const line = within(aside()).getByRole('region', { name: 'cv.thisLine' });
+      expect(line).toHaveTextContent(
+        'Experience · Senior Backend Engineer, Fenwick Pay',
+      );
+      expect(
+        await within(line).findByText('Maya Okafor CV 2026'),
+      ).toBeVisible();
+      expect(line).toHaveTextContent('profile.typeCv');
+      expect(
+        screen.queryByRole('region', { name: 'cv.notesTitle' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('edits a line in the candidate’s words, beside what we wrote', async () => {
+      const gateway = setUp(ready());
+
+      await userEvent.click(
+        within(cv()).getByRole('button', { name: /Moved the payments ledger/ }),
+      );
+      const line = within(aside()).getByRole('region', { name: 'cv.thisLine' });
+      await userEvent.click(
+        within(line).getByRole('button', { name: 'cv.editButton' }),
+      );
+      expect(line).toHaveTextContent('cv.whatWeWrote');
+      const wording = within(line).getByRole('textbox', {
+        name: /cv.yourWordingLabel/,
+      });
+      await userEvent.clear(wording);
+      await userEvent.type(wording, ' Moved the ledger to events. ');
+      await userEvent.click(
+        within(line).getByRole('button', { name: 'cv.saveWordingButton' }),
+      );
+
+      expect(gateway.reviseCvLine).toHaveBeenCalledExactlyOnceWith('w1', {
+        lineId: 'l2',
+        action: 'edit',
+        text: 'Moved the ledger to events.',
+      });
+      expect(gateway.getCvVersion).toHaveBeenCalledWith('uid-1', 'w1');
+    });
+
+    it('removes a line, and restores one removed or edited', async () => {
+      const document = writtenDocumentFixture();
+      document.summary[0]!.state = 'edited';
+      document.experience[0]!.bullets[1]!.state = 'removed';
+      const gateway = setUp(ready({ document }));
+
+      // The removed one keeps its place while the sources show
+      expect(cv()).toHaveTextContent('cv.lineRemovedByYou');
+      await userEvent.click(
+        within(cv()).getByRole('button', { name: 'cv.restoreRemovedLabel' }),
+      );
+      expect(gateway.reviseCvLine).toHaveBeenLastCalledWith('w1', {
+        lineId: 'l3',
+        action: 'restore',
+      });
+
+      await userEvent.click(
+        within(cv()).getByRole('button', {
+          name: /Backend engineer who designs/,
+        }),
+      );
+      const line = within(aside()).getByRole('region', { name: 'cv.thisLine' });
+      expect(line).toHaveTextContent('cv.yourWordsText');
+      await userEvent.click(
+        within(line).getByRole('button', { name: 'cv.restoreWrittenButton' }),
+      );
+      expect(gateway.reviseCvLine).toHaveBeenLastCalledWith('w1', {
+        lineId: 'l1',
+        action: 'restore',
+      });
+      await userEvent.click(
+        within(line).getByRole('button', { name: 'cv.removeLineButton' }),
+      );
+      expect(gateway.reviseCvLine).toHaveBeenLastCalledWith('w1', {
+        lineId: 'l1',
+        action: 'remove',
+      });
+
+      await userEvent.click(
+        screen.getByRole('switch', { name: 'cv.showSources' }),
+      );
+      expect(cv()).not.toHaveTextContent('cv.lineRemovedByYou');
+    });
+
+    it('edits a role’s heading, sending only the fields changed', async () => {
+      const gateway = setUp(ready());
+
+      await userEvent.click(
+        within(cv()).getByRole('button', {
+          name: /Senior Backend Engineer · Fenwick Pay/,
+        }),
+      );
+      const role = within(aside()).getByRole('region', { name: 'cv.thisRole' });
+      await userEvent.click(
+        within(role).getByRole('button', { name: 'cv.editButton' }),
+      );
+      const to = within(role).getByRole('textbox', { name: /cv.roleTo/ });
+      await userEvent.clear(to);
+      await userEvent.type(to, 'Present');
+      await userEvent.click(
+        within(role).getByRole('button', { name: 'cv.saveRoleButton' }),
+      );
+
+      expect(gateway.reviseCvLine).toHaveBeenCalledExactlyOnceWith('w1', {
+        lineId: 'e1',
+        action: 'edit',
+        fields: { end: 'Present' },
+      });
+    });
+
+    it('says when a cited item is no longer in the profile, and shows an answer it cites', async () => {
+      const document = writtenDocumentFixture();
+      document.experience[0]!.bullets[0]!.sources = [
+        { kind: 'item', itemId: 'gone' },
+      ];
+      setUp(ready({ document }), '15 Oct 2026');
+
+      await userEvent.click(
+        within(cv()).getByRole('button', { name: /Moved the payments ledger/ }),
+      );
+      expect(
+        await within(aside()).findByText('cv.sourceGoneTitle'),
+      ).toBeInTheDocument();
+      await userEvent.click(
+        within(cv()).getByRole('button', { name: /Led the on-call redesign/ }),
+      );
+      const line = within(aside()).getByRole('region', { name: 'cv.thisLine' });
+      expect(line).toHaveTextContent('cv.yourAnswerOf');
+      expect(line).toHaveTextContent('How large was the team?');
+      expect(line).toHaveTextContent('Nine engineers.');
+    });
+  });
+
+  describe('the questions, and "Write again"', () => {
+    it('saves an answer, or skips the question', async () => {
+      const gateway = setUp(ready());
+
+      const questions = screen.getByRole('region', {
+        name: 'cv.writtenQuestionsTitle',
+      });
+      await userEvent.type(
+        within(questions).getByRole('textbox', { name: /cv.yourAnswer/ }),
+        'Nine engineers, for two years.',
+      );
+      await userEvent.click(
+        within(questions).getByRole('button', { name: 'cv.saveAnswerButton' }),
+      );
+      expect(gateway.answerCvQuestion).toHaveBeenCalledExactlyOnceWith(
+        'w1',
+        'q1',
+        'Nine engineers, for two years.',
+      );
+
+      await userEvent.click(
+        await within(questions).findByRole('button', {
+          name: 'cv.changeAnswerButton',
+        }),
+      );
+      await userEvent.click(
+        within(questions).getByRole('button', { name: 'cv.skipButton' }),
+      );
+      expect(gateway.answerCvQuestion).toHaveBeenLastCalledWith(
+        'w1',
+        'q1',
+        undefined,
+      );
+    });
+
+    it('writes again with the answers given, as a new version', async () => {
+      const gateway = setUp(
+        ready({
+          questions: [
+            {
+              id: 'q1',
+              text: 'How large was the team?',
+              status: 'answered',
+              answer: 'Nine.',
+            },
+          ],
+        }),
+      );
+
+      await userEvent.click(
+        screen.getByRole('button', { name: 'cv.writeAgainWithAnswers' }),
+      );
+
+      expect(gateway.rewriteCvVersion).toHaveBeenCalledExactlyOnceWith('w1');
+      expect(gateway.getCvVersion).toHaveBeenCalledWith('uid-1', 'version-3');
+    });
+
+    it('writes again with no answer, and says why it could not', async () => {
+      const gateway = setUp(ready({ questions: [] }));
+      gateway.rewriteCvVersion.mockRejectedValue(
+        new ProfileError(ProfileErrorCode.DailyLimit),
+      );
+
+      expect(screen.getByText('cv.writeAgainText')).toBeInTheDocument();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'cv.writeAgainButton' }),
+      );
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'cv.limitMessage',
+      );
+    });
   });
 });

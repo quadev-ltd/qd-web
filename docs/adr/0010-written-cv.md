@@ -1,6 +1,6 @@
 # ADR 0010: A CV written for the job (D83)
 
-- Status: in progress (slices 16 and 17 of the website's numbering)
+- Status: in progress (slices 16 to 18 of the website's numbering)
 - Date: 2026-10-19
 
 ## Context
@@ -91,10 +91,35 @@ to end, a CV for a job marked as sent, a failure tried again, an empty profile, 
 reviewed and compared with a written one); the page checks; and emulator tests against `fbf8c26`
 (a CV written by the fake writer, read back, removed; two compared and one restored).
 
+## Lines, roles, questions and "Write again" (slice 18)
+
+Against quadev-backend `3ed7884` (#42: no new edit version, `edit-retired`).
+
+- **A line or a role opens.** Each line, each role's heading and each summary sentence of the CV
+  is a button. Opened, it shows beside the CV when the window is at least 768 px wide (a card in the
+  aside, with "What we did and why" closed meanwhile), and in a side panel over it on a phone
+  (`useMediaQuery`). "Where it says this" lists each source: the resource's title and type with
+  the item's words, the candidate's answer with its question and the day of the version it was
+  written again from, or "Your words". An item removed or hidden since is "No longer in your
+  profile".
+- **Revisions are one `reviseCvLine` each**, then the version is read again, so the page shows
+  what the backend keeps. A line is edited in "Your wording" beside "What we wrote", up to 800
+  characters as the contract allows. A role's heading sends only the fields changed. An edited one
+  offers "Restore what we wrote". A removed one keeps its place in the CV while the sources show,
+  with "Restore"; off, the CV shows as it downloads.
+- **Questions** are answered or skipped with `answerCvQuestion`, as before. An answer changes
+  nothing by itself.
+- **"Write again"** is `rewriteCvVersion`: a new version, followed while it is written. With
+  answers the button counts them. Without, it writes again from the profile as it is now. Both say
+  the version stays and that it counts as one of today's versions. The new version says which one
+  it was written again from, with how many answers, and links to it.
+- **"Try again" on an old edit version that failed** now writes a CV for the same target, at 2
+  pages. The backend refuses new edit versions (`edit-retired`, mapped to `Invalid`), and nothing
+  on the website asks for one any more.
+- **The preview gateway** revises lines and roles, and writes again keeping the edits, leaving
+  out what was removed and citing each answer, as the backend's checks keep them.
+
 ## What follows
 
-- Slice 18: a line opened ("Where it says this" with the items' words), edit, remove and restore
-  of lines and roles (`reviseCvLine`), the questions answered and "Write again"
-  (`rewriteCvVersion`, "Written again from the version of …").
-- Slice 19: the PDF's Unicode font, loaded only when a file is made, and the layout checked
-  against the page estimate.
+Slice 19: the PDF's Unicode font, loaded only when a file is made, and the layout checked against
+the page estimate.

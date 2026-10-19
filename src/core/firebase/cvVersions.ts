@@ -34,6 +34,11 @@ import {
   MarkCvVersionSentResponseSchema,
   REMOVE_CV_VERSION,
   RemoveCvVersionResponseSchema,
+  REVISE_CV_LINE,
+  type ReviseCvLineRequest,
+  ReviseCvLineResponseSchema,
+  REWRITE_CV_VERSION,
+  RewriteCvVersionResponseSchema,
 } from '@/core/profile/cvVersions';
 
 /** A version as the contract reads it: every Firestore Timestamp in milliseconds. */
@@ -147,6 +152,27 @@ export const copyCvVersion = async (
     versionId,
   });
   return { versionId: copy.versionId };
+};
+
+export const reviseCvLine = async (
+  versionId: string,
+  request: ReviseCvLineRequest,
+): Promise<void> => {
+  await call(REVISE_CV_LINE, ReviseCvLineResponseSchema, {
+    versionId,
+    ...request,
+  });
+};
+
+export const rewriteCvVersion = async (
+  versionId: string,
+): Promise<{ versionId: string }> => {
+  const { versionId: written } = await call(
+    REWRITE_CV_VERSION,
+    RewriteCvVersionResponseSchema,
+    { versionId },
+  );
+  return { versionId: written };
 };
 
 /** How many versions the backend made for this user today (UTC). */

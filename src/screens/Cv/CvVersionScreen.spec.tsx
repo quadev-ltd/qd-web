@@ -142,10 +142,11 @@ describe('CvVersionScreen', () => {
       within(alert).getByRole('button', { name: 'cv.tryAgainButton' }),
     );
 
+    // No new edit version since D83: the CV is written for the same job instead
     expect(gateway.createCvVersion).toHaveBeenCalledExactlyOnceWith({
-      resourceId: 'r1',
+      mode: 'write',
       target: { kind: 'job', applicationId: 'a1' },
-      length: 'two-pages',
+      pages: 2,
     });
     expect(gateway.removeCvVersion).toHaveBeenCalledExactlyOnceWith('v1');
     expect(await screen.findByRole('status')).toHaveTextContent(
@@ -223,6 +224,46 @@ describe('CvVersionScreen', () => {
         pages: 1,
       });
       expect(gateway.removeCvVersion).toHaveBeenCalledWith('w1');
+    });
+
+    it('says which version it was written again from, with how many answers, and links to it', () => {
+      const original = writtenVersionFixture({
+        id: 'w0',
+        createdAt: Date.parse('2026-10-15T09:00:00Z'),
+      });
+      const again = writtenVersionFixture({ rewrittenFrom: 'w0' });
+      const gateway = createMockProfileGateway();
+      gateway.getCvVersion.mockImplementation(async (_uid, id) =>
+        id === 'w1' ? again : id === 'w0' ? original : null,
+      );
+      renderCvPage(
+        <Routes>
+          <Route path="/cv/versions/:versionId" element={<CvVersionScreen />} />
+        </Routes>,
+        {
+          gateway,
+          route: '/cv/versions/w1',
+          interviewProfile: { uid: 'uid-1', status: 'loaded', resources: [] },
+          applications: {
+            uid: 'uid-1',
+            status: 'loaded',
+            applications: [applicationFixture()],
+          },
+          cvVersions: {
+            uid: 'uid-1',
+            status: 'loaded',
+            versions: [again, original],
+            madeToday: 0,
+          },
+        },
+      );
+
+      expect(
+        screen.getByText(/cv.writtenAgainFromAnswers/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('link', { name: 'cv.openVersionOf' }),
+      ).toHaveAttribute('href', '/cv/versions/w0');
     });
 
     it('shows one that is written as the CV, with what we did and why', () => {

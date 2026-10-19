@@ -175,6 +175,82 @@ test('a CV for a job: asked in "New version", listed under its application, mark
   ).toBeVisible();
 });
 
+test('a written CV revised: a line edited, another removed and restored, a role’s end changed, a question answered, then written again', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await seedProfile(page);
+  await openCv(page);
+  await page.getByRole('button', { name: 'Write a general CV' }).click();
+  await writeCv(page, 'Write a general CV');
+  const cv = page.getByRole('article', { name: 'Your CV' });
+  // Beside the CV when wide, in a panel over it on a phone
+  const line = page
+    .getByRole('region', { name: 'This line' })
+    .or(page.getByRole('dialog', { name: 'This line' }));
+  const role = page
+    .getByRole('region', { name: 'This role' })
+    .or(page.getByRole('dialog', { name: 'This role' }));
+  const close = async () => {
+    const dialog = page.getByRole('dialog');
+    if (await dialog.isVisible()) {
+      await dialog.getByRole('button', { name: 'Close' }).click();
+    }
+  };
+
+  // A line opened: where it says this, then edited in the candidate's words
+  await cv.getByRole('button', { name: /Led the on-call redesign/ }).click();
+  await expect(line).toContainText('Where it says this');
+  await expect(line).toContainText('Maya Okafor CV 2026');
+  await line.getByRole('button', { name: 'Edit' }).click();
+  await line
+    .getByLabel('Your wording')
+    .fill('Redesigned on-call for a team of nine: pages fell from 31 to 12.');
+  await line.getByRole('button', { name: 'Save my wording' }).click();
+  await expect(line).toContainText('Edited by you');
+  await close();
+  await expect(cv).toContainText('Edited by you · Your words');
+
+  // Another removed, then restored from its place in the CV
+  await cv
+    .getByRole('button', { name: /Moved the team to weekly releases/ })
+    .click();
+  await line.getByRole('button', { name: 'Remove this line' }).click();
+  await close();
+  await expect(cv).toContainText('Line removed by you');
+  await cv.getByRole('button', { name: /^Restore: Moved the team/ }).click();
+  await expect(cv).not.toContainText('Line removed by you');
+
+  // A role's end, as it should be printed
+  await cv
+    .getByRole('button', { name: /Senior Backend Engineer · Fenwick Pay/ })
+    .click();
+  await role.getByRole('button', { name: 'Edit' }).click();
+  await role.getByLabel('To').fill('Present');
+  await role.getByRole('button', { name: 'Save', exact: true }).click();
+  await close();
+  await expect(cv).toContainText('2021 – Present');
+
+  // A question answered, then written again with it
+  const questions = page.getByRole('region', { name: /^Questions · / });
+  await questions.getByLabel('Your answer').fill('Nine engineers.');
+  await questions.getByRole('button', { name: 'Save the answer' }).click();
+  await expect(questions).toContainText('Answered: Nine engineers.');
+  await page
+    .getByRole('button', { name: 'Write again with my answers (1)' })
+    .click();
+  await expect(
+    page.getByText(
+      /^Written again from the version of .+, with 1 of your answers/,
+    ),
+  ).toBeVisible();
+  await expect(cv).toContainText('Nine engineers.');
+  await expect(cv).toContainText(
+    'Redesigned on-call for a team of nine: pages fell from 31 to 12.',
+  );
+  await expect(cv).toContainText('From your answer of');
+});
+
 test('a CV that could not be written is tried again, and written', async ({
   page,
 }) => {

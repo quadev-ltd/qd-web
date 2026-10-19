@@ -193,3 +193,62 @@ test('the CV details: filled by reading the CV, corrected with updateCvDetails, 
   await expect(panel.getByLabel('Right to work (optional)')).toHaveValue('');
   await expect(panel.getByLabel('Full name')).toHaveValue(/^fake-/);
 });
+
+test('a written CV revised (reviseCvLine), a question answered, then written again (rewriteCvVersion)', async ({
+  page,
+}) => {
+  const account = await createAccount({
+    interviewAssistant: true,
+    cvTool: true,
+  });
+  await signIn(page, account);
+  await openProfile(page);
+  await addCv(page);
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'CV', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Write a general CV' }).click();
+  await page
+    .getByRole('dialog', { name: 'Write a general CV' })
+    .getByRole('button', { name: 'Write my CV' })
+    .click();
+  const cv = page.getByRole('article', { name: 'Your CV' });
+  const line = page.getByRole('region', { name: 'This line' });
+  await expect(cv).toContainText('fake-profile:');
+
+  // The profile line edited, the skills removed: both kept by the backend
+  await cv.getByRole('button', { name: /fake-profile:/ }).click();
+  await line.getByRole('button', { name: 'Edit' }).click();
+  await line
+    .getByLabel('Your wording')
+    .fill('Backend engineer, in my own words.');
+  await line.getByRole('button', { name: 'Save my wording' }).click();
+  await expect(line).toContainText('Edited by you');
+  await cv.getByRole('button', { name: /fake-skills:/ }).click();
+  await line.getByRole('button', { name: 'Remove this line' }).click();
+  await expect(cv).toContainText('Line removed by you');
+  await page.reload();
+  await expect(cv).toContainText('Backend engineer, in my own words.');
+  await expect(cv).toContainText('Edited by you · Your words');
+  await expect(cv).toContainText('Line removed by you');
+
+  // answerCvQuestion on a written version, then rewriteCvVersion: a new version, made in the background
+  const questions = page.getByRole('region', { name: /^Questions · / });
+  await questions.getByLabel('Your answer').fill('Nine engineers.');
+  await questions.getByRole('button', { name: 'Save the answer' }).click();
+  await expect(questions).toContainText('Answered: Nine engineers.');
+  await page
+    .getByRole('button', { name: 'Write again with my answers (1)' })
+    .click();
+  await expect(
+    page.getByText(
+      /^Written again from the version of .+, with 1 of your answers/,
+    ),
+  ).toBeVisible();
+  await expect(cv).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole('link', { name: /^Open the version of/ }),
+  ).toBeVisible();
+});

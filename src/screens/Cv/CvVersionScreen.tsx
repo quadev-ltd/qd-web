@@ -63,7 +63,10 @@ const BackLink: React.FC = () => {
   );
 };
 
-/** "Try again" after a failure: the same version asked for again, and the failed one removed. */
+/**
+ * "Try again" after a failure: a CV written for the same target, and the failed one removed. A
+ * version made before D83 is written again too, at 2 pages: no new edit version is made.
+ */
 const useTryAgain = (version: CvVersion | undefined) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -80,15 +83,11 @@ const useTryAgain = (version: CvVersion | undefined) => {
     setBusy(true);
     setErrorMessage(undefined);
     try {
-      const { versionId } = await gateway.createCvVersion(
-        isWrittenVersion(version)
-          ? { mode: 'write', target: version.target, pages: version.pages }
-          : {
-              resourceId: version.resourceId,
-              target: version.target,
-              ...(version.length === 'same' ? {} : { length: version.length }),
-            },
-      );
+      const { versionId } = await gateway.createCvVersion({
+        mode: 'write',
+        target: version.target,
+        pages: isWrittenVersion(version) ? version.pages : 2,
+      });
       // The failed one keeps nothing: it goes, so the list has the new one only.
       await gateway.removeCvVersion(version.id).catch(() => undefined);
       await Promise.all([
@@ -358,6 +357,27 @@ export const CvVersionScreen: React.FC = () => {
           {original && (
             <p className="text-sm leading-normal text-muted">
               {t('cv.copiedFrom', { date: versionDay(original) })}
+            </p>
+          )}
+          {written && rewrittenFrom && (
+            <p className="text-sm leading-normal text-muted">
+              {(() => {
+                const answers = version.statements.filter(
+                  ({ kind }) => kind === 'answer',
+                ).length;
+                const day = versionDay(rewrittenFrom);
+                return answers > 0
+                  ? t('cv.writtenAgainFromAnswers', {
+                      date: day,
+                      count: answers,
+                    })
+                  : t('cv.writtenAgainFrom', { date: day });
+              })()}{' '}
+              <Link
+                to={cvVersionPath(rewrittenFrom.id)}
+                className="font-medium whitespace-nowrap">
+                {t('cv.openVersionOf', { date: versionDay(rewrittenFrom) })}
+              </Link>
             </p>
           )}
         </div>

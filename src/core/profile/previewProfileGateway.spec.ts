@@ -1757,4 +1757,66 @@ describe('previewProfileGateway, written CVs (D83)', () => {
       gateway.answerCvQuestion(versionId, 'q1', 'Nine engineers.'),
     ).resolves.toEqual({ open: 0 });
   });
+
+  it('revises lines and roles, and writes again keeping the edits, leaving out what was removed, citing the answers', async () => {
+    const { gateway, pass } = await setUp();
+    gateway.controls.seed();
+    const { versionId } = await gateway.createCvVersion({
+      mode: 'write',
+      target: { kind: 'general' },
+    });
+    pass(PREVIEW_CV_MS);
+    const first = writtenOf(await gateway.getCvVersion(UID, versionId));
+    const [role] = first.document!.experience;
+    const [kept, dropped] = role!.bullets;
+
+    await gateway.reviseCvLine(versionId, {
+      lineId: kept!.id,
+      action: 'edit',
+      text: 'Moved the ledger to events.',
+    });
+    await gateway.reviseCvLine(versionId, {
+      lineId: dropped!.id,
+      action: 'remove',
+    });
+    await gateway.reviseCvLine(versionId, {
+      lineId: role!.id,
+      action: 'edit',
+      fields: { end: 'Present' },
+    });
+    await gateway.answerCvQuestion(versionId, 'q1', 'Nine engineers.');
+    const revised = writtenOf(await gateway.getCvVersion(UID, versionId));
+    expect(revised.document!.experience[0]).toMatchObject({
+      end: 'Present',
+      state: 'edited',
+    });
+    expect(
+      await codeOf(
+        gateway.reviseCvLine(versionId, { lineId: 'l999', action: 'remove' }),
+      ),
+    ).toBe(ProfileErrorCode.NotFound);
+
+    const { versionId: againId } = await gateway.rewriteCvVersion(versionId);
+    pass(PREVIEW_CV_MS);
+    const again = writtenOf(await gateway.getCvVersion(UID, againId));
+    const lines = again.document!.experience[0]!.bullets;
+    expect(again).toMatchObject({ rewrittenFrom: versionId, status: 'ready' });
+    expect(lines.map(({ text }) => text)).toContain(
+      'Moved the ledger to events.',
+    );
+    expect(lines.map(({ text }) => text)).not.toContain(dropped!.text);
+    expect(lines.at(-1)).toMatchObject({
+      text: 'Nine engineers.',
+      sources: [{ kind: 'statement', id: 'A1' }],
+    });
+    expect(again.statements[0]).toMatchObject({
+      kind: 'answer',
+      text: 'Nine engineers.',
+    });
+    // The version written again from doesn't change
+    expect(
+      writtenOf(await gateway.getCvVersion(UID, versionId)).document!
+        .experience[0]!.bullets,
+    ).toHaveLength(role!.bullets.length);
+  });
 });

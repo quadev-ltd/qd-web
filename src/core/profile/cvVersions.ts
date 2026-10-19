@@ -339,6 +339,8 @@ export const CvRefusal = {
   NoItems: 'no-items',
   /** Lines are revised, and CVs written again, in written versions only. */
   NotWritten: 'not-written',
+  /** No new edit version (D83): the pages ask for written ones only. */
+  EditRetired: 'edit-retired',
 } as const;
 
 // ---------- What the pages work out ----------

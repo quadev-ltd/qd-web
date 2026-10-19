@@ -70,10 +70,12 @@ export const sourceLine = (
     if (!items) {
       return '';
     }
+    // An item removed or hidden since the CV was written is no longer in the profile.
     const item = items.get(source.itemId);
-    const resource = item
-      ? resources.find(({ id }) => id === item.resourceId)
-      : undefined;
+    const resource =
+      item && !item.hidden
+        ? resources.find(({ id }) => id === item.resourceId)
+        : undefined;
     parts.push(resource ? resource.title : t('cv.sourceGone'));
   }
   const unique = [...new Set(parts)];

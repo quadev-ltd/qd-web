@@ -11,6 +11,8 @@ import {
   getCvVersionsToday,
   markCvVersionSent,
   removeCvVersion,
+  reviseCvLine,
+  rewriteCvVersion,
 } from './cvVersions';
 
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
@@ -318,5 +320,41 @@ describe('the review', () => {
       'copyCvVersion',
     );
     expect(callable).toHaveBeenCalledWith({ versionId: 'v1' });
+  });
+});
+
+describe('a written CV revised (D83)', () => {
+  it('revises a line or a role with reviseCvLine', async () => {
+    callable.mockResolvedValue({ data: { versionId: 'w1' } });
+
+    await reviseCvLine('w1', {
+      lineId: 'e1',
+      action: 'edit',
+      fields: { end: 'Present' },
+    });
+
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'reviseCvLine',
+    );
+    expect(callable).toHaveBeenCalledWith({
+      versionId: 'w1',
+      lineId: 'e1',
+      action: 'edit',
+      fields: { end: 'Present' },
+    });
+  });
+
+  it('writes one again with rewriteCvVersion, and resolves the new one', async () => {
+    callable.mockResolvedValue({
+      data: { versionId: 'w2', status: 'creating' },
+    });
+
+    await expect(rewriteCvVersion('w1')).resolves.toEqual({ versionId: 'w2' });
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'rewriteCvVersion',
+    );
+    expect(callable).toHaveBeenCalledWith({ versionId: 'w1' });
   });
 });
