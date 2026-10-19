@@ -31,6 +31,14 @@ import {
   type SkillMapItem,
 } from './contract';
 import {
+  CV_DETAILS_FIELDS,
+  CV_DETAILS_MAX_CHARS,
+  CV_DETAILS_MAX_LINKS,
+  CV_DETAILS_TEXT_FIELDS,
+  type CvDetails,
+  type CvDetailsField,
+} from './cvDetails';
+import {
   CV_DAILY_VERSIONS,
   CV_LINE_MAX_CHARS,
   CV_ROLE_MAX_CHARS,
@@ -42,6 +50,7 @@ import {
 import { ProfileError, ProfileErrorCode } from './errors';
 import { type ProfileGateway } from './gateway';
 import {
+  PREVIEW_CV_DETAILS,
   PREVIEW_FACTS,
   PREVIEW_SEED,
   PREVIEW_SEED_APPLICATIONS,
@@ -115,6 +124,8 @@ interface PreviewProfile {
   cvMaking?: Record<string, { settlesAt: number; failure?: CvVersionFailure }>;
   /** How many versions were made today. */
   cvVersionsToday?: number;
+  /** The CV's details (doc 19 §3.1); none until a field is filled. */
+  cvDetails?: CvDetails;
 }
 
 /** How the fake reads a page again: when it ends, and how. */
@@ -700,6 +711,43 @@ export const createPreviewProfileGateway = ({
     resource.textAt = at;
   };
 
+  /**
+   * A CV read fills the CV's details, as `profile-extract` 1.3.0 does: only the fields that are
+   * empty and that the candidate has not set or cleared.
+   */
+  const fillDetails = (
+    profile: PreviewProfile,
+    resource: StoredResource,
+    at: number,
+  ) => {
+    if (resource.type !== 'cv') {
+      return;
+    }
+    const details: CvDetails = profile.cvDetails ?? {
+      edited: [],
+      sources: {},
+      updatedAt: at,
+    };
+    let filled = false;
+    for (const field of CV_DETAILS_FIELDS) {
+      const empty =
+        field === 'links' ? !details.links?.length : !details[field];
+      if (empty && !details.edited.includes(field)) {
+        if (field === 'links') {
+          details.links = [...PREVIEW_CV_DETAILS.links];
+        } else {
+          details[field] = PREVIEW_CV_DETAILS[field];
+        }
+        details.sources[field] = resource.id;
+        filled = true;
+      }
+    }
+    if (filled) {
+      details.updatedAt = at;
+      profile.cvDetails = details;
+    }
+  };
+
   /** Ends the readings whose time has come. */
   const settle = (profile: PreviewProfile) => {
     const time = now();
@@ -718,6 +766,7 @@ export const createPreviewProfileGateway = ({
       if (resource.outcome === 'ready') {
         resource.status = 'ready';
         keepText(profile, resource, resource.settlesAt);
+        fillDetails(profile, resource, resource.settlesAt);
         resource.itemCount = addItems(
           profile,
           resource.id,
@@ -880,6 +929,7 @@ export const createPreviewProfileGateway = ({
       profile.resources = [];
       profile.items = [];
       profile.texts = {};
+      delete profile.cvDetails;
       // Oldest first, so the first of the list is the newest: a day apart, ending today.
       const day = 24 * 60 * 60 * 1000;
       [...PREVIEW_SEED].reverse().forEach((entry, index, all) => {
@@ -920,6 +970,13 @@ export const createPreviewProfileGateway = ({
         }
         profile.resources.push(resource);
       });
+      // The details as the designs show them: filled from the CV, the first of the seed.
+      const cv = profile.resources.find(
+        ({ title }) => title === PREVIEW_SEED[0].title,
+      );
+      if (cv) {
+        fillDetails(profile, cv, cv.createdAt ?? now());
+      }
       save();
     },
     failNext: reason => {
@@ -1175,6 +1232,18 @@ export const createPreviewProfileGateway = ({
       if (profile.texts?.[resourceId]) {
         const { [resourceId]: _removed, ...texts } = profile.texts;
         profile.texts = texts;
+      }
+      // The fields it filled go with it, unless the candidate set them since.
+      const details = profile.cvDetails;
+      if (details) {
+        for (const field of CV_DETAILS_FIELDS) {
+          if (details.sources[field] === resourceId) {
+            delete details.sources[field];
+            if (!details.edited.includes(field)) {
+              delete details[field];
+            }
+          }
+        }
       }
       touch(profile);
       save();
@@ -1571,6 +1640,71 @@ export const createPreviewProfileGateway = ({
       save();
     },
     getCvVersionsToday: async uid => read(uid).cvVersionsToday ?? 0,
+    getCvDetails: async uid => {
+      const details = read(uid).cvDetails;
+      return details ? structuredClone(details) : null;
+    },
+    updateCvDetails: async request => {
+      const profile = currentProfile();
+      const given = Object.entries(request).filter(
+        ([, value]) => value !== undefined,
+      );
+      const links = request.links?.map(link => link.trim());
+      const valid =
+        given.length > 0 &&
+        CV_DETAILS_TEXT_FIELDS.every(
+          field => (request[field]?.trim().length ?? 0) <= CV_DETAILS_MAX_CHARS,
+        ) &&
+        (links === undefined ||
+          (links.length <= CV_DETAILS_MAX_LINKS &&
+            links.every(
+              link => link.length > 0 && link.length <= CV_DETAILS_MAX_CHARS,
+            )));
+      if (!valid) {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      const details: CvDetails = profile.cvDetails ?? {
+        edited: [],
+        sources: {},
+        updatedAt: now(),
+      };
+      const changed: CvDetailsField[] = [];
+      for (const field of CV_DETAILS_TEXT_FIELDS) {
+        const value = request[field]?.trim();
+        if (value === undefined) {
+          continue;
+        }
+        if ((details[field] ?? '') !== value) {
+          changed.push(field);
+        }
+        if (value) {
+          details[field] = value;
+        } else {
+          delete details[field];
+        }
+      }
+      if (links !== undefined) {
+        if ((details.links ?? []).join('\n') !== links.join('\n')) {
+          changed.push('links');
+        }
+        if (links.length > 0) {
+          details.links = links;
+        } else {
+          delete details.links;
+        }
+      }
+      for (const [field] of given) {
+        const name = field as CvDetailsField;
+        delete details.sources[name];
+        if (!details.edited.includes(name)) {
+          details.edited.push(name);
+        }
+      }
+      details.updatedAt = now();
+      profile.cvDetails = details;
+      save();
+      return { changed };
+    },
     decideCvChange: async (versionId, changeId, decision, text) => {
       const version = readyVersion(versionId);
       const change = version.changes.find(({ id }) => id === changeId);

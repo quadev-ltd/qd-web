@@ -294,3 +294,47 @@ test('two versions for a job compared, the earlier one restored as a copy, and t
     page.getByRole('dialog', { name: 'New CV version' }),
   ).toBeVisible();
 });
+
+test('the CV details at the top of every CV: filled from the CV, corrected, and kept', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await seedProfile(page);
+  await openCv(page);
+
+  const card = page.getByRole('region', { name: 'At the top of every CV' });
+  await expect(card).toContainText('Maya Okafor · Senior Backend Engineer');
+  await expect(card).toContainText(
+    'London, UK · maya.okafor@example.com · 07700 900123 · 2 links',
+  );
+  await card.getByRole('button', { name: 'Edit your details' }).click();
+
+  const panel = page.getByRole('dialog', { name: 'Your CV details' });
+  await expect(panel).toContainText(
+    `We filled these from Maya Okafor CV 2026 on`,
+  );
+  await panel.getByLabel('Phone (optional)').fill('07700 900999');
+  await panel.getByRole('button', { name: 'Remove link 1' }).click();
+  await panel.getByRole('button', { name: 'Add a link' }).click();
+  await panel
+    .getByRole('textbox', { name: 'Link 2' })
+    .fill('maya-okafor.example');
+  await panel.getByLabel('Right to work (optional)').fill('');
+  await panel.getByRole('button', { name: 'Save my details' }).click();
+
+  await expect(panel).toBeHidden();
+  await expect(card).toContainText(
+    'London, UK · maya.okafor@example.com · 07700 900999 · 2 links',
+  );
+  // Opened again: what was saved, and the right to work left out
+  await card.getByRole('button', { name: 'Edit your details' }).click();
+  await expect(panel.getByRole('textbox', { name: 'Link 1' })).toHaveValue(
+    'github.com/maya-okafor-example',
+  );
+  await expect(panel.getByRole('textbox', { name: 'Link 2' })).toHaveValue(
+    'maya-okafor.example',
+  );
+  await expect(panel.getByLabel('Right to work (optional)')).toHaveValue('');
+  await panel.getByRole('button', { name: 'Cancel' }).click();
+  await expect(panel).toBeHidden();
+});

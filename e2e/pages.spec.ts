@@ -397,6 +397,17 @@ test('CV versions: no CV, no version yet, the panel, being made, made, the list 
   await expectAccessibleAndNotTooWide(page);
   await panel.getByRole('button', { name: 'Close' }).click();
 
+  // The CV details, from the card "At the top of every CV"
+  await page
+    .getByRole('region', { name: 'At the top of every CV' })
+    .getByRole('button', { name: 'Edit your details' })
+    .click();
+  const details = page.getByRole('dialog', { name: 'Your CV details' });
+  await details.getByRole('button', { name: 'Add a link' }).click();
+  await expectInsideViewport(page, details);
+  await expectAccessibleAndNotTooWide(page);
+  await details.getByRole('button', { name: 'Cancel' }).click();
+
   // Being made, then made
   await page.getByRole('button', { name: 'Improve my CV' }).click();
   await page

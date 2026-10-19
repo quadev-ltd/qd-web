@@ -12,6 +12,8 @@ import {
   startTitle,
   versionDay,
 } from './cvMeta';
+import CvDetailsCard from './details/CvDetailsCard';
+import CvDetailsPanel from './details/CvDetailsPanel';
 import NewCvVersionPanel, { type CvVersionKind } from './NewCvVersionPanel';
 
 import Icon, { type IconName } from '@/components/Icon';
@@ -166,6 +168,8 @@ export const CvScreen: React.FC = () => {
   const { reload } = useCvVersionsActions();
   const { applications } = useApplications();
   const [panel, setPanel] = useState<Panel>();
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const detailsCard = <CvDetailsCard onEdit={() => setDetailsOpen(true)} />;
 
   const cvs = cvsOf(profile.resources);
   const loading =
@@ -242,6 +246,7 @@ export const CvScreen: React.FC = () => {
             onOpen={() => setPanel({ kind: 'general', ask: false })}
           />
         </div>
+        {detailsCard}
         <Card elevation="raised" className="p-5">
           <div className="flex flex-wrap items-center gap-3">
             <span
@@ -312,6 +317,7 @@ export const CvScreen: React.FC = () => {
     const general = versions.filter(({ target }) => target.kind === 'general');
     body = (
       <>
+        {detailsCard}
         {byJob.size > 0 && (
           <section aria-labelledby="cv-for-job" className="flex flex-col gap-4">
             <h2
@@ -420,6 +426,7 @@ export const CvScreen: React.FC = () => {
           onClose={() => setPanel(undefined)}
         />
       )}
+      {detailsOpen && <CvDetailsPanel onClose={() => setDetailsOpen(false)} />}
     </SignedInShell>
   );
 };
