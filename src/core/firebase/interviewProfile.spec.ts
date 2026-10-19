@@ -215,6 +215,26 @@ describe('reading the profile', () => {
     expect(orderBy).not.toHaveBeenCalled();
   });
 
+  it.each(['education', 'certification', 'language'])(
+    'reads an item of the kind %s, which profile-extract 1.3.0 adds',
+    async kind => {
+      vi.mocked(getDocs).mockResolvedValue({
+        docs: [
+          document('i1', {
+            kind,
+            text: 'BSc Computer Science, University of Leeds, 2014.',
+            evidence: 'BSc Computer Science, Leeds, 2014',
+            resourceId: 'r1',
+            createdAt: at(5_000),
+            updatedAt: at(6_000),
+          }),
+        ],
+      } as never);
+
+      await expect(getItems('uid-1')).resolves.toMatchObject([{ kind }]);
+    },
+  );
+
   describe('what was read today', () => {
     beforeEach(() => {
       vi.useFakeTimers();

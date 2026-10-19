@@ -28,6 +28,9 @@ const ITEM_KIND_KEYS = {
   project: 'applications.kindProject',
   achievement: 'applications.kindAchievement',
   story: 'applications.kindStory',
+  education: 'applications.kindEducation',
+  certification: 'applications.kindCertification',
+  language: 'applications.kindLanguage',
 } as const satisfies Record<SkillMapKind, string>;
 
 const QUESTION_KIND_KEYS = {
