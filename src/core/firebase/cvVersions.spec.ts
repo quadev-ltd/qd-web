@@ -111,6 +111,26 @@ describe('reading CV versions', () => {
     );
   });
 
+  it('leaves out, without a word in the log, a version made a way it does not show yet', async () => {
+    vi.mocked(getDocs).mockResolvedValue({
+      docs: [
+        document('written', version({ mode: 'write', cv: { summary: [] } })),
+        document('edit', version({ mode: 'edit', createdAt: at(3) })),
+        document('before', version()),
+      ],
+    } as never);
+
+    const versions = await getCvVersions('uid-1');
+
+    expect(versions.map(({ id }) => id)).toEqual(['edit', 'before']);
+    expect(mockLogger.logError).not.toHaveBeenCalled();
+
+    vi.mocked(getDoc).mockResolvedValueOnce(
+      document('written', version({ mode: 'write' })) as never,
+    );
+    await expect(getCvVersion('uid-1', 'written')).resolves.toBeNull();
+  });
+
   it('reads one, or null when it is gone', async () => {
     vi.mocked(getDoc).mockResolvedValueOnce(document('v1', version()) as never);
     await expect(getCvVersion('uid-1', 'v1')).resolves.toMatchObject({

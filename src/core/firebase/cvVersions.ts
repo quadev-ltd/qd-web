@@ -29,6 +29,7 @@ import {
   cvVersionsPath,
   type CvVersionStatus,
   DECIDE_CV_CHANGE,
+  hasKnownMode,
   MARK_CV_VERSION_SENT,
   MarkCvVersionSentResponseSchema,
   REMOVE_CV_VERSION,
@@ -45,14 +46,18 @@ const withDates = (id: string, data: DocumentData) => ({
   ...(data.sentAt === undefined ? {} : { sentAt: millis(data.sentAt) }),
 });
 
-/** The ones that match the contract; one that does not is counted in the log, never shown. */
+/**
+ * The ones that match the contract; one that does not is counted in the log, never shown. A
+ * version made a way the website doesn't show yet (doc 19's written CV) is left out quietly.
+ */
 const parse = (
   operation: string,
   documents: { id: string; data(): DocumentData | undefined }[],
 ): CvVersion[] => {
-  const parsed = documents.map(document =>
-    CvVersionSchema.safeParse(withDates(document.id, document.data() ?? {})),
-  );
+  const parsed = documents
+    .map(document => ({ id: document.id, data: document.data() ?? {} }))
+    .filter(({ data }) => hasKnownMode(data))
+    .map(({ id, data }) => CvVersionSchema.safeParse(withDates(id, data)));
   const rejected = parsed.filter(result => !result.success).length;
   if (rejected > 0) {
     logger().logError(
