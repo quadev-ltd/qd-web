@@ -1,6 +1,6 @@
 // A CV written from the profile (research doc 19, D83): the document a written version keeps,
 // and the functions that print it. A copy of quadev-backend's packages/shared/src/cvDocument.ts
-// (as of fbf8c26), with zod schemas to read the document, so the website's text, compare and
+// (as of 31b27ad), with zod schemas to read the document, so the website's text, compare and
 // download say what the backend's says. Its spec copies the backend's fixtures.
 import { z } from 'zod';
 
@@ -128,6 +128,13 @@ export interface CvHeaderDetails {
 
 /** Joins the parts of one header line. */
 export const CV_HEADER_SEPARATOR = ' · ';
+
+/**
+ * The title of the entry that holds the roles a written CV keeps to one line each (cv-write
+ * 1.1.0): the experience's last entry, with no organisation and no dates, whose bullets are
+ * "Title, Organisation, start – end".
+ */
+export const CV_EARLIER_CAREER_TITLE = 'Earlier career';
 
 /** The hosts whose links keep a query: an app store's, for the app's id. */
 const STORE_QUERY: Readonly<Record<string, string>> = {
