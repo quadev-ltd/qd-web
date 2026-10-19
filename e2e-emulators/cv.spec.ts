@@ -3,7 +3,7 @@
 // offline answer, decideCvChange and answerCvQuestion, the version document read back under
 // the rules, and removeCvVersion. The
 // fake quotes real lines of the CV, so the test checks where a version is, not what it says.
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import { createAccount, openProfile, signIn } from './support';
 
@@ -19,17 +19,8 @@ const CV_TEXT = Buffer.from(
   ].join('\n'),
 );
 
-test('a general version: asked for, made in the background, reviewed, read back, then removed', async ({
-  page,
-}) => {
-  const account = await createAccount({
-    interviewAssistant: true,
-    cvTool: true,
-  });
-  await signIn(page, account);
-  await openProfile(page);
-
-  // A CV with its text kept (doc 17), which a version starts from
+/** Adds the CV as a text file on the profile page, and waits until it is read. */
+const addCv = async (page: Page) => {
   await page.getByRole('button', { name: 'Add your CV' }).click();
   await page.getByRole('button', { name: /Upload a file/ }).click();
   const form = page.getByRole('dialog', { name: 'Upload your CV' });
@@ -46,6 +37,20 @@ test('a general version: asked for, made in the background, reviewed, read back,
       .filter({ hasText: 'Maya Okafor CV 2026' })
       .getByText('Ready', { exact: true }),
   ).toBeVisible();
+};
+
+test('a general version: asked for, made in the background, reviewed, read back, then removed', async ({
+  page,
+}) => {
+  const account = await createAccount({
+    interviewAssistant: true,
+    cvTool: true,
+  });
+  await signIn(page, account);
+  await openProfile(page);
+
+  // A CV with its text kept (doc 17), which a version starts from
+  await addCv(page);
 
   // createCvVersion answers at once; the page follows the document until it is made
   await page
@@ -169,4 +174,44 @@ test('a version restored (copyCvVersion): compared with a later one, copied with
   await expect(page.getByText(/A copy of the version of/)).toBeVisible();
   await page.reload();
   await expect(page.getByText(/^1 of \d+ reviewed$/)).toBeVisible();
+});
+
+test('the CV details: filled by reading the CV, corrected with updateCvDetails, read back', async ({
+  page,
+}) => {
+  const account = await createAccount({
+    interviewAssistant: true,
+    cvTool: true,
+  });
+  await signIn(page, account);
+  await openProfile(page);
+  await addCv(page);
+
+  // profile-extract 1.3.0 filled details/cv: the fake writes every field as fake-<digest>
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'CV', exact: true })
+    .click();
+  const card = page.getByRole('region', { name: 'At the top of every CV' });
+  await expect(card).toContainText(/fake-.* · fake-/);
+  await expect(card).toContainText('1 link');
+  await card.getByRole('button', { name: 'Edit your details' }).click();
+  const panel = page.getByRole('dialog', { name: 'Your CV details' });
+  await expect(panel).toContainText(
+    'We filled these from Maya Okafor CV 2026 on',
+  );
+
+  // Only the fields changed are sent; the backend keeps them as the candidate's
+  await panel.getByLabel('Phone (optional)').fill('07700 900999');
+  await panel.getByLabel('Right to work (optional)').fill('');
+  await panel.getByRole('button', { name: 'Save my details' }).click();
+  await expect(panel).toBeHidden();
+  await expect(card).toContainText('07700 900999');
+
+  // Read back from the backend's document after a reload
+  await page.reload();
+  await expect(card).toContainText('07700 900999');
+  await card.getByRole('button', { name: 'Edit your details' }).click();
+  await expect(panel.getByLabel('Right to work (optional)')).toHaveValue('');
+  await expect(panel.getByLabel('Full name')).toHaveValue(/^fake-/);
 });

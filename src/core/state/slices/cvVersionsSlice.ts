@@ -4,6 +4,7 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import { authStateChanged } from './sessionSlice';
 
+import { type CvDetails } from '@/core/profile/cvDetails';
 import { type CvVersion } from '@/core/profile/cvVersions';
 
 export type CvVersionsStatus = 'idle' | 'loading' | 'loaded' | 'error';
@@ -16,6 +17,10 @@ export interface CvVersionsState {
   versions: CvVersion[];
   /** How many were made today, for "4 of 5 left today"; `null` until it is read. */
   madeToday: number | null;
+  /** The CV's details (doc 19 §3.1), read apart: when they can't be, the versions still show. */
+  detailsStatus: CvVersionsStatus;
+  /** `null` while no field is filled. */
+  details: CvDetails | null;
 }
 
 export const initialCvVersionsState: CvVersionsState = {
@@ -23,6 +28,8 @@ export const initialCvVersionsState: CvVersionsState = {
   status: 'idle',
   versions: [],
   madeToday: null,
+  detailsStatus: 'idle',
+  details: null,
 };
 
 const newestFirst = (a: CvVersion, b: CvVersion) =>
@@ -77,6 +84,28 @@ export const cvVersionsSlice = createSlice({
     cvVersionsTodayRead: (state, { payload }: PayloadAction<number>) => {
       state.madeToday = payload;
     },
+    /** A read of the CV's details started, for this user. */
+    cvDetailsLoadStarted: (state, { payload: uid }: PayloadAction<string>) => {
+      if (state.uid !== uid) {
+        Object.assign(state, initialCvVersionsState, { uid });
+      }
+      state.detailsStatus = 'loading';
+    },
+    cvDetailsLoaded: (
+      state,
+      { payload }: PayloadAction<{ uid: string; details: CvDetails | null }>,
+    ) => {
+      if (state.uid !== payload.uid) {
+        return;
+      }
+      state.detailsStatus = 'loaded';
+      state.details = payload.details;
+    },
+    cvDetailsLoadFailed: (state, { payload: uid }: PayloadAction<string>) => {
+      if (state.uid === uid) {
+        state.detailsStatus = 'error';
+      }
+    },
   },
   extraReducers: builder => {
     // The user signed out, or another one signed in: nothing of theirs is kept.
@@ -95,6 +124,9 @@ export const {
   cvVersionChanged,
   cvVersionRemoved,
   cvVersionsTodayRead,
+  cvDetailsLoadStarted,
+  cvDetailsLoaded,
+  cvDetailsLoadFailed,
 } = cvVersionsSlice.actions;
 
 export default cvVersionsSlice.reducer;

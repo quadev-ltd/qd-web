@@ -11,6 +11,7 @@ import {
   useRef,
 } from 'react';
 
+import { type CvDetailsField, type UpdateCvDetailsRequest } from './cvDetails';
 import { type CvVersion, isCreating } from './cvVersions';
 import { logProfileError } from './errors';
 import { RESOURCE_POLL_MS } from './InterviewProfileProvider';
@@ -20,6 +21,9 @@ import { useSessionUser } from '@/core/session/hooks';
 import { useAppDispatch, useAppSelector } from '@/core/state/hooks';
 import { selectCvVersions } from '@/core/state/selectors/cvVersions';
 import {
+  cvDetailsLoaded,
+  cvDetailsLoadFailed,
+  cvDetailsLoadStarted,
   cvVersionChanged,
   cvVersionRemoved,
   cvVersionsLoaded,
@@ -38,6 +42,13 @@ export interface CvVersionsActions {
   refreshVersion(versionId: string): Promise<CvVersion | null>;
   /** Reads today's count again, after a version was asked for. */
   refreshToday(): Promise<void>;
+  /** Reads the CV's details again (after "could not load"). */
+  reloadDetails(): Promise<void>;
+  /**
+   * Saves the fields given (only those the candidate changed: each is then kept from a later
+   * reading) and reads the details again. Resolves the fields whose value changed.
+   */
+  saveDetails(request: UpdateCvDetailsRequest): Promise<CvDetailsField[]>;
 }
 
 const notMounted = () =>
@@ -47,11 +58,14 @@ const CvVersionsContext = createContext<CvVersionsActions>({
   reload: notMounted,
   refreshVersion: notMounted,
   refreshToday: notMounted,
+  reloadDetails: notMounted,
+  saveDetails: notMounted,
 });
 
 /**
  * Mount it inside ProfileGatewayProvider, around the CV pages. The first of them in a session
- * reads the versions; the next ones use what the store has.
+ * reads the versions; the next ones use what the store has. The CV's details are read each time
+ * the CV pages open, since reading a resource in the profile can fill them meanwhile.
  */
 export const CvVersionsProvider: React.FC<{ children: ReactNode }> = ({
   children,
@@ -109,11 +123,36 @@ export const CvVersionsProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, [dispatch, gateway, uid]);
 
+  const reloadDetails = useCallback(async () => {
+    if (!uid) {
+      return;
+    }
+    dispatch(cvDetailsLoadStarted(uid));
+    try {
+      dispatch(
+        cvDetailsLoaded({ uid, details: await gateway.getCvDetails(uid) }),
+      );
+    } catch (error) {
+      logProfileError('getCvDetails', error, uid);
+      dispatch(cvDetailsLoadFailed(uid));
+    }
+  }, [dispatch, gateway, uid]);
+
+  const saveDetails = useCallback(
+    async (request: UpdateCvDetailsRequest) => {
+      const { changed } = await gateway.updateCvDetails(request);
+      await reloadDetails();
+      return changed;
+    },
+    [gateway, reloadDetails],
+  );
+
   // The first CV page of the session reads the versions; coming back, the store has them.
   useEffect(() => {
     if (uid && (loadedFor !== uid || status === 'idle')) {
       reload();
     }
+    reloadDetails();
     // Once per mount and per user: `status` changes while this effect's own work runs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
@@ -152,8 +191,14 @@ export const CvVersionsProvider: React.FC<{ children: ReactNode }> = ({
   }, [creatingIds, refreshToday, refreshVersion, uid]);
 
   const actions = useMemo<CvVersionsActions>(
-    () => ({ reload, refreshVersion, refreshToday }),
-    [refreshToday, refreshVersion, reload],
+    () => ({
+      reload,
+      refreshVersion,
+      refreshToday,
+      reloadDetails,
+      saveDetails,
+    }),
+    [refreshToday, refreshVersion, reload, reloadDetails, saveDetails],
   );
 
   return (

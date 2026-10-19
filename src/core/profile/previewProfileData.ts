@@ -105,6 +105,20 @@ export const PREVIEW_FACTS: Record<ProfileResourceType, PreviewFact[]> = {
   link: LINK_FACTS,
 };
 
+/** The name and contact lines a CV gives the CV's details (doc 19 §3.1), as the designs show them. */
+export const PREVIEW_CV_DETAILS = {
+  name: 'Maya Okafor',
+  headline: 'Senior Backend Engineer',
+  email: 'maya.okafor@example.com',
+  phone: '07700 900123',
+  location: 'London, UK',
+  rightToWork: 'British citizen',
+  links: [
+    'linkedin.com/in/maya-okafor-example',
+    'github.com/maya-okafor-example',
+  ],
+} as const;
+
 export interface PreviewSeedResource {
   type: ProfileResourceType;
   title: string;

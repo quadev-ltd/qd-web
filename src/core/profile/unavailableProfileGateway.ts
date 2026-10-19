@@ -40,6 +40,8 @@ export const unavailableProfileGateway: ProfileGateway = {
   answerCvQuestion: unavailable,
   markCvVersionSent: unavailable,
   copyCvVersion: unavailable,
+  getCvDetails: unavailable,
+  updateCvDetails: unavailable,
 };
 
 export default unavailableProfileGateway;

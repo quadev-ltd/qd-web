@@ -11,6 +11,11 @@ import {
   type SkillMapItem,
 } from './contract';
 import {
+  type CvDetails,
+  type CvDetailsField,
+  type UpdateCvDetailsRequest,
+} from './cvDetails';
+import {
   type CreateCvVersionRequest,
   type CvChangeDecisionRequest,
   type CvVersion,
@@ -207,4 +212,16 @@ export interface ProfileGateway {
    * The version copied does not change. Resolves the copy's id.
    */
   copyCvVersion(versionId: string): Promise<{ versionId: string }>;
+
+  // ---------- The CV's details (doc 19 §3.1) ----------
+
+  /** The name and contact lines at the top of a CV; `null` until a field is filled. */
+  getCvDetails(uid: string): Promise<CvDetails | null>;
+  /**
+   * Sets or clears the fields given, which a later reading of a resource then never changes.
+   * Resolves the fields whose value changed.
+   */
+  updateCvDetails(
+    request: UpdateCvDetailsRequest,
+  ): Promise<{ changed: CvDetailsField[] }>;
 }

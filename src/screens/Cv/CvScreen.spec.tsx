@@ -6,7 +6,10 @@ import { CvScreen } from './CvScreen';
 
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import { applicationFixture } from '@/testUtil/applicationFixtures';
-import { cvVersionFixture } from '@/testUtil/cvVersionFixtures';
+import {
+  cvDetailsFixture,
+  cvVersionFixture,
+} from '@/testUtil/cvVersionFixtures';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
 import { resourceFixture } from '@/testUtil/profileFixtures';
 import { renderCvPage } from '@/testUtil/renderCvPage';
@@ -260,6 +263,72 @@ describe('CvScreen', () => {
       expect(
         within(panel).getByRole('button', { name: 'cv.createButton' }),
       ).toBeDisabled();
+    });
+  });
+  describe('the CV details, at the top of every CV', () => {
+    it('shows them in two lines and opens them to edit, before any version and in the list', async () => {
+      const gateway = createMockProfileGateway();
+      gateway.getCvDetails.mockResolvedValue(cvDetailsFixture());
+      setUp({ gateway });
+
+      const card = await screen.findByRole('region', {
+        name: 'cv.detailsCardTitle',
+      });
+      expect(card).toHaveTextContent('Maya Okafor · Senior Backend Engineer');
+      expect(card).toHaveTextContent(
+        'London, UK · maya.okafor@example.com · 07700 900123 · cv.detailsLinksCount',
+      );
+      await userEvent.click(
+        within(card).getByRole('button', { name: 'cv.detailsEditButton' }),
+      );
+      expect(
+        screen.getByRole('dialog', { name: 'cv.detailsTitle' }),
+      ).toBeInTheDocument();
+    });
+
+    it('is in the list of versions too', async () => {
+      const gateway = createMockProfileGateway();
+      gateway.getCvDetails.mockResolvedValue(cvDetailsFixture());
+      setUp({ gateway, versions: [cvVersionFixture()] });
+
+      expect(
+        await screen.findByRole('region', { name: 'cv.detailsCardTitle' }),
+      ).toBeInTheDocument();
+    });
+
+    it('says when there are none yet, and offers to add them', async () => {
+      setUp();
+
+      const card = await screen.findByRole('region', {
+        name: 'cv.detailsCardTitle',
+      });
+      expect(card).toHaveTextContent('cv.detailsNoneYet');
+      expect(
+        within(card).getByRole('button', { name: 'cv.detailsAddButton' }),
+      ).toBeInTheDocument();
+    });
+
+    it('offers to read them again when they could not be read, and still lists the rest', async () => {
+      const gateway = createMockProfileGateway();
+      gateway.getCvDetails.mockRejectedValueOnce(
+        new ProfileError(ProfileErrorCode.Unknown),
+      );
+      setUp({ gateway });
+
+      const card = await screen.findByRole('region', {
+        name: 'cv.detailsCardTitle',
+      });
+      expect(card).toHaveTextContent('cv.detailsLoadErrorMessage');
+      expect(
+        screen.getByRole('button', { name: 'cv.generalButton' }),
+      ).toBeInTheDocument();
+      await userEvent.click(
+        within(card).getByRole('button', { name: 'cv.retryButton' }),
+      );
+      expect(
+        await screen.findByRole('region', { name: 'cv.detailsCardTitle' }),
+      ).toHaveTextContent('cv.detailsNoneYet');
+      expect(gateway.getCvDetails).toHaveBeenCalledTimes(2);
     });
   });
 });

@@ -5,7 +5,7 @@ import {
 } from './contract';
 import { CV_DAILY_VERSIONS } from './cvVersions';
 import { ProfileErrorCode } from './errors';
-import { PREVIEW_FACTS } from './previewProfileData';
+import { PREVIEW_CV_DETAILS, PREVIEW_FACTS } from './previewProfileData';
 import {
   createPreviewProfileGateway,
   exposePreviewProfileControls,
@@ -1602,5 +1602,74 @@ describe('previewProfileGateway, CV versions (delivery 2b)', () => {
     expect((await gateway.getCvVersion(UID, versionId))!.sentAt).toEqual(
       expect.any(Number),
     );
+  });
+});
+
+describe('previewProfileGateway, the CV details (doc 19 §3.1)', () => {
+  /** Adds the CV as a file and lets it be read. */
+  const addCv = async (set: Awaited<ReturnType<typeof setUp>>) => {
+    const { resourceId, upload } = await set.gateway.createResource(cvFile);
+    await set.gateway.uploadFile(upload!, pdf, { onProgress: () => {} });
+    set.pass(PREVIEW_READ_MS);
+    await set.gateway.getResources(UID);
+    return resourceId;
+  };
+
+  it('has none until a CV is read, which fills every field from it', async () => {
+    const set = await setUp();
+    await expect(set.gateway.getCvDetails(UID)).resolves.toBeNull();
+
+    const resourceId = await addCv(set);
+
+    await expect(set.gateway.getCvDetails(UID)).resolves.toMatchObject({
+      name: PREVIEW_CV_DETAILS.name,
+      links: PREVIEW_CV_DETAILS.links,
+      edited: [],
+      sources: { name: resourceId, links: resourceId },
+    });
+  });
+
+  it('keeps what the candidate set or cleared from a CV read later, and says what changed', async () => {
+    const set = await setUp();
+
+    await expect(
+      set.gateway.updateCvDetails({ phone: ' 07700 900999 ', headline: '' }),
+    ).resolves.toEqual({ changed: ['phone'] });
+    await addCv(set);
+
+    const details = (await set.gateway.getCvDetails(UID))!;
+    expect(details.phone).toBe('07700 900999');
+    expect(details.headline).toBeUndefined();
+    expect(details.name).toBe(PREVIEW_CV_DETAILS.name);
+    expect(details.edited).toEqual(['phone', 'headline']);
+  });
+
+  it('clears what a removed CV filled, but not what the candidate set since', async () => {
+    const set = await setUp();
+    const resourceId = await addCv(set);
+    await set.gateway.updateCvDetails({ email: 'maya@example.com' });
+
+    await set.gateway.removeResource(resourceId);
+
+    const details = (await set.gateway.getCvDetails(UID))!;
+    expect(details.email).toBe('maya@example.com');
+    expect(details.name).toBeUndefined();
+    expect(details.links).toBeUndefined();
+    expect(details.sources).toEqual({});
+  });
+
+  it('refuses what the backend refuses: no field, a field too long, a fifth link', async () => {
+    const { gateway } = await setUp();
+
+    for (const request of [
+      {},
+      { name: 'x'.repeat(201) },
+      { links: ['a', 'b', 'c', 'd', 'e'] },
+      { links: ['  '] },
+    ]) {
+      expect(await codeOf(gateway.updateCvDetails(request))).toBe(
+        ProfileErrorCode.Invalid,
+      );
+    }
   });
 });
