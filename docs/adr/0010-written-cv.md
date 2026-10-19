@@ -1,6 +1,6 @@
 # ADR 0010: A CV written for the job (D83)
 
-- Status: in progress (slices 16 to 18 of the website's numbering)
+- Status: accepted (slices 16 to 19 of the website's numbering: doc 19 slice 5 is built)
 - Date: 2026-10-19
 
 ## Context
@@ -119,7 +119,35 @@ Against quadev-backend `3ed7884` (#42: no new edit version, `edit-retired`).
 - **The preview gateway** revises lines and roles, and writes again keeping the edits, leaving
   out what was removed and citing each answer, as the backend's checks keep them.
 
+## The PDF's fonts and length (slice 19)
+
+- **Letters beyond Western European.** The PDF's built-in fonts (Helvetica) write Western European
+  letters only, and print anything else as "?". The CV details make that matter: "Łukasz" or
+  "Dvořák" is the first line of the CV. When every letter fits, the file keeps the built-in fonts:
+  small, and nothing to fetch. Otherwise it embeds Noto Sans (Latin, Greek and Cyrillic), regular
+  and bold. Only the letters used go into the file (a subset: about 11 KB for a short CV). What
+  Noto Sans lacks (Chinese, say) still prints as "?". The letters are checked against a throwaway
+  document, so a file carries one set of fonts.
+- **Where the fonts come from.** `@pdf-lib/fontkit` 1.1.1 (MIT), in its own chunk of about 330 KB
+  gzipped, and the two TTF files (about 630 KB each), served from `public/fonts/` with their
+  licence (`OFL.txt`, SIL Open Font License 1.1). They were taken from `@expo-google-fonts/noto-sans`
+  0.4.2, which packages Google's Noto Sans. Both load only when such a file is made, so no page
+  carries them. The build warns that the fontkit chunk is over 500 kB; it is lazy, so the warning
+  is left as it is.
+- **The layout keeps to the page estimate.** A page holds `CV_WORDS_PER_PAGE` (500) words with
+  headings and spacing at 10 pt, single line spacing (1.2) and margins of about 14 mm (40 pt), in the
+  PDF and in Word. Measured on CVs of known length: an estimate up to about 1.1 fills one page, up
+  to about 2.2 two. Before, an estimate of 0.9 took two pages. A spec makes a CV of "about 1 page"
+  and one of "about 2 pages" and counts the PDF's pages.
+- **Word** names Arial and lets Word substitute fonts. It needs no embedding: Word writes any letter
+  the system has.
+
+Tests: specs make real PDFs (built-in fonts for "Café, Zürich", a Noto Sans subset and no
+Helvetica for "Łukasz Dvořák", Greek and Cyrillic, and the page count against the estimate). A
+journey on the preview build sets the name "Łukasz Dvořák" in the CV details, downloads the PDF and
+reads its fonts.
+
 ## What follows
 
-Slice 19: the PDF's Unicode font, loaded only when a file is made, and the layout checked against
-the page estimate.
+Doc 19 slice 5 is complete on the website. What is left is in doc 19 §6: "Edit my CV" (a resource
+marked as "my CV"), saving an answer to the profile, "private" and "do not name", and US resumes.
