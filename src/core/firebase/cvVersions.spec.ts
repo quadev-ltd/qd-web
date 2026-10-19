@@ -114,7 +114,7 @@ describe('reading CV versions', () => {
   it('leaves out, without a word in the log, a version made a way it does not show yet', async () => {
     vi.mocked(getDocs).mockResolvedValue({
       docs: [
-        document('written', version({ mode: 'write', cv: { summary: [] } })),
+        document('unknown', version({ mode: 'translate' })),
         document('edit', version({ mode: 'edit', createdAt: at(3) })),
         document('before', version()),
       ],
@@ -126,9 +126,62 @@ describe('reading CV versions', () => {
     expect(mockLogger.logError).not.toHaveBeenCalled();
 
     vi.mocked(getDoc).mockResolvedValueOnce(
-      document('written', version({ mode: 'write' })) as never,
+      document('unknown', version({ mode: 'translate' })) as never,
     );
-    await expect(getCvVersion('uid-1', 'written')).resolves.toBeNull();
+    await expect(getCvVersion('uid-1', 'unknown')).resolves.toBeNull();
+  });
+
+  it('reads a written version (D83) with its document, notes and questions', async () => {
+    vi.mocked(getDoc).mockResolvedValueOnce(
+      document('w1', {
+        mode: 'write',
+        target: { kind: 'general' },
+        convention: 'uk',
+        pages: 1,
+        status: 'ready',
+        document: {
+          summary: [
+            {
+              id: 'l1',
+              text: 'Backend engineer.',
+              sources: [{ kind: 'item', itemId: 'i1' }, { kind: 'cv' }],
+              state: 'written',
+              proposed: 'Backend engineer.',
+            },
+          ],
+          experience: [],
+          projects: [],
+          skills: [],
+          education: [],
+          certifications: [],
+          languages: [],
+        },
+        notes: ['Put the results first.'],
+        questions: [
+          { id: 'q1', lineId: 'l1', text: 'How many?', status: 'open' },
+        ],
+        unsupportedJobTerms: [],
+        statements: [],
+        dropped: { lines: 2, numbers: 0, names: 0 },
+        profileRevision: 3,
+        createdAt: at(1),
+        updatedAt: at(2),
+      }) as never,
+    );
+
+    const written = await getCvVersion('uid-1', 'w1');
+
+    expect(written).toMatchObject({
+      mode: 'write',
+      pages: 1,
+      notes: ['Put the results first.'],
+      questions: [{ id: 'q1', lineId: 'l1' }],
+      dropped: { lines: 2 },
+    });
+    // A source of a kind the website doesn't know is left out, not the line.
+    expect(
+      written && 'document' in written && written.document?.summary[0]?.sources,
+    ).toEqual([{ kind: 'item', itemId: 'i1' }]);
   });
 
   it('reads one, or null when it is gone', async () => {

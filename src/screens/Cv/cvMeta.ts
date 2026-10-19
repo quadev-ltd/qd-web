@@ -4,7 +4,12 @@ import { type TFunction } from 'i18next';
 
 import { type JobApplication } from '@/core/profile/applications';
 import { type ProfileResource } from '@/core/profile/contract';
-import { type CvVersion } from '@/core/profile/cvVersions';
+import {
+  type CvEditVersion,
+  type CvVersion,
+  isWrittenVersion,
+} from '@/core/profile/cvVersions';
+import { aboutPages } from '@/screens/Cv/written/writtenMeta';
 import { formatDay } from '@/screens/Profile/Resource/resourceMeta';
 
 /** The CVs of the profile, the newest first. */
@@ -28,7 +33,7 @@ export const versionDay = (version: Pick<CvVersion, 'createdAt'>) =>
 /** The title of the CV a version starts from, or that it was removed since. */
 export const startTitle = (
   t: TFunction,
-  version: Pick<CvVersion, 'resourceId'>,
+  version: Pick<CvEditVersion, 'resourceId'>,
   resources: ProfileResource[],
 ) =>
   resources.find(({ id }) => id === version.resourceId)?.title ??
@@ -69,4 +74,30 @@ export const versionHeading = (
     return t('cv.applicationGone');
   }
   return [application.title, application.company].filter(Boolean).join(' · ');
+};
+
+/**
+ * The line under a version in a list (doc 13 §20.4): "Written for this job · about 2 pages" for a
+ * written one, "Edits to Maya Okafor CV 2026" for one made before D83. A general version says
+ * its day first, since its title is its role.
+ */
+export const versionMeta = (
+  t: TFunction,
+  version: CvVersion,
+  resources: ProfileResource[],
+) => {
+  const general = version.target.kind === 'general';
+  if (isWrittenVersion(version)) {
+    const what = general ? t('cv.writtenGeneralMeta') : t('cv.writtenJobMeta');
+    const parts = [
+      general ? t('cv.versionOf', { date: versionDay(version) }) : '',
+      what,
+      version.document ? aboutPages(t, version.document).toLowerCase() : '',
+    ];
+    return parts.filter(Boolean).join(' · ');
+  }
+  const edits = t('cv.editsTo', { title: startTitle(t, version, resources) });
+  return general
+    ? `${t('cv.versionOf', { date: versionDay(version) })} · ${edits.charAt(0).toLowerCase()}${edits.slice(1)}`
+    : edits;
 };

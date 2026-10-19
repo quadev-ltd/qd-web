@@ -358,7 +358,7 @@ test('a posting read again, its outcome and "Replace your edited text?": accessi
   await expectAccessibleAndNotTooWide(page);
 });
 
-test('CV versions: no CV, no version yet, the panel, being made, made, the list and the remove dialog: accessible and no horizontal scroll', async ({
+test('CV versions: nothing in the profile, no version yet, the panel, the details, being written, written, the list and the remove dialog: accessible and no horizontal scroll', async ({
   page,
 }) => {
   await openProfile(page);
@@ -368,10 +368,10 @@ test('CV versions: no CV, no version yet, the panel, being made, made, the list 
       .getByRole('link', { name: 'CV', exact: true })
       .click();
 
-  // No CV in the profile
+  // Nothing in the profile
   await cv();
   await expect(
-    page.getByRole('heading', { name: 'Add your CV first' }),
+    page.getByRole('heading', { name: 'Add to your profile first' }),
   ).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
 
@@ -384,41 +384,55 @@ test('CV versions: no CV, no version yet, the panel, being made, made, the list 
     page.getByRole('heading', { level: 1, name: 'Profile' }),
   ).toBeVisible();
   await seedProfile(page);
+  // A version made before D83, for its review below
+  await page.evaluate(() => window.qdPreviewProfile?.createEditVersion());
   await cv();
   await expect(
-    page.getByRole('button', { name: 'Improve my CV' }),
+    page.getByRole('region', { name: 'At the top of every CV' }),
   ).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
-  await page.getByRole('button', { name: 'Choose a job' }).click();
+  await page.getByRole('button', { name: 'New version' }).click();
   const panel = page.getByRole('dialog', { name: 'New CV version' });
-  await panel.getByRole('button', { name: /More options/ }).click();
   await expect(panel.getByText('Length')).toBeVisible();
   await expectInsideViewport(page, panel);
   await expectAccessibleAndNotTooWide(page);
-  await panel.getByRole('button', { name: 'Close' }).click();
 
-  // The CV details, from the card "At the top of every CV"
-  await page
-    .getByRole('region', { name: 'At the top of every CV' })
-    .getByRole('button', { name: 'Edit your details' })
-    .click();
+  // The CV details, opened over the panel
+  await panel.getByRole('button', { name: 'Edit your CV details' }).click();
   const details = page.getByRole('dialog', { name: 'Your CV details' });
   await details.getByRole('button', { name: 'Add a link' }).click();
   await expectInsideViewport(page, details);
   await expectAccessibleAndNotTooWide(page);
   await details.getByRole('button', { name: 'Cancel' }).click();
 
-  // Being made, then made
-  await page.getByRole('button', { name: 'Improve my CV' }).click();
-  await page
-    .getByRole('dialog', { name: 'Improve your CV in general' })
-    .getByRole('button', { name: 'Create the version' })
-    .click();
-  await expect(page.getByRole('status')).toContainText('Creating your version');
+  // Being written, then written
+  await panel.getByText('No job in particular').click();
+  await panel.getByRole('button', { name: 'Write my CV' }).click();
+  await expect(page.getByRole('status')).toContainText('Writing your CV');
   await expectAccessibleAndNotTooWide(page);
+  await expect(page.getByRole('article', { name: 'Your CV' })).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'What we did and why' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // The remove dialog, then the list
+  await page.getByRole('button', { name: 'Remove this version' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Remove this version?' });
+  await expectInsideViewport(page, dialog);
+  await expectAccessibleAndNotTooWide(page);
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await cv();
+  await expect(page.getByRole('region', { name: 'General' })).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // A version made before D83: its review, a change being edited, and a question
+  await page
+    .getByRole('region', { name: 'General' })
+    .getByRole('link', { name: /edits to Maya Okafor CV 2026/ })
+    .click();
   await expect(page.getByText('0 of 3 reviewed')).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
-  // A change being edited, and a question
   const aside = page.getByRole('complementary', { name: 'Changes' });
   await aside.getByRole('button', { name: 'Edit' }).click();
   await expectAccessibleAndNotTooWide(page);
@@ -433,16 +447,6 @@ test('CV versions: no CV, no version yet, the panel, being made, made, the list 
   }
   await expect(page.getByRole('article', { name: 'Your CV' })).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
-
-  // The remove dialog, then the list
-  await page.getByRole('button', { name: 'Remove this version' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Remove this version?' });
-  await expectInsideViewport(page, dialog);
-  await expectAccessibleAndNotTooWide(page);
-  await dialog.getByRole('button', { name: 'Cancel' }).click();
-  await cv();
-  await expect(page.getByRole('region', { name: 'General' })).toBeVisible();
-  await expectAccessibleAndNotTooWide(page);
 });
 
 test('CV versions compared, and the application’s CV tab: accessible and no horizontal scroll', async ({
@@ -455,28 +459,23 @@ test('CV versions compared, and the application’s CV tab: accessible and no ho
       .getByRole('navigation', { name: 'Main' })
       .getByRole('link', { name: 'CV', exact: true })
       .click();
-  const create = async () => {
+  const write = async () => {
     await page
       .getByRole('dialog', { name: 'New CV version' })
-      .getByRole('button', { name: 'Create the version' })
+      .getByRole('button', { name: 'Write my CV' })
       .click();
-    await expect(page.getByText(/of 3 reviewed/)).toBeVisible();
+    await expect(page.getByRole('article', { name: 'Your CV' })).toBeVisible();
   };
   await cv();
   await page.getByRole('button', { name: 'Choose a job' }).click();
-  await create();
-  await page
-    .getByRole('complementary', { name: 'Changes' })
-    .getByRole('button', { name: 'Accept' })
-    .click();
-  await expect(page.getByText('1 of 3 reviewed')).toBeVisible();
+  await write();
   await cv();
   await page.getByRole('button', { name: 'New version' }).click();
-  await create();
+  await write();
 
   await page.getByRole('link', { name: 'Compare' }).click();
   await expect(
-    page.getByRole('region', { name: '1 difference' }),
+    page.getByRole('heading', { level: 1, name: 'Compare two versions' }),
   ).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
 

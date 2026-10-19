@@ -88,6 +88,9 @@ const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
   [CvRefusal.NotReady]: ProfileErrorCode.Invalid,
   [CvRefusal.NotEditable]: ProfileErrorCode.Invalid,
   [CvRefusal.NotAJob]: ProfileErrorCode.Invalid,
+  // A written CV (D83) needs something in the profile to write from.
+  [CvRefusal.NoItems]: ProfileErrorCode.NoItems,
+  [CvRefusal.NotWritten]: ProfileErrorCode.Invalid,
 };
 
 /**

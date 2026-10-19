@@ -1,25 +1,38 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { cvBlocks, cvFileName, makeDocx, makePdf, saveFile } from './cvFile';
+import {
+  cvBlocks,
+  cvFileName,
+  makeDocx,
+  makePdf,
+  saveFile,
+  writtenBlocks,
+} from './cvFile';
 
 import Icon from '@/components/Icon';
 import Spinner from '@/components/Spinner';
 import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
-import { type CvVersion, cvVersionText } from '@/core/profile/cvVersions';
+import {
+  type CvVersion,
+  cvVersionText,
+  isWrittenVersion,
+} from '@/core/profile/cvVersions';
+import { useCvVersions } from '@/core/profile/CvVersionsProvider';
 import { logProfileError } from '@/core/profile/errors';
 import { useSessionUser } from '@/core/session/hooks';
 
 export interface DownloadButtonProps {
-  version: Pick<CvVersion, 'cv' | 'changes' | 'questions'>;
+  version: CvVersion;
   /** What the file is called, without its extension. */
   fileTitle: string;
 }
 
 /**
  * The one download of a version (D75): "Download PDF", with an arrow for Word (.docx). The file
- * is made here, from the version's text, once nothing is left to review.
+ * is made here: a written version from its structure, its header from the CV's details as they
+ * are now; an edit version from its text, once nothing is left to review.
  */
 export const DownloadButton: React.FC<DownloadButtonProps> = ({
   version,
@@ -27,6 +40,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
 }) => {
   const { t } = useTranslation();
   const uid = useSessionUser()?.uid;
+  const { details } = useCvVersions();
   const [busy, setBusy] = useState<'pdf' | 'docx'>();
   const [menu, setMenu] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -42,7 +56,20 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
     setBusy(format);
     setFailed(false);
     try {
-      const blocks = cvBlocks(cvVersionText(version));
+      const blocks = isWrittenVersion(version)
+        ? writtenBlocks(
+            version.document ?? {
+              summary: [],
+              experience: [],
+              projects: [],
+              skills: [],
+              education: [],
+              certifications: [],
+              languages: [],
+            },
+            details,
+          )
+        : cvBlocks(cvVersionText(version));
       const file =
         format === 'pdf' ? await makePdf(blocks) : await makeDocx(blocks);
       saveFile(file, cvFileName([fileTitle], format));

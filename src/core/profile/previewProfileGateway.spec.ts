@@ -3,7 +3,12 @@ import {
   PROFILE_MAX_RESOURCES,
   PROFILE_UPLOAD_MAX_BYTES,
 } from './contract';
-import { CV_DAILY_VERSIONS } from './cvVersions';
+import {
+  CV_DAILY_VERSIONS,
+  type CvEditVersion,
+  type CvVersion,
+  isWrittenVersion,
+} from './cvVersions';
 import { ProfileErrorCode } from './errors';
 import { PREVIEW_CV_DETAILS, PREVIEW_FACTS } from './previewProfileData';
 import {
@@ -1380,6 +1385,14 @@ describe('previewProfileGateway', () => {
   });
 });
 
+/** A version the spec made as an edit (doc 18): its review's fields. */
+const editOf = (version: CvVersion | null): CvEditVersion => {
+  if (!version || isWrittenVersion(version)) {
+    throw new Error('Not an edit version');
+  }
+  return version;
+};
+
 describe('previewProfileGateway, CV versions (delivery 2b)', () => {
   /** A profile of the designs, its CV with its text, and an application with its job. */
   const seeded = async () => {
@@ -1414,7 +1427,7 @@ describe('previewProfileGateway, CV versions (delivery 2b)', () => {
     });
     pass(PREVIEW_CV_MS);
 
-    const version = (await gateway.getCvVersion(UID, versionId))!;
+    const version = editOf(await gateway.getCvVersion(UID, versionId));
     expect(version.status).toBe('ready');
     for (const passage of [
       ...version.findings.map(({ passage: quoted }) => quoted),
@@ -1523,7 +1536,7 @@ describe('previewProfileGateway, CV versions (delivery 2b)', () => {
         target: { kind: 'job', applicationId },
       });
       pass(PREVIEW_CV_MS);
-      return (await gateway.getCvVersion(UID, versionId))!;
+      return editOf(await gateway.getCvVersion(UID, versionId));
     };
     const first = await made();
     const [rewrite, add] = first.changes;
@@ -1538,7 +1551,7 @@ describe('previewProfileGateway, CV versions (delivery 2b)', () => {
     await expect(
       gateway.answerCvQuestion(first.id, first.questions[0]!.id, '12 people'),
     ).resolves.toEqual({ open: 0 });
-    const reviewed = (await gateway.getCvVersion(UID, first.id))!;
+    const reviewed = editOf(await gateway.getCvVersion(UID, first.id));
     expect(reviewed.changes[0]).toMatchObject({
       decision: 'edited',
       text: 'Wrote it',
@@ -1550,7 +1563,7 @@ describe('previewProfileGateway, CV versions (delivery 2b)', () => {
 
     await gateway.decideCvChange(first.id, rewrite!.id, 'reopen');
     expect(
-      (await gateway.getCvVersion(UID, first.id))!.changes[0],
+      editOf(await gateway.getCvVersion(UID, first.id)).changes[0],
     ).not.toHaveProperty('text');
 
     const second = await made();
@@ -1588,7 +1601,7 @@ describe('previewProfileGateway, CV versions (delivery 2b)', () => {
       target: { kind: 'job', applicationId },
     });
     pass(PREVIEW_CV_MS);
-    const made = (await gateway.getCvVersion(UID, versionId))!;
+    const made = editOf(await gateway.getCvVersion(UID, versionId));
     await gateway.decideCvChange(versionId, made.changes[0]!.id, 'accept');
     await gateway.markCvVersionSent(versionId, true);
     pass(1000);
@@ -1597,7 +1610,7 @@ describe('previewProfileGateway, CV versions (delivery 2b)', () => {
 
     const [newest] = await gateway.getCvVersions(UID);
     expect(newest).toMatchObject({ id: copyId, copiedFrom: versionId });
-    expect(newest!.changes[0]!.decision).toBe('accepted');
+    expect(editOf(newest ?? null).changes[0]!.decision).toBe('accepted');
     expect(newest!.sentAt).toBeUndefined();
     expect((await gateway.getCvVersion(UID, versionId))!.sentAt).toEqual(
       expect.any(Number),
@@ -1671,5 +1684,77 @@ describe('previewProfileGateway, the CV details (doc 19 §3.1)', () => {
         ProfileErrorCode.Invalid,
       );
     }
+  });
+});
+
+describe('previewProfileGateway, written CVs (D83)', () => {
+  const writtenOf = (version: CvVersion | null) => {
+    if (!version || !isWrittenVersion(version)) {
+      throw new Error('Not a written version');
+    }
+    return version;
+  };
+
+  it('writes one in the background from the visible items, each line citing the item it comes from', async () => {
+    const { gateway, pass } = await setUp();
+    gateway.controls.seed();
+
+    const { versionId, status } = await gateway.createCvVersion({
+      mode: 'write',
+      target: { kind: 'general' },
+    });
+    expect(status).toBe('creating');
+    expect(writtenOf(await gateway.getCvVersion(UID, versionId))).toMatchObject(
+      { status: 'creating', pages: 2 },
+    );
+    pass(PREVIEW_CV_MS);
+
+    const version = writtenOf(await gateway.getCvVersion(UID, versionId));
+    const items = new Set((await gateway.getItems(UID)).map(({ id }) => id));
+    const document = version.document!;
+    expect(version.status).toBe('ready');
+    expect(document.experience[0]).toMatchObject({
+      title: 'Senior Backend Engineer',
+      organisation: 'Fenwick Pay',
+      start: '2021',
+      end: '2026',
+    });
+    expect(document.experience[0]!.bullets.length).toBeGreaterThan(0);
+    for (const line of [
+      ...document.summary,
+      ...document.experience.flatMap(({ bullets }) => bullets),
+      ...document.skills,
+    ]) {
+      expect(line.sources).toHaveLength(1);
+      expect(
+        line.sources[0]!.kind === 'item' && items.has(line.sources[0]!.itemId),
+      ).toBe(true);
+    }
+    expect(version.notes.length).toBeGreaterThan(0);
+    expect(version.questions[0]?.lineId).toBeDefined();
+    await expect(gateway.getCvVersionsToday(UID)).resolves.toBe(1);
+  });
+
+  it('refuses a written CV with nothing in the profile, and a change decided on one', async () => {
+    const { gateway, pass } = await setUp();
+    expect(
+      await codeOf(
+        gateway.createCvVersion({ mode: 'write', target: { kind: 'general' } }),
+      ),
+    ).toBe(ProfileErrorCode.NoItems);
+
+    gateway.controls.seed();
+    const { versionId } = await gateway.createCvVersion({
+      mode: 'write',
+      target: { kind: 'general' },
+      pages: 1,
+    });
+    pass(PREVIEW_CV_MS);
+    expect(
+      await codeOf(gateway.decideCvChange(versionId, 'c1', 'accept')),
+    ).toBe(ProfileErrorCode.Invalid);
+    await expect(
+      gateway.answerCvQuestion(versionId, 'q1', 'Nine engineers.'),
+    ).resolves.toEqual({ open: 0 });
   });
 });

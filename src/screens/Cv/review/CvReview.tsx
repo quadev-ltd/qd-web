@@ -2,7 +2,7 @@
 // the CV with each change marked beside the list of changes and questions ("To review",
 // "Questions", "Done"), and once nothing is left, "Your version is ready" with "Did you send
 // it?". At phone width a switch moves between the changes and the CV.
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DownloadButton from '../download/DownloadButton';
@@ -14,56 +14,21 @@ import {
   QuestionCard,
   TermsCard,
 } from './ReviewCards';
-import { SENT, useCvReview } from './useCvReview';
+import SentCard from './SentCard';
+import { useCvReview } from './useCvReview';
+import useItems from './useItems';
 
 import Icon from '@/components/Icon';
-import Spinner from '@/components/Spinner';
-import Banner from '@/components/ui/Banner';
-import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import Chip from '@/components/ui/Chip';
 import ProgressBar from '@/components/ui/ProgressBar';
 import SegmentedControl from '@/components/ui/SegmentedControl';
-import { type SkillMapItem } from '@/core/profile/contract';
-import { type CvVersion, openReviews } from '@/core/profile/cvVersions';
-import { logProfileError } from '@/core/profile/errors';
+import { type CvEditVersion, openReviews } from '@/core/profile/cvVersions';
 import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
-import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
-import { useSessionUser } from '@/core/session/hooks';
 
 type Tab = 'review' | 'questions' | 'done';
 
-/**
- * The profile's items, for "Based on" and "Where it says this": read once for the page. Each
- * item is a billed read, so only a page that names them reads them, as the brief does.
- */
-const useItems = (needed: boolean): Map<string, SkillMapItem> | null => {
-  const gateway = useProfileGateway();
-  const uid = useSessionUser()?.uid;
-  const [items, setItems] = useState<Map<string, SkillMapItem> | null>(null);
-  useEffect(() => {
-    if (!uid || !needed) {
-      return undefined;
-    }
-    let live = true;
-    gateway.getItems(uid).then(
-      list => live && setItems(new Map(list.map(item => [item.id, item]))),
-      error => {
-        logProfileError('getItems', error, uid);
-        if (live) {
-          setItems(new Map());
-        }
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [gateway, needed, uid]);
-  return items;
-};
-
 export interface CvReviewProps {
-  version: CvVersion;
+  version: CvEditVersion;
   /** The title of the CV it starts from. */
   cvTitle: string;
   /** What the downloaded file is called, without its extension. */
@@ -97,12 +62,12 @@ export const CvReview: React.FC<CvReviewProps> = ({
     ...changes.filter(({ decision }) => decision !== 'open'),
     ...questions.filter(({ status }) => status !== 'open'),
   ];
-  const count = (decision: CvVersion['changes'][number]['decision']) =>
+  const count = (decision: CvEditVersion['changes'][number]['decision']) =>
     changes.filter(change => change.decision === decision).length;
 
   const toggle = (id: string) =>
     setOpened(current => (current === id ? undefined : id));
-  const changeCard = (change: CvVersion['changes'][number]) => (
+  const changeCard = (change: CvEditVersion['changes'][number]) => (
     <ChangeCard
       key={change.id}
       change={change}
@@ -115,7 +80,7 @@ export const CvReview: React.FC<CvReviewProps> = ({
       resources={resources}
     />
   );
-  const questionCard = (question: CvVersion['questions'][number]) => (
+  const questionCard = (question: CvEditVersion['questions'][number]) => (
     <QuestionCard
       key={question.id}
       question={question}
@@ -142,7 +107,6 @@ export const CvReview: React.FC<CvReviewProps> = ({
   )[tab];
 
   const sent = version.sentAt !== undefined && version.sentAt !== null;
-  const busySent = review.busy === SENT;
 
   return (
     <div className="flex flex-col gap-5">
@@ -190,51 +154,7 @@ export const CvReview: React.FC<CvReviewProps> = ({
             <DownloadButton version={version} fileTitle={fileTitle} />
           </Card>
           {version.target.kind === 'job' && (
-            <Card
-              as="section"
-              elevation="raised"
-              aria-labelledby="cv-sent"
-              className="gap-3 p-5">
-              {sent ? (
-                <span className="flex">
-                  <Chip tone="success" icon="check">
-                    {t('cv.sentChip')}
-                  </Chip>
-                </span>
-              ) : (
-                <h2
-                  id="cv-sent"
-                  className="font-display text-[18px] leading-tight font-semibold">
-                  {t('cv.sentTitle')}
-                </h2>
-              )}
-              {!sent && (
-                <p className="text-[15px] leading-normal text-muted">
-                  {t('cv.sentText')}
-                </p>
-              )}
-              {review.failed === SENT && (
-                <Banner tone="danger" role="alert">
-                  {t('cv.markFailedMessage')}
-                </Banner>
-              )}
-              <Button
-                variant={sent ? 'quiet' : 'secondary'}
-                size="small"
-                disabled={busySent}
-                aria-busy={busySent}
-                onClick={() => {
-                  review.markSent(!sent);
-                }}
-                className="gap-2 self-start">
-                {busySent ? (
-                  <Spinner size="small" decorative />
-                ) : (
-                  !sent && <Icon name="check" size={18} />
-                )}
-                {t(sent ? 'cv.unmarkSentButton' : 'cv.markSentButton')}
-              </Button>
-            </Card>
+            <SentCard sent={sent} review={review} />
           )}
         </div>
       )}

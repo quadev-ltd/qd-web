@@ -18,6 +18,8 @@ export const ProfileErrorCode = {
   MaxCvVersions: 'profile/max-cv-versions',
   /** The CV has no text kept yet, so no version can start from it. */
   NoCvText: 'profile/no-cv-text',
+  /** The profile has no visible item, so no CV can be written from it. */
+  NoItems: 'profile/no-items',
   /** The resource or the item does not exist (any more). */
   NotFound: 'profile/not-found',
   /** It is being read (the first time, or its page again), so it cannot change or start again. */
@@ -63,6 +65,7 @@ const EXPECTED_CODES: ReadonlySet<string> = new Set([
   ProfileErrorCode.MaxApplications,
   ProfileErrorCode.MaxCvVersions,
   ProfileErrorCode.NoCvText,
+  ProfileErrorCode.NoItems,
   ProfileErrorCode.NotFound,
   ProfileErrorCode.Reading,
   ProfileErrorCode.JobEdited,

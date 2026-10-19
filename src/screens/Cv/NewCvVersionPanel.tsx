@@ -1,27 +1,29 @@
-// "New CV version" (C3, D69, D75, D80, D81): one panel for a version for a job or in general.
-// Opened from "New version" it asks what the version is for; the first screen's two cards open
-// it with that chosen. "Start from" shows only with two or more CVs; the length is under "More
-// options"; every version is a UK CV, which the panel says instead of asking.
+// "New CV version" (C3, D69, D80, D83, doc 13 §20.2): one panel for a CV written for a job or in
+// general, from everything in the profile. Opened from "New version" it asks what the CV is for;
+// the first screen's two cards open it with that chosen. It asks the length (1 or 2 pages, 2 by
+// default), shows the CV's details that go at the top ("Edit" opens them over it), and says every
+// CV is a UK CV instead of asking.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
 import ChoiceGroup from './ChoiceGroup';
-import { usableCvsOf } from './cvMeta';
+import { detailsLines } from './details/CvDetailsCard';
+import CvDetailsPanel from './details/CvDetailsPanel';
 
 import FormTextInput from '@/components/FormTextInput';
 import Icon from '@/components/Icon';
 import Banner from '@/components/ui/Banner';
+import Button from '@/components/ui/Button';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import SidePanel from '@/components/ui/SidePanel';
 import { type JobApplication, jobStatusOf } from '@/core/profile/applications';
 import { useApplications } from '@/core/profile/ApplicationsProvider';
+import { CV_PAGE_COUNTS, type CvPageCount } from '@/core/profile/cvDocument';
 import {
   CV_DAILY_VERSIONS,
   CV_ROLE_MAX_CHARS,
-  CV_VERSION_LENGTHS,
   CV_VERSIONS_MAX,
-  type CvVersionLength,
 } from '@/core/profile/cvVersions';
 import {
   useCvVersions,
@@ -38,16 +40,15 @@ import { cvVersionPath } from '@/core/profile/paths';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
 import { useSessionUser } from '@/core/session/hooks';
 import SubmitFooter from '@/screens/Applications/SubmitFooter';
-import { contentOf, formatDay } from '@/screens/Profile/Resource/resourceMeta';
 
 export type CvVersionKind = 'job' | 'general';
 
-/** A job a version can be tailored to: read, with its text. */
+/** A job a CV can be written for: read, with its text. */
 const tailorable = (application: JobApplication) =>
   jobStatusOf(application) === 'ready' && Boolean(application.jobDescription);
 
 export interface NewCvVersionPanelProps {
-  /** What the version is for, when it was chosen before the panel opened. */
+  /** What the CV is for, when it was chosen before the panel opened. */
   kind?: CvVersionKind;
   /** Asks "What is it for?" (opened from "New version"). */
   ask: boolean;
@@ -68,19 +69,17 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
   const uid = useSessionUser()?.uid;
   const { resources } = useInterviewProfile();
   const { applications } = useApplications();
-  const { versions, madeToday } = useCvVersions();
+  const { versions, madeToday, details } = useCvVersions();
   const { refreshVersion, refreshToday } = useCvVersionsActions();
   const jobs = applications.filter(tailorable);
-  const cvs = usableCvsOf(resources);
 
   const [kind, setKind] = useState<CvVersionKind>(initialKind);
   const [applicationId, setApplicationId] = useState(
     jobs.find(({ id }) => id === initialApplicationId)?.id ?? jobs[0]?.id,
   );
   const [role, setRole] = useState('');
-  const [resourceId, setResourceId] = useState(cvs[0]?.id);
-  const [length, setLength] = useState<CvVersionLength>('same');
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [pages, setPages] = useState<CvPageCount>(2);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
   const [limitRefused, setLimitRefused] = useState(false);
@@ -91,12 +90,11 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
   const full = versions.length >= CV_VERSIONS_MAX;
   const trimmedRole = role.trim();
   const roleTooLong = trimmedRole.length > CV_ROLE_MAX_CHARS;
-  const others = resources.length - 1;
   const blocked =
-    limitReached ||
-    full ||
-    !resourceId ||
-    (kind === 'job' ? !applicationId : roleTooLong);
+    limitReached || full || (kind === 'job' ? !applicationId : roleTooLong);
+  const [who, contact] = detailsLines(details, count =>
+    t('cv.detailsLinksCount', { count }),
+  );
 
   const messageFor = (error: unknown) => {
     switch (getProfileErrorCode(error)) {
@@ -105,8 +103,8 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
         return undefined;
       case ProfileErrorCode.MaxCvVersions:
         return t('cv.maxMessage', { max: CV_VERSIONS_MAX });
-      case ProfileErrorCode.NoCvText:
-        return t('cv.noCvTextMessage');
+      case ProfileErrorCode.NoItems:
+        return t('cv.noItemsMessage');
       case ProfileErrorCode.FlagOff:
         return t('cv.notAvailableMessage');
       default:
@@ -116,14 +114,14 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (blocked || !resourceId) {
+    if (blocked) {
       return;
     }
     setIsBusy(true);
     setErrorMessage(undefined);
     try {
       const { versionId } = await gateway.createCvVersion({
-        resourceId,
+        mode: 'write',
         target:
           kind === 'job' && applicationId
             ? { kind: 'job', applicationId }
@@ -131,9 +129,9 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
                 kind: 'general',
                 ...(trimmedRole ? { role: trimmedRole } : {}),
               },
-        ...(length === 'same' ? {} : { length }),
+        pages,
       });
-      // Into the list before its page opens; the page follows it while it is made.
+      // Into the list before its page opens; the page follows it while it is written.
       await refreshVersion(versionId).catch(() => null);
       navigate(cvVersionPath(versionId));
     } catch (error) {
@@ -218,58 +216,45 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
             counter={{ length: trimmedRole.length, max: CV_ROLE_MAX_CHARS }}
           />
         )}
-        {cvs.length === 0 && (
-          <Banner tone="info">{t('cv.noCvTextMessage')}</Banner>
-        )}
-        {cvs.length > 1 && (
-          <ChoiceGroup
-            label={t('cv.startFromLabel')}
-            value={resourceId}
-            onChange={setResourceId}
+        <div className="flex flex-col gap-1.5">
+          <SegmentedControl
+            label={t('cv.lengthLabel')}
+            options={CV_PAGE_COUNTS.map(count => ({
+              value: String(count) as `${CvPageCount}`,
+              label: t('cv.pagesOption', { count }),
+            }))}
+            value={`${pages}`}
+            onChange={value => setPages(Number(value) as CvPageCount)}
             disabled={isBusy}
-            choices={cvs.map(cv => {
-              const content = contentOf(cv);
-              return {
-                value: cv.id,
-                title: cv.title,
-                meta: t('cv.cvOptionMeta', {
-                  content: 'host' in content ? content.host : t(content.key),
-                  date: cv.createdAt === null ? '' : formatDay(cv.createdAt),
-                }),
-              };
-            })}
           />
-        )}
-        <div className="flex flex-col gap-4 border-t border-border-subtle">
-          <button
-            type="button"
-            aria-expanded={moreOpen}
-            onClick={() => setMoreOpen(open => !open)}
-            className="flex min-h-12 w-full cursor-pointer items-center gap-2.5 pt-2 text-left text-text">
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-base leading-normal font-medium">
-                {t('cv.moreOptions')}
-              </span>
-              {!moreOpen && (
-                <span className="text-sm leading-normal text-muted">
-                  {t(`cv.lengthSummary_${length}`)}
-                </span>
-              )}
+          <p className="text-sm leading-normal text-muted">
+            {t('cv.pagesHint')}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-border-subtle px-3.5 py-3">
+          <div className="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
+            <span className="text-sm leading-normal font-medium">
+              {t('cv.atTheTop')}
             </span>
-            <Icon name={moreOpen ? 'up' : 'down'} size={18} />
-          </button>
-          {moreOpen && (
-            <SegmentedControl
-              label={t('cv.lengthLabel')}
-              options={CV_VERSION_LENGTHS.map(value => ({
-                value,
-                label: t(`cv.length_${value}`),
-              }))}
-              value={length}
-              onChange={setLength}
-              disabled={isBusy}
-            />
-          )}
+            <span className="text-[15px] leading-normal wrap-anywhere">
+              {who || contact || t('cv.atTheTopNone')}
+            </span>
+            {who && contact && (
+              <span className="text-sm leading-normal text-muted wrap-anywhere">
+                {contact}
+              </span>
+            )}
+          </div>
+          <Button
+            variant="quiet"
+            size="small"
+            disabled={isBusy}
+            aria-label={t('cv.atTheTopEditLabel')}
+            onClick={() => setDetailsOpen(true)}
+            className="gap-2">
+            <Icon name="edit" size={18} />
+            {t('cv.atTheTopEdit')}
+          </Button>
         </div>
         <p className="flex items-start gap-2 text-sm leading-normal text-muted">
           <span className="flex pt-0.5 text-primary">
@@ -277,14 +262,12 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
           </span>
           {t('cv.ukLine')}
         </p>
-        {others > 0 && (
-          <p className="flex items-start gap-2 text-sm leading-normal text-muted">
-            <span className="flex pt-0.5 text-primary">
-              <Icon name="user" size={18} />
-            </span>
-            {t('cv.usesProfile', { count: others })}
-          </p>
-        )}
+        <p className="flex items-start gap-2 text-sm leading-normal text-muted">
+          <span className="flex pt-0.5 text-primary">
+            <Icon name="user" size={18} />
+          </span>
+          {t('cv.writtenFromProfile', { count: resources.length })}
+        </p>
         <SubmitFooter
           errorMessage={errorMessage}
           isBusy={isBusy}
@@ -300,6 +283,7 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
               : t('cv.takesMinute', { left, max: CV_DAILY_VERSIONS })}
         </p>
       </form>
+      {detailsOpen && <CvDetailsPanel onClose={() => setDetailsOpen(false)} />}
     </SidePanel>
   );
 };

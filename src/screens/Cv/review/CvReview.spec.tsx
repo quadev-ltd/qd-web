@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 
 import { CvReview } from './CvReview';
 
-import { type CvVersion } from '@/core/profile/cvVersions';
+import { type CvEditVersion } from '@/core/profile/cvVersions';
 import { CV_TEXT, cvVersionFixture } from '@/testUtil/cvVersionFixtures';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
 import { itemFixture, resourceFixture } from '@/testUtil/profileFixtures';
@@ -17,7 +17,7 @@ const RECON =
   'Built reconciliation service for card transactions, approx. 2M/day.';
 
 /** A version with a rewrite, a line added from an item, a removal and a question. */
-const full = (overrides: Partial<CvVersion> = {}) =>
+const full = (overrides: Partial<CvEditVersion> = {}) =>
   cvVersionFixture({
     findings: [
       {
@@ -70,7 +70,10 @@ const full = (overrides: Partial<CvVersion> = {}) =>
     ...overrides,
   });
 
-const setUp = (version: CvVersion, gateway = createMockProfileGateway()) => {
+const setUp = (
+  version: CvEditVersion,
+  gateway = createMockProfileGateway(),
+) => {
   gateway.getItems.mockResolvedValue([itemFixture()]);
   gateway.getCvVersion.mockResolvedValue(version);
   return renderCvPage(

@@ -4,11 +4,13 @@ import { Route, Routes, useLocation } from 'react-router';
 
 import { CvScreen } from './CvScreen';
 
+import { type CvVersion } from '@/core/profile/cvVersions';
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import { applicationFixture } from '@/testUtil/applicationFixtures';
 import {
   cvDetailsFixture,
   cvVersionFixture,
+  writtenVersionFixture,
 } from '@/testUtil/cvVersionFixtures';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
 import { resourceFixture } from '@/testUtil/profileFixtures';
@@ -42,7 +44,7 @@ const setUp = ({
   gateway = createMockProfileGateway(),
 }: {
   resources?: ReturnType<typeof resourceFixture>[];
-  versions?: ReturnType<typeof cvVersionFixture>[];
+  versions?: CvVersion[];
   applications?: ReturnType<typeof applicationFixture>[];
   madeToday?: number | null;
   gateway?: ReturnType<typeof createMockProfileGateway>;
@@ -61,8 +63,8 @@ const setUp = ({
   );
 
 describe('CvScreen', () => {
-  it('asks for a CV first when the profile has none, and opens "Add your CV" on the profile', async () => {
-    setUp({ resources: [note] });
+  it('asks to add to the profile first when it holds nothing, and opens "Add your CV" there', async () => {
+    setUp({ resources: [] });
 
     expect(
       screen.getByRole('heading', { name: 'cv.emptyTitle' }),
@@ -80,8 +82,8 @@ describe('CvScreen', () => {
     expect(
       screen.queryByRole('button', { name: 'cv.newVersionButton' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText(/Maya Okafor CV 2026/)).toBeInTheDocument();
-    expect(screen.getByText('cv.otherResources')).toBeInTheDocument();
+    // Written from the whole profile, not from one CV
+    expect(screen.getByText('cv.writtenFromResources')).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole('button', { name: 'cv.generalButton' }),
     );
@@ -136,6 +138,30 @@ describe('CvScreen', () => {
     );
   });
 
+  it('says a written version is written for the job, how long it is and its open questions; an old one, which CV it edits', () => {
+    setUp({
+      versions: [
+        writtenVersionFixture(),
+        writtenVersionFixture({
+          id: 'w2',
+          status: 'creating',
+          document: undefined,
+          createdAt: Date.now(),
+        }),
+        cvVersionFixture({ changes: [], questions: [] }),
+      ],
+    });
+
+    const forJob = screen.getByRole('region', { name: 'cv.forJobTitle' });
+    expect(
+      // The specs' translations give keys: "Written for this job · about half a page"
+      within(forJob).getByText('cv.writtenJobMeta · cv.abouthalfpage'),
+    ).toBeInTheDocument();
+    expect(within(forJob).getByText('cv.writingChip')).toBeInTheDocument();
+    expect(within(forJob).getByText('cv.questionsChip')).toBeInTheDocument();
+    expect(within(forJob).getByText('cv.editsTo')).toBeInTheDocument();
+  });
+
   describe('"New CV version"', () => {
     const openPanel = async () => {
       await userEvent.click(
@@ -157,19 +183,23 @@ describe('CvScreen', () => {
       expect(
         within(panel).getByRole('radio', { name: /Senior Backend Engineer/ }),
       ).toBeChecked();
-      // One CV: nothing to choose
+      // Written from the whole profile: no CV to choose, 2 pages unless asked
       expect(
-        within(panel).queryByText('cv.startFromLabel'),
-      ).not.toBeInTheDocument();
+        within(panel).getAllByRole('radio', { name: 'cv.pagesOption' })[1],
+      ).toBeChecked();
       expect(within(panel).getByText('cv.ukLine')).toBeInTheDocument();
+      expect(
+        within(panel).getByText('cv.writtenFromProfile'),
+      ).toBeInTheDocument();
       expect(within(panel).getByText('cv.takesMinute')).toBeInTheDocument();
       await userEvent.click(
         within(panel).getByRole('button', { name: 'cv.createButton' }),
       );
 
       expect(gateway.createCvVersion).toHaveBeenCalledExactlyOnceWith({
-        resourceId: 'r1',
+        mode: 'write',
         target: { kind: 'job', applicationId: 'a1' },
+        pages: 2,
       });
       expect(gateway.getCvVersion).toHaveBeenCalledWith('uid-1', 'v9');
       expect(
@@ -177,18 +207,9 @@ describe('CvScreen', () => {
       ).toBeInTheDocument();
     });
 
-    it('makes a general one for a role, from the CV chosen, with the length under "More options"', async () => {
+    it('writes a general one for a role, on one page', async () => {
       const gateway = createMockProfileGateway();
-      const second = resourceFixture({
-        id: 'r3',
-        title: 'LinkedIn profile export',
-        textAt: 1_600,
-      });
-      setUp({
-        resources: [cv, second, note],
-        versions: [cvVersionFixture()],
-        gateway,
-      });
+      setUp({ versions: [cvVersionFixture()], gateway });
       const panel = await openPanel();
 
       await userEvent.click(
@@ -198,24 +219,36 @@ describe('CvScreen', () => {
         within(panel).getByRole('textbox', { name: /cv.roleLabel/ }),
         ' Data engineer ',
       );
-      await userEvent.click(
-        within(panel).getByRole('radio', { name: /LinkedIn profile export/ }),
-      );
-      await userEvent.click(
-        within(panel).getByRole('button', { name: /cv.moreOptions/ }),
-      );
-      await userEvent.click(
-        within(panel).getByRole('radio', { name: 'cv.length_one-page' }),
-      );
+      const [onePage] = within(panel).getAllByRole('radio', {
+        name: 'cv.pagesOption',
+      });
+      await userEvent.click(onePage!);
       await userEvent.click(
         within(panel).getByRole('button', { name: 'cv.createButton' }),
       );
 
       expect(gateway.createCvVersion).toHaveBeenCalledExactlyOnceWith({
-        resourceId: 'r3',
+        mode: 'write',
         target: { kind: 'general', role: 'Data engineer' },
-        length: 'one-page',
+        pages: 1,
       });
+    });
+
+    it('shows the CV details that go at the top, and opens them over the panel', async () => {
+      const gateway = createMockProfileGateway();
+      gateway.getCvDetails.mockResolvedValue(cvDetailsFixture());
+      setUp({ versions: [cvVersionFixture()], gateway });
+      await screen.findByRole('region', { name: 'cv.detailsCardTitle' });
+      const panel = await openPanel();
+
+      expect(panel).toHaveTextContent('Maya Okafor · Senior Backend Engineer');
+      await userEvent.click(
+        within(panel).getByRole('button', { name: 'cv.atTheTopEditLabel' }),
+      );
+
+      expect(
+        screen.getByRole('dialog', { name: 'cv.detailsTitle' }),
+      ).toBeInTheDocument();
     });
 
     it('says today’s limit, and creates nothing', async () => {
@@ -233,7 +266,7 @@ describe('CvScreen', () => {
     it('says why the backend refused it', async () => {
       const gateway = createMockProfileGateway();
       gateway.createCvVersion.mockRejectedValue(
-        new ProfileError(ProfileErrorCode.NoCvText),
+        new ProfileError(ProfileErrorCode.NoItems),
       );
       setUp({ versions: [cvVersionFixture()], gateway });
       const panel = await openPanel();
@@ -243,7 +276,7 @@ describe('CvScreen', () => {
       );
 
       expect(await within(panel).findByRole('alert')).toHaveTextContent(
-        'cv.noCvTextMessage',
+        'cv.noItemsMessage',
       );
     });
 
