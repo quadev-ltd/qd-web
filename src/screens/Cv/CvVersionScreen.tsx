@@ -20,12 +20,12 @@ import ButtonLink from '@/components/ui/ButtonLink';
 import Card from '@/components/ui/Card';
 import { useApplications } from '@/core/profile/ApplicationsProvider';
 import {
-  CV_DAILY_VERSIONS,
   type CvVersion,
   isCreating,
   isWrittenVersion,
 } from '@/core/profile/cvVersions';
 import {
+  useCvDailyLimit,
   useCvVersions,
   useCvVersionsActions,
 } from '@/core/profile/CvVersionsProvider';
@@ -73,6 +73,7 @@ const useTryAgain = (version: CvVersion | undefined) => {
   const gateway = useProfileGateway();
   const uid = useSessionUser()?.uid;
   const { refreshVersion, refreshToday } = useCvVersionsActions();
+  const max = useCvDailyLimit();
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
 
@@ -99,10 +100,7 @@ const useTryAgain = (version: CvVersion | undefined) => {
       logProfileError('createCvVersion', error, uid);
       setErrorMessage(
         getProfileErrorCode(error) === ProfileErrorCode.DailyLimit
-          ? t('cv.limitMessage', {
-              max: CV_DAILY_VERSIONS,
-              time: dailyLimitResetTime(),
-            })
+          ? t('cv.limitMessage', { max, time: dailyLimitResetTime() })
           : t('cv.createFailedMessage'),
       );
       refreshToday();
@@ -119,6 +117,7 @@ export const CvVersionScreen: React.FC = () => {
   const { versionId = '' } = useParams();
   const { status, versions } = useCvVersions();
   const { reload } = useCvVersionsActions();
+  const max = useCvDailyLimit();
   const { applications } = useApplications();
   const { resources } = useInterviewProfile();
   const [removing, setRemoving] = useState(false);
@@ -290,7 +289,7 @@ export const CvVersionScreen: React.FC = () => {
         </h2>
         <p className="text-base leading-normal text-muted">
           {t(FAILURES[version.failure ?? 'internal'], {
-            max: CV_DAILY_VERSIONS,
+            max,
             time: dailyLimitResetTime(),
           })}
         </p>

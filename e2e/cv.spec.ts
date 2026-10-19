@@ -291,6 +291,34 @@ test('a PDF for a name the built-in fonts lack is written in the embedded Noto S
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
+test('a tester with a higher daily limit writes a sixth CV, counted against it', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await seedProfile(page);
+  // Five written today, and an override of 6, as set-limit writes it
+  await page.evaluate(() => {
+    window.qdPreviewProfile?.setCvVersionsToday(5);
+    window.qdPreviewProfile?.setUsageLimits({
+      cvVersion: { maxCallsPerDay: 6 },
+    });
+  });
+  await openCv(page);
+  await page.getByRole('button', { name: 'Write a general CV' }).click();
+  const panel = page.getByRole('dialog', { name: 'Write a general CV' });
+  await expect(panel).toContainText(
+    'Takes a minute or two · 1 of 6 left today',
+  );
+  await writeCv(page, 'Write a general CV');
+
+  // The limit reached: the panel says so, and writes nothing more today
+  await page.getByRole('link', { name: 'CV', exact: true }).first().click();
+  await page.getByRole('button', { name: 'New version' }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'New CV version' }),
+  ).toContainText('You’ve created 6 versions today, the daily limit.');
+});
+
 test('a CV that could not be written is tried again, and written', async ({
   page,
 }) => {

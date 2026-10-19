@@ -18,13 +18,15 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
 import {
-  CV_DAILY_VERSIONS,
   CV_LINE_MAX_CHARS,
   CV_VERSIONS_MAX,
   type CvWrittenQuestion,
   type CvWrittenVersion,
 } from '@/core/profile/cvVersions';
-import { useCvVersionsActions } from '@/core/profile/CvVersionsProvider';
+import {
+  useCvDailyLimit,
+  useCvVersionsActions,
+} from '@/core/profile/CvVersionsProvider';
 import {
   getProfileErrorCode,
   logProfileError,
@@ -146,6 +148,7 @@ export const WrittenQuestions: React.FC<{
   const gateway = useProfileGateway();
   const uid = useSessionUser()?.uid;
   const { refreshVersion, refreshToday } = useCvVersionsActions();
+  const max = useCvDailyLimit();
   const [writing, setWriting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
   const { questions } = version;
@@ -165,10 +168,7 @@ export const WrittenQuestions: React.FC<{
       switch (getProfileErrorCode(error)) {
         case ProfileErrorCode.DailyLimit:
           setErrorMessage(
-            t('cv.limitMessage', {
-              max: CV_DAILY_VERSIONS,
-              time: dailyLimitResetTime(),
-            }),
+            t('cv.limitMessage', { max, time: dailyLimitResetTime() }),
           );
           break;
         case ProfileErrorCode.MaxCvVersions:
@@ -244,9 +244,7 @@ export const WrittenQuestions: React.FC<{
         <p className="text-sm leading-normal text-muted">
           {t(
             answered > 0 ? 'cv.writeAgainWithAnswersText' : 'cv.writeAgainText',
-            {
-              max: CV_DAILY_VERSIONS,
-            },
+            { max },
           )}
         </p>
       </div>

@@ -1819,4 +1819,25 @@ describe('previewProfileGateway, written CVs (D83)', () => {
         .experience[0]!.bullets,
     ).toHaveLength(role!.bullets.length);
   });
+
+  it('keeps to the account’s own daily limit, set as set-limit does', async () => {
+    const { gateway } = await setUp();
+    gateway.controls.seed();
+    gateway.controls.setCvVersionsToday(CV_DAILY_VERSIONS);
+    const write = () =>
+      gateway.createCvVersion({ mode: 'write', target: { kind: 'general' } });
+    expect(await codeOf(write())).toBe(ProfileErrorCode.DailyLimit);
+
+    gateway.controls.setUsageLimits({ cvVersion: { maxCallsPerDay: 6 } });
+    await expect(gateway.getUsageLimits(UID)).resolves.toEqual({
+      services: { cvVersion: { maxCallsPerDay: 6 } },
+    });
+    await expect(write()).resolves.toMatchObject({ status: 'creating' });
+
+    gateway.controls.setUsageLimits({ cvVersion: { maxCallsPerDay: 0 } });
+    gateway.controls.setCvVersionsToday(0);
+    expect(await codeOf(write())).toBe(ProfileErrorCode.DailyLimit);
+    gateway.controls.setUsageLimits(null);
+    await expect(gateway.getUsageLimits(UID)).resolves.toBeNull();
+  });
 });

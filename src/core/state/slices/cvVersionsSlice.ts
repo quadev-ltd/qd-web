@@ -6,6 +6,7 @@ import { authStateChanged } from './sessionSlice';
 
 import { type CvDetails } from '@/core/profile/cvDetails';
 import { type CvVersion } from '@/core/profile/cvVersions';
+import { type UsageLimits } from '@/core/profile/usageLimits';
 
 export type CvVersionsStatus = 'idle' | 'loading' | 'loaded' | 'error';
 
@@ -17,6 +18,8 @@ export interface CvVersionsState {
   versions: CvVersion[];
   /** How many were made today, for "4 of 5 left today"; `null` until it is read. */
   madeToday: number | null;
+  /** The user's overrides of the daily limits (`usageLimits/{uid}`); `null` for the defaults. */
+  limits: UsageLimits | null;
   /** The CV's details (doc 19 §3.1), read apart: when they can't be, the versions still show. */
   detailsStatus: CvVersionsStatus;
   /** `null` while no field is filled. */
@@ -28,6 +31,7 @@ export const initialCvVersionsState: CvVersionsState = {
   status: 'idle',
   versions: [],
   madeToday: null,
+  limits: null,
   detailsStatus: 'idle',
   details: null,
 };
@@ -55,6 +59,7 @@ export const cvVersionsSlice = createSlice({
         uid: string;
         versions: CvVersion[];
         madeToday: number | null;
+        limits?: UsageLimits | null;
       }>,
     ) => {
       // An answer for a user who has gone is dropped.
@@ -64,6 +69,7 @@ export const cvVersionsSlice = createSlice({
       state.status = 'loaded';
       state.versions = [...payload.versions].sort(newestFirst);
       state.madeToday = payload.madeToday;
+      state.limits = payload.limits ?? null;
     },
     cvVersionsLoadFailed: (state, { payload: uid }: PayloadAction<string>) => {
       if (state.uid === uid) {
@@ -80,9 +86,21 @@ export const cvVersionsSlice = createSlice({
     cvVersionRemoved: (state, { payload: id }: PayloadAction<string>) => {
       state.versions = state.versions.filter(version => version.id !== id);
     },
-    /** Today's count was read again, after a version was made. */
-    cvVersionsTodayRead: (state, { payload }: PayloadAction<number>) => {
-      state.madeToday = payload;
+    /** Today's count was read again, after a version was made, with the user's limits. */
+    cvVersionsTodayRead: (
+      state,
+      {
+        payload,
+      }: PayloadAction<
+        number | { madeToday: number; limits: UsageLimits | null }
+      >,
+    ) => {
+      if (typeof payload === 'number') {
+        state.madeToday = payload;
+      } else {
+        state.madeToday = payload.madeToday;
+        state.limits = payload.limits;
+      }
     },
     /** A read of the CV's details started, for this user. */
     cvDetailsLoadStarted: (state, { payload: uid }: PayloadAction<string>) => {

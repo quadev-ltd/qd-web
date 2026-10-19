@@ -20,12 +20,9 @@ import SidePanel from '@/components/ui/SidePanel';
 import { type JobApplication, jobStatusOf } from '@/core/profile/applications';
 import { useApplications } from '@/core/profile/ApplicationsProvider';
 import { CV_PAGE_COUNTS, type CvPageCount } from '@/core/profile/cvDocument';
+import { CV_ROLE_MAX_CHARS, CV_VERSIONS_MAX } from '@/core/profile/cvVersions';
 import {
-  CV_DAILY_VERSIONS,
-  CV_ROLE_MAX_CHARS,
-  CV_VERSIONS_MAX,
-} from '@/core/profile/cvVersions';
-import {
+  useCvDailyLimit,
   useCvVersions,
   useCvVersionsActions,
 } from '@/core/profile/CvVersionsProvider';
@@ -71,6 +68,7 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
   const { applications } = useApplications();
   const { versions, madeToday, details } = useCvVersions();
   const { refreshVersion, refreshToday } = useCvVersionsActions();
+  const max = useCvDailyLimit();
   const jobs = applications.filter(tailorable);
 
   const [kind, setKind] = useState<CvVersionKind>(initialKind);
@@ -84,8 +82,7 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>();
   const [limitRefused, setLimitRefused] = useState(false);
 
-  const left =
-    madeToday === null ? null : Math.max(0, CV_DAILY_VERSIONS - madeToday);
+  const left = madeToday === null ? null : Math.max(0, max - madeToday);
   const limitReached = left === 0 || limitRefused;
   const full = versions.length >= CV_VERSIONS_MAX;
   const trimmedRole = role.trim();
@@ -158,10 +155,9 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
       <form noValidate onSubmit={submit} className="flex flex-col gap-[18px]">
         {limitReached && (
           <Banner>
-            {t('cv.limitMessage', {
-              max: CV_DAILY_VERSIONS,
-              time: dailyLimitResetTime(),
-            })}
+            {max === 0
+              ? t('cv.limitNoneMessage')
+              : t('cv.limitMessage', { max, time: dailyLimitResetTime() })}
           </Banner>
         )}
         {full && (
@@ -280,7 +276,7 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
             ? t('cv.takesMinuteOnly')
             : left === 0
               ? t('cv.takesMinuteNone')
-              : t('cv.takesMinute', { left, max: CV_DAILY_VERSIONS })}
+              : t('cv.takesMinute', { left, max })}
         </p>
       </form>
       {detailsOpen && <CvDetailsPanel onClose={() => setDetailsOpen(false)} />}

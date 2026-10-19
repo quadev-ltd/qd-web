@@ -5,7 +5,13 @@
 // skills only), so the tests check where a version is, not what it says.
 import { expect, type Page, test } from '@playwright/test';
 
-import { createAccount, openProfile, signIn } from './support';
+import {
+  createAccount,
+  openProfile,
+  setUsageLimit,
+  setUsageToday,
+  signIn,
+} from './support';
 
 /** A small fictional CV as a text file: its lines are what the fake quotes. */
 const CV_TEXT = Buffer.from(
@@ -252,4 +258,38 @@ test('a written CV revised (reviseCvLine), a question answered, then written aga
   await expect(
     page.getByRole('link', { name: /^Open the version of/ }),
   ).toBeVisible();
+});
+
+test('a per-user daily limit (usageLimits/{uid}): the backend lets a sixth CV through with an override of 6', async ({
+  page,
+}) => {
+  const account = await createAccount({
+    interviewAssistant: true,
+    cvTool: true,
+  });
+  await setUsageToday(account.uid, 'cvVersion', 5);
+  await signIn(page, account);
+  await openProfile(page);
+  await addCv(page);
+  const cv = () =>
+    page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'CV', exact: true })
+      .click();
+
+  // The default: 5 a day, all made
+  await cv();
+  await page.getByRole('button', { name: 'Write a general CV' }).click();
+  const panel = page.getByRole('dialog', { name: 'Write a general CV' });
+  await expect(panel).toContainText('none left today');
+
+  // An override of 6, as set-limit writes it: read on the next visit, and the backend agrees
+  await setUsageLimit(account.uid, 'cvVersion', 6);
+  await page.reload();
+  await page.getByRole('button', { name: 'Write a general CV' }).click();
+  await expect(panel).toContainText('1 of 6 left today');
+  await panel.getByRole('button', { name: 'Write my CV' }).click();
+  await expect(page.getByRole('article', { name: 'Your CV' })).toContainText(
+    'fake-profile:',
+  );
 });

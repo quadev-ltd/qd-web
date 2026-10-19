@@ -22,6 +22,7 @@ import {
   type CvVersionStatus,
   type ReviseCvLineRequest,
 } from './cvVersions';
+import { type UsageLimits } from './usageLimits';
 
 /** Where a file goes, as `createResource` answers for a file. */
 export interface UploadTarget {
@@ -224,6 +225,12 @@ export interface ProfileGateway {
    * one; the version written again from doesn't change. Resolves the new one's id.
    */
   rewriteCvVersion(versionId: string): Promise<{ versionId: string }>;
+
+  /**
+   * The user's overrides of the AI services' daily limits (`usageLimits/{uid}`); `null` when
+   * there are none, and the defaults apply.
+   */
+  getUsageLimits(uid: string): Promise<UsageLimits | null>;
 
   // ---------- The CV's details (doc 19 §3.1) ----------
 
