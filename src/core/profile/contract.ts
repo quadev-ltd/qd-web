@@ -62,13 +62,16 @@ export const PROFILE_RESOURCE_FAILURES = [
 ] as const;
 export type ProfileResourceFailure = (typeof PROFILE_RESOURCE_FAILURES)[number];
 
-/** The kinds of item in the skill map. */
+/** The kinds of item in the skill map. The last three since `profile-extract` 1.3.0 (doc 19). */
 export const SKILL_MAP_KINDS = [
   'skill',
   'experience',
   'project',
   'achievement',
   'story',
+  'education',
+  'certification',
+  'language',
 ] as const;
 export type SkillMapKind = (typeof SKILL_MAP_KINDS)[number];
 
