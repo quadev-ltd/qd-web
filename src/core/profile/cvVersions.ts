@@ -55,6 +55,18 @@ export const CV_QUESTION_STATUSES = ['open', 'answered', 'skipped'] as const;
 export const CV_VERSION_STATUSES = ['creating', 'ready', 'failed'] as const;
 export type CvVersionStatus = (typeof CV_VERSION_STATUSES)[number];
 /**
+ * How a version is made. `edit`: changes to the candidate's CV, decided one by one (doc 18); a
+ * version with no `mode` is one. A version made another way (`write`, a whole CV written for its
+ * target, doc 19) is left out until the website shows it.
+ */
+export const CV_VERSION_MODES = ['edit'] as const;
+
+/** The version was made a way the website shows. */
+export const hasKnownMode = ({ mode }: { mode?: unknown }) =>
+  mode === undefined ||
+  mode === null ||
+  (CV_VERSION_MODES as readonly unknown[]).includes(mode);
+/**
  * Why a version could not be made: no usable answer in time (`model`), the model refused the
  * content (`blocked`), the daily limit was reached meanwhile (`quota`), or something else.
  */
@@ -129,6 +141,8 @@ export const CvVersionSchema = z.object({
   resourceId: z.string(),
   length: z.enum(CV_VERSION_LENGTHS).catch('same'),
   status: z.enum(CV_VERSION_STATUSES),
+  /** None on the versions made before doc 19: they are edits. */
+  mode: z.enum(CV_VERSION_MODES).nullish().catch(undefined),
   failure: z.enum(CV_VERSION_FAILURES).optional().catch('internal'),
   /** The CV's text when the version was made. Every passage quotes it. */
   cv: z.string().catch(''),
