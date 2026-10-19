@@ -217,19 +217,17 @@ test('a written CV revised (reviseCvLine), a question answered, then written aga
   const line = page.getByRole('region', { name: 'This line' });
   await expect(cv).toContainText('fake-profile:');
 
-  // The profile line edited, the skills removed: both kept by the backend
-  await cv.getByRole('button', { name: /fake-profile:/ }).click();
+  // The skills edited, the profile line removed: both kept by the backend
+  await cv.getByRole('button', { name: /fake-skills:/ }).click();
   await line.getByRole('button', { name: 'Edit' }).click();
-  await line
-    .getByLabel('Your wording')
-    .fill('Backend engineer, in my own words.');
+  await line.getByLabel('Your wording').fill('Go, TypeScript and Kotlin.');
   await line.getByRole('button', { name: 'Save my wording' }).click();
   await expect(line).toContainText('Edited by you');
-  await cv.getByRole('button', { name: /fake-skills:/ }).click();
+  await cv.getByRole('button', { name: /fake-profile:/ }).click();
   await line.getByRole('button', { name: 'Remove this line' }).click();
   await expect(cv).toContainText('Line removed by you');
   await page.reload();
-  await expect(cv).toContainText('Backend engineer, in my own words.');
+  await expect(cv).toContainText('Go, TypeScript and Kotlin.');
   await expect(cv).toContainText('Edited by you · Your words');
   await expect(cv).toContainText('Line removed by you');
 
@@ -246,8 +244,11 @@ test('a written CV revised (reviseCvLine), a question answered, then written aga
       /^Written again from the version of .+, with 1 of your answers/,
     ),
   ).toBeVisible();
-  await expect(cv).toBeVisible();
+  // cv-write 1.1.0's fake writes again as the writer does: the answer used, what was removed left out
+  await expect(cv).toContainText('fake-answer: Nine engineers.');
+  await expect(cv).not.toContainText('fake-profile:');
   await page.reload();
+  await expect(cv).toContainText('fake-answer: Nine engineers.');
   await expect(
     page.getByRole('link', { name: /^Open the version of/ }),
   ).toBeVisible();

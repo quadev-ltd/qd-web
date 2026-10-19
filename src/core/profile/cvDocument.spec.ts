@@ -1,5 +1,4 @@
 import {
-  cvLinkLabel,
   CV_SECTION_HEADINGS,
   CV_SECTION_KEYS,
   CV_WORDS_PER_PAGE,
@@ -9,13 +8,14 @@ import {
   cvDocumentWords,
   cvEntryHeading,
   cvHeaderLines,
+  cvLinkLabel,
   cvRightToWorkLine,
   type CvDocument,
   type CvEntry,
   type CvLine,
 } from './cvDocument';
 
-// The backend's fixtures (quadev-backend packages/shared/src/cvDocument.test.ts, as of fbf8c26),
+// The backend's fixtures (quadev-backend packages/shared/src/cvDocument.test.ts, as of 31b27ad),
 // copied as they are: the same inputs give the same text here and there.
 
 const line = (
@@ -180,6 +180,40 @@ describe('cvHeaderLines', () => {
   });
 });
 
+describe('cvLinkLabel', () => {
+  it.each([
+    [
+      'https://play.google.com/store/apps/details?id=com.qdmobile&gl=UK',
+      'play.google.com/store/apps/details?id=com.qdmobile',
+    ],
+    ['https://www.linkedin.com/in/gus/', 'linkedin.com/in/gus'],
+    ['github.com/gusfran', 'github.com/gusfran'],
+    [
+      'https://apps.apple.com/gb/app/quadev/id123?mt=8',
+      'apps.apple.com/gb/app/quadev/id123',
+    ],
+    ['HTTPS://WWW.Example.com/', 'Example.com'],
+    [
+      'play.google.com/store/apps/details?gl=UK',
+      'play.google.com/store/apps/details',
+    ],
+    ['  https://quadev.net/#work ', 'quadev.net'],
+  ])('prints %s as %s', (link, label) => {
+    expect(cvLinkLabel(link)).toBe(label);
+  });
+
+  it('shortens the links of the header', () => {
+    expect(
+      cvHeaderLines({
+        links: [
+          'https://github.com/quadev-ltd',
+          'https://www.linkedin.com/in/gus/',
+        ],
+      }),
+    ).toEqual(['github.com/quadev-ltd · linkedin.com/in/gus']);
+  });
+});
+
 describe('cvDocumentText', () => {
   it('prints the header, then each section with its heading, in the fixed order', () => {
     expect(cvDocumentText(DOCUMENT, DETAILS)).toBe(
@@ -309,44 +343,5 @@ describe('the length and the lines of a document', () => {
       'Certifications',
       'Languages',
     ]);
-  });
-});
-
-describe('cvLinkLabel (proposed for packages/shared)', () => {
-  it('prints a link without its scheme, "www.", fragment, trailing "/" or query', () => {
-    expect(cvLinkLabel('https://www.linkedin.com/in/gus/')).toBe(
-      'linkedin.com/in/gus',
-    );
-    expect(cvLinkLabel(' github.com/gusfran ')).toBe('github.com/gusfran');
-    expect(cvLinkLabel('HTTP://example.com/talk?utm_source=cv#slides')).toBe(
-      'example.com/talk',
-    );
-    expect(cvLinkLabel('https://apps.apple.com/gb/app/quadev/id123?mt=8')).toBe(
-      'apps.apple.com/gb/app/quadev/id123',
-    );
-    // Only the scheme and "www." are matched whatever their case
-    expect(cvLinkLabel('HTTPS://WWW.Example.com/')).toBe('Example.com');
-  });
-
-  it('keeps the id of an app in the Play store, and nothing else of its query', () => {
-    expect(
-      cvLinkLabel(
-        'https://play.google.com/store/apps/details?id=com.qdmobile&gl=UK',
-      ),
-    ).toBe('play.google.com/store/apps/details?id=com.qdmobile');
-    expect(
-      cvLinkLabel('https://play.google.com/store/apps/details?gl=UK'),
-    ).toBe('play.google.com/store/apps/details');
-    expect(cvLinkLabel('play.google.com/store/apps/details?gl=UK')).toBe(
-      'play.google.com/store/apps/details',
-    );
-  });
-
-  it('is used for the links of the header', () => {
-    expect(
-      cvHeaderLines({
-        links: ['https://www.github.com/marta/', 'linkedin.com/in/marta'],
-      }),
-    ).toEqual(['github.com/marta · linkedin.com/in/marta']);
   });
 });
