@@ -2,6 +2,12 @@ import { doc, getDoc } from 'firebase/firestore/lite';
 
 import { getUsageLimits } from './usageLimits';
 
+import {
+  CV_VERSION_DAILY_LIMIT,
+  effectiveLimits,
+  serviceOverride,
+} from '@/core/profile/usageLimits';
+
 const mockLogger = vi.hoisted(() => ({
   logError: vi.fn(),
   logMessage: vi.fn(),
@@ -56,9 +62,34 @@ describe('the usage limits', () => {
 
     await expect(getUsageLimits('uid-1')).resolves.toEqual({
       services: { cvVersion: { maxCallsPerDay: 20, maxCostUsdPerDay: 2 } },
-      note: 'Tester',
     });
     expect(doc).toHaveBeenCalledWith({ name: 'db' }, 'usageLimits/uid-1');
+  });
+
+  it('keeps a malformed entry as stored, so it gives only its own service the defaults', async () => {
+    vi.mocked(getDoc).mockResolvedValue({
+      data: () => ({
+        services: {
+          cvVersion: { maxCallsPerDay: 20 },
+          jobReading: { maxCallsPerDay: 2.5 },
+        },
+      }),
+    } as never);
+
+    const limits = await getUsageLimits('uid-1');
+
+    expect(
+      effectiveLimits(
+        CV_VERSION_DAILY_LIMIT,
+        serviceOverride(limits, 'cvVersion'),
+      ).maxCallsPerDay,
+    ).toBe(20);
+    expect(
+      effectiveLimits(
+        CV_VERSION_DAILY_LIMIT,
+        serviceOverride(limits, 'jobReading'),
+      ),
+    ).toEqual(CV_VERSION_DAILY_LIMIT);
   });
 
   it('answers null when there are none: the defaults apply', async () => {

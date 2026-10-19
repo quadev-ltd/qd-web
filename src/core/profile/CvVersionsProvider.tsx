@@ -19,6 +19,7 @@ import { useProfileGateway } from './ProfileGatewayProvider';
 import {
   CV_VERSION_DAILY_LIMIT,
   effectiveLimits,
+  serviceOverride,
   USAGE_SERVICES,
 } from './usageLimits';
 
@@ -228,7 +229,7 @@ export const useCvDailyLimit = (): number => {
   const { limits } = useAppSelector(selectCvVersions);
   return effectiveLimits(
     CV_VERSION_DAILY_LIMIT,
-    limits?.services[USAGE_SERVICES.cvVersion],
+    serviceOverride(limits, USAGE_SERVICES.cvVersion),
   ).maxCallsPerDay;
 };
 

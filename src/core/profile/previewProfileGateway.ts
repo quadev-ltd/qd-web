@@ -71,8 +71,9 @@ import {
 import {
   CV_VERSION_DAILY_LIMIT,
   effectiveLimits,
+  serviceOverride,
+  type StoredUsageLimits,
   USAGE_SERVICES,
-  type UsageLimits,
 } from './usageLimits';
 
 import { PREVIEW_GATEWAY_MARKER } from '@/core/auth/previewGateway';
@@ -147,7 +148,7 @@ interface PreviewProfile {
   /** The document a version being written again starts from, by the new version. */
   cvRewrites?: Record<string, CvDocument>;
   /** The overrides of the daily limits (`usageLimits/{uid}`); none for the defaults. */
-  usageLimits?: UsageLimits;
+  usageLimits?: StoredUsageLimits;
 }
 
 /** How the fake reads a page again: when it ends, and how. */
@@ -209,7 +210,7 @@ export interface PreviewProfileControls {
    */
   createEditVersion(target?: CvVersionTarget): Promise<string>;
   /** Sets the account's overrides of the daily limits, as set-limit does; `null` removes them. */
-  setUsageLimits(services: UsageLimits['services'] | null): void;
+  setUsageLimits(services: StoredUsageLimits['services'] | null): void;
 }
 
 /** How long the fake takes to prepare a brief; the real one takes 10 to 20 seconds. */
@@ -472,7 +473,7 @@ const rewriteFrom = (version: CvWrittenVersion, before: CvDocument) => {
 const cvDailyLimit = (profile: PreviewProfile) =>
   effectiveLimits(
     CV_VERSION_DAILY_LIMIT,
-    profile.usageLimits?.services[USAGE_SERVICES.cvVersion],
+    serviceOverride(profile.usageLimits, USAGE_SERVICES.cvVersion),
   ).maxCallsPerDay;
 
 /** Questions the fake asks for any job, with what kind each is. */

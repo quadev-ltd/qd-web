@@ -165,6 +165,28 @@ writer's content (fewer full roles, "Earlier career") is changing separately, in
 - **A role with no title** prints its organisation alone. An entry with no organisation or dates
   ("Earlier career") prints no date column. Both are checked, in the file and on the page.
 
+## A daily limit per user (20 Oct 2026)
+
+The owner asked for a higher daily CV limit for testers. Against quadev-backend `00b79c0` (#46):
+`usageLimits/{uid}`, set by the owner with `npm run set-limit`, readable by the user it is for and
+applied by the backend for every AI service.
+
+- **The contract copy is `src/core/profile/usageLimits.ts`**, from the backend's
+  `packages/shared/src/usage.ts`, with the backend's fixtures as its spec. A service's limit is
+  `effectiveLimits(default, serviceOverride(document, service))`: each field of the override on top
+  of the default, capped at 50 a day and $5, and 0 blocks the service.
+- **The document is kept as stored**, and read one service at a time as the backend reads it, so a
+  malformed entry for one service never hides another's override.
+- **The limits are read with the versions and with today's count.** A changed limit shows the next
+  time the CV pages open or a version is asked for. A failure to read them means the defaults,
+  and the backend decides anyway.
+- **The CV pages count against the user's own limit**: "N of M left today", the limit message, and
+  "counts as one of today's M". With a limit of 0, the panel says writing CVs isn't available on the
+  account.
+- **Only the CV pages read the limits so far.** The profile's "resources read today" and the brief's
+  daily limit still show their defaults, so an override for those services waits until their pages
+  read it too.
+
 ## What follows
 
 Doc 19 slice 5 is complete on the website. What is left is in doc 19 §6: "Edit my CV" (a resource

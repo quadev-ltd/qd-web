@@ -6,7 +6,7 @@ import { CvScreen } from './CvScreen';
 
 import { type CvVersion } from '@/core/profile/cvVersions';
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
-import { type UsageLimits } from '@/core/profile/usageLimits';
+import { type StoredUsageLimits } from '@/core/profile/usageLimits';
 import { applicationFixture } from '@/testUtil/applicationFixtures';
 import {
   cvDetailsFixture,
@@ -49,7 +49,7 @@ const setUp = ({
   versions?: CvVersion[];
   applications?: ReturnType<typeof applicationFixture>[];
   madeToday?: number | null;
-  limits?: UsageLimits | null;
+  limits?: StoredUsageLimits | null;
   gateway?: ReturnType<typeof createMockProfileGateway>;
 } = {}) =>
   renderCvPage(

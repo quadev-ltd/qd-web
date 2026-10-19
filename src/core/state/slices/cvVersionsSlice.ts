@@ -6,7 +6,7 @@ import { authStateChanged } from './sessionSlice';
 
 import { type CvDetails } from '@/core/profile/cvDetails';
 import { type CvVersion } from '@/core/profile/cvVersions';
-import { type UsageLimits } from '@/core/profile/usageLimits';
+import { type StoredUsageLimits } from '@/core/profile/usageLimits';
 
 export type CvVersionsStatus = 'idle' | 'loading' | 'loaded' | 'error';
 
@@ -19,7 +19,7 @@ export interface CvVersionsState {
   /** How many were made today, for "4 of 5 left today"; `null` until it is read. */
   madeToday: number | null;
   /** The user's overrides of the daily limits (`usageLimits/{uid}`); `null` for the defaults. */
-  limits: UsageLimits | null;
+  limits: StoredUsageLimits | null;
   /** The CV's details (doc 19 §3.1), read apart: when they can't be, the versions still show. */
   detailsStatus: CvVersionsStatus;
   /** `null` while no field is filled. */
@@ -59,7 +59,7 @@ export const cvVersionsSlice = createSlice({
         uid: string;
         versions: CvVersion[];
         madeToday: number | null;
-        limits?: UsageLimits | null;
+        limits?: StoredUsageLimits | null;
       }>,
     ) => {
       // An answer for a user who has gone is dropped.
@@ -92,7 +92,7 @@ export const cvVersionsSlice = createSlice({
       {
         payload,
       }: PayloadAction<
-        number | { madeToday: number; limits: UsageLimits | null }
+        number | { madeToday: number; limits: StoredUsageLimits | null }
       >,
     ) => {
       if (typeof payload === 'number') {
