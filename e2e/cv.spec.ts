@@ -7,6 +7,7 @@
 import { readFileSync } from 'node:fs';
 
 import { expect, type Page, test } from '@playwright/test';
+import { PDFDict, PDFDocument, PDFName } from 'pdf-lib';
 
 import {
   openHome,
@@ -249,6 +250,45 @@ test('a written CV revised: a line edited, another removed and restored, a role�
     'Redesigned on-call for a team of nine: pages fell from 31 to 12.',
   );
   await expect(cv).toContainText('From your answer of');
+});
+
+test('a PDF for a name the built-in fonts lack is written in the embedded Noto Sans', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await seedProfile(page);
+  await openCv(page);
+  await page
+    .getByRole('region', { name: 'At the top of every CV' })
+    .getByRole('button', { name: 'Edit your details' })
+    .click();
+  const details = page.getByRole('dialog', { name: 'Your CV details' });
+  await details.getByLabel('Full name').fill('Łukasz Dvořák');
+  await details.getByRole('button', { name: 'Save my details' }).click();
+  await expect(details).toBeHidden();
+  await page.getByRole('button', { name: 'Write a general CV' }).click();
+  await writeCv(page, 'Write a general CV');
+  await expect(page.getByRole('article', { name: 'Your CV' })).toContainText(
+    'Łukasz Dvořák',
+  );
+
+  const pdf = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download PDF' }).click();
+  const bytes = readFileSync(await (await pdf).path());
+  expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+  // Its fonts: Noto Sans (a subset, named after it), not the built-in Helvetica
+  const file = await PDFDocument.load(bytes);
+  const fonts = file.context
+    .enumerateIndirectObjects()
+    .flatMap(([, object]) =>
+      object instanceof PDFDict &&
+      object.get(PDFName.of('Type')) === PDFName.of('Font')
+        ? [String(object.get(PDFName.of('BaseFont')))]
+        : [],
+    );
+  expect(fonts.some(name => name.startsWith('/NotoSans-Regular'))).toBe(true);
+  expect(fonts.some(name => name.startsWith('/Helvetica'))).toBe(false);
+  await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
 test('a CV that could not be written is tried again, and written', async ({

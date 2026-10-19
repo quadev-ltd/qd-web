@@ -137,33 +137,100 @@ export const cvFileName = (parts: string[], extension: 'pdf' | 'docx') =>
 // ---------- PDF ----------
 
 /**
- * A4 in points, with margins of about 17 mm, at 10 pt: about 500 words a page with headings and
- * spacing, the page the length check counts (CV_WORDS_PER_PAGE, doc 19 §3.4).
+ * A4 in points, with margins of about 14 mm, at 10 pt with single line spacing: a page holds the
+ * CV_WORDS_PER_PAGE (500) words the length check counts (doc 19 §3.4), headings and spacing
+ * included, so "about 2 pages" downloads as 2. Measured: an estimate up to 1.1 fills one page, up
+ * to 2.2 two (cvFile.spec.ts).
  */
-const PAGE = { width: 595.28, height: 841.89, margin: 48 };
+const PAGE = { width: 595.28, height: 841.89, margin: 40 };
 const SIZES = { name: 18, heading: 11, text: 10 };
-const LEADING = 1.32;
+const LEADING = 1.2;
 
-export const makePdf = async (blocks: CvBlock[]): Promise<Blob> => {
+/** Noto Sans (SIL Open Font License, public/fonts/OFL.txt): Latin, Greek and Cyrillic letters. */
+export const UNICODE_FONTS = {
+  regular: '/fonts/NotoSans-Regular.ttf',
+  bold: '/fonts/NotoSans-Bold.ttf',
+} as const;
+
+/** Reads the two fonts from the site, as they are needed. */
+const fetchFonts = async (): Promise<[ArrayBuffer, ArrayBuffer]> => {
+  const read = async (path: string) => {
+    const response = await fetch(path);
+    if (!response.ok) {
+      throw new Error(
+        `The font ${path} could not be read (${response.status})`,
+      );
+    }
+    return response.arrayBuffer();
+  };
+  return Promise.all([read(UNICODE_FONTS.regular), read(UNICODE_FONTS.bold)]);
+};
+
+export interface MakePdfOptions {
+  /** Where the Unicode fonts come from; the site's own files by default. */
+  loadFonts?: () => Promise<[ArrayBuffer, ArrayBuffer]>;
+}
+
+export const makePdf = async (
+  blocks: CvBlock[],
+  { loadFonts = fetchFonts }: MakePdfOptions = {},
+): Promise<Blob> => {
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
   const pdf = await PDFDocument.create();
-  const regular = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+  // The standard fonts write Western European text only. A CV with any other letter ("Łukasz",
+  // "Dvořák") is written in Noto Sans, of which only the letters used go into the file. The
+  // letters are checked against a document of their own, so the file carries one set of fonts.
+  const probe = await (
+    await PDFDocument.create()
+  ).embedFont(StandardFonts.Helvetica);
+  const fits = (character: string) => {
+    try {
+      probe.widthOfTextAtSize(character, SIZES.text);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const characters = new Set(
+    blocks.flatMap(block => [
+      ...block.text,
+      ...(block.kind === 'entry' ? block.when : ''),
+    ]),
+  );
+  const unicode = [...characters].some(
+    character => !/\s/.test(character) && !fits(character),
+  );
+  let regular;
+  let bold;
+  if (unicode) {
+    const [{ default: fontkit }, [regularBytes, boldBytes]] = await Promise.all(
+      [import('@pdf-lib/fontkit'), loadFonts()],
+    );
+    pdf.registerFontkit(fontkit);
+    // As bytes of this page's own kind, wherever they were read.
+    regular = await pdf.embedFont(new Uint8Array(regularBytes), {
+      subset: true,
+    });
+    bold = await pdf.embedFont(new Uint8Array(boldBytes), { subset: true });
+  } else {
+    regular = await pdf.embedFont(StandardFonts.Helvetica);
+    bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  }
   type Font = typeof regular;
 
-  // The standard fonts write Western European text only: anything else becomes "?".
+  // What a font cannot write (a script Noto Sans doesn't cover) becomes "?".
   const known = new Map<string, boolean>();
   const writable = (font: Font, text: string) =>
     [...text]
       .map(character => {
         const key = `${font.name}${character}`;
         if (!known.has(key)) {
-          try {
-            font.widthOfTextAtSize(character, SIZES.text);
-            known.set(key, true);
-          } catch {
-            known.set(key, false);
-          }
+          known.set(
+            key,
+            /\s/.test(character) ||
+              font.getCharacterSet().includes(character.codePointAt(0) ?? -1),
+          );
         }
         return known.get(key) ? character : '?';
       })
@@ -273,8 +340,8 @@ export const makePdf = async (blocks: CvBlock[]): Promise<Blob> => {
 
 // ---------- Word ----------
 
-/** A4 in twentieths of a point, with margins of about 17 mm, as the PDF. */
-const WORD_PAGE = { width: 11906, height: 16838, margin: 964 };
+/** A4 in twentieths of a point, with margins of about 14 mm, as the PDF. */
+const WORD_PAGE = { width: 11906, height: 16838, margin: 800 };
 /** The PDF's sizes in half-points, as Word counts them. */
 const WORD_SIZES = { name: 36, heading: 22, text: 20 };
 
