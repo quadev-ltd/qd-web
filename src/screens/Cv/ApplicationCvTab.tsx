@@ -1,10 +1,10 @@
-// The CV tab of an application (A6, doc 13 §16.2, §19): the version sent with it, with the job's
-// words it doesn't show; the other versions for this job; and "Tailor your CV for this job",
+// The CV tab of an application (A6, doc 13 §16.2, §19, §20.4): the version sent with it, with
+// the job's words it doesn't show; the other versions for this job; and "A CV for this job",
 // which opens "New CV version" on this job.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { startTitle, versionDay } from './cvMeta';
+import { versionDay, versionMeta } from './cvMeta';
 import { VersionRow } from './CvScreen';
 import DownloadButton from './download/DownloadButton';
 import NewCvVersionPanel from './NewCvVersionPanel';
@@ -17,7 +17,7 @@ import ButtonLink from '@/components/ui/ButtonLink';
 import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
 import { type JobApplication, jobStatusOf } from '@/core/profile/applications';
-import { openReviews } from '@/core/profile/cvVersions';
+import { isWrittenVersion, openReviews } from '@/core/profile/cvVersions';
 import {
   useCvVersions,
   useCvVersionsActions,
@@ -87,7 +87,7 @@ export const ApplicationCvTab: React.FC<{ application: JobApplication }> = ({
               {t('cv.versionOf', { date: versionDay(sent) })}
             </h2>
             <p className="text-sm leading-normal text-muted">
-              {t('cv.versionFrom', { title: startTitle(t, sent, resources) })}
+              {versionMeta(t, sent, resources)}
             </p>
             {sent.unsupportedJobTerms.length > 0 && (
               <p className="text-[15px] leading-normal text-muted">
@@ -103,7 +103,7 @@ export const ApplicationCvTab: React.FC<{ application: JobApplication }> = ({
                 size="small">
                 {t('cv.openButton')}
               </ButtonLink>
-              {openReviews(sent) === 0 && (
+              {(isWrittenVersion(sent) || openReviews(sent) === 0) && (
                 <DownloadButton
                   version={sent}
                   fileTitle={t('cv.fileTitle', {
@@ -134,9 +134,7 @@ export const ApplicationCvTab: React.FC<{ application: JobApplication }> = ({
                   key={version.id}
                   version={version}
                   title={t('cv.versionOf', { date: versionDay(version) })}
-                  meta={t('cv.versionFrom', {
-                    title: startTitle(t, version, resources),
-                  })}
+                  meta={versionMeta(t, version, resources)}
                 />
               ))}
             </ul>
@@ -159,7 +157,11 @@ export const ApplicationCvTab: React.FC<{ application: JobApplication }> = ({
           {t('cv.tailorJobTitle')}
         </h2>
         <p className="text-[15px] leading-normal text-muted">
-          {ready ? t('cv.tailorJobText') : t('cv.jobNotReadyForCv')}
+          {ready
+            ? t('cv.tailorJobText', {
+                company: application.company || t('cv.theEmployer'),
+              })
+            : t('cv.jobNotReadyForCv')}
         </p>
         <Button
           size="small"

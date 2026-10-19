@@ -1,6 +1,7 @@
-// "Compare two versions" (C3, FR-28): two versions of the same CV for the same job (or both
-// general), what differs between their texts, and "Restore" for the earlier one, which makes a
-// copy that becomes the newest (copyCvVersion). Nothing is overwritten.
+// "Compare two versions" (C3, FR-28): two versions for the same job (or both general), what
+// differs between their texts, and "Restore" for the earlier one, which makes a copy that becomes
+// the newest (copyCvVersion). Nothing is overwritten. A written version's text is cvDocumentText
+// with its header from the CV's details as they are now, the same for both (doc 13 §20.6).
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router';
@@ -17,7 +18,7 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Chip, { type ChipProps } from '@/components/ui/Chip';
 import { useApplications } from '@/core/profile/ApplicationsProvider';
-import { type CvVersion, cvVersionText } from '@/core/profile/cvVersions';
+import { type CvVersion, versionText } from '@/core/profile/cvVersions';
 import {
   useCvVersions,
   useCvVersionsActions,
@@ -77,7 +78,7 @@ export const CvCompareScreen: React.FC = () => {
   const gateway = useProfileGateway();
   const uid = useSessionUser()?.uid;
   const [params, setParams] = useSearchParams();
-  const { status, versions } = useCvVersions();
+  const { status, versions, details } = useCvVersions();
   const { refreshVersion } = useCvVersionsActions();
   const { applications } = useApplications();
   const [onlyDiffers, setOnlyDiffers] = useState(true);
@@ -149,7 +150,10 @@ export const CvCompareScreen: React.FC = () => {
     t(version.sentAt ? 'cv.versionOptionSent' : 'cv.versionOption', {
       date: versionDay(version),
     });
-  const rows = diffLines(cvVersionText(earlier), cvVersionText(later));
+  const rows = diffLines(
+    versionText(earlier, details),
+    versionText(later, details),
+  );
   const differences = rows.filter(({ kind }) => kind !== 'same');
   const shown = onlyDiffers ? differences : rows;
   const choose = (side: 'earlier' | 'later', id: string) => {

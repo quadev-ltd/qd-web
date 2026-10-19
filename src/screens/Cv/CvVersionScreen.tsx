@@ -1,6 +1,6 @@
-// One CV version (C3): being created (one line, D80), taking longer than it ever does, could
-// not be created ("Try again"), or made: its review (CvReview). "Remove this version" is
-// always there.
+// One CV version (C3): being made (one line, D80), taking longer than it ever does, could not be
+// made ("Try again"), or made: a written CV (WrittenReview, D83) or the review of an edit version
+// (CvReview). "Remove this version" is always there.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -8,6 +8,8 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { startTitle, versionDay, versionHeading } from './cvMeta';
 import RemoveCvVersionDialog from './RemoveCvVersionDialog';
 import CvReview from './review/CvReview';
+import { aboutPages } from './written/writtenMeta';
+import WrittenReview from './written/WrittenReview';
 
 import Icon from '@/components/Icon';
 import SignedInShell from '@/components/layout/SignedInShell';
@@ -21,6 +23,7 @@ import {
   CV_DAILY_VERSIONS,
   type CvVersion,
   isCreating,
+  isWrittenVersion,
 } from '@/core/profile/cvVersions';
 import {
   useCvVersions,
@@ -77,11 +80,15 @@ const useTryAgain = (version: CvVersion | undefined) => {
     setBusy(true);
     setErrorMessage(undefined);
     try {
-      const { versionId } = await gateway.createCvVersion({
-        resourceId: version.resourceId,
-        target: version.target,
-        ...(version.length === 'same' ? {} : { length: version.length }),
-      });
+      const { versionId } = await gateway.createCvVersion(
+        isWrittenVersion(version)
+          ? { mode: 'write', target: version.target, pages: version.pages }
+          : {
+              resourceId: version.resourceId,
+              target: version.target,
+              ...(version.length === 'same' ? {} : { length: version.length }),
+            },
+      );
       // The failed one keeps nothing: it goes, so the list has the new one only.
       await gateway.removeCvVersion(version.id).catch(() => undefined);
       await Promise.all([
@@ -181,10 +188,26 @@ export const CvVersionScreen: React.FC = () => {
   }
 
   const date = versionDay(version);
-  const sub = t(
-    version.target.kind === 'job' ? 'cv.tailoredSub' : 'cv.generalSub',
-    { date, title: startTitle(t, version, resources) },
-  );
+  const written = isWrittenVersion(version);
+  let sub: string;
+  if (written) {
+    const pages = version.document
+      ? aboutPages(t, version.document).toLowerCase()
+      : t('cv.pagesAsked', { count: version.pages });
+    sub = t(
+      version.target.kind === 'job' ? 'cv.writtenJobSub' : 'cv.writtenSub',
+      { date, pages },
+    );
+  } else {
+    sub = t(
+      version.target.kind === 'job' ? 'cv.tailoredSub' : 'cv.generalSub',
+      { date, title: startTitle(t, version, resources) },
+    );
+  }
+  const rewrittenFrom =
+    written && version.rewrittenFrom
+      ? versions.find(({ id }) => id === version.rewrittenFrom)
+      : undefined;
   const lost = creating && !isCreating(version, now);
   // Another version made for the same job (or general) to compare it with.
   const comparable =
@@ -214,12 +237,23 @@ export const CvVersionScreen: React.FC = () => {
             <Spinner decorative />
           </span>
           <h2 className="font-display text-[22px] leading-tight font-semibold">
-            {t('cv.creatingTitle')}
+            {t(written ? 'cv.writingTitle' : 'cv.creatingTitle')}
           </h2>
         </div>
         <p className="text-base leading-normal text-muted">
-          {t('cv.creatingDescription')}
+          {t(written ? 'cv.writingDescription' : 'cv.creatingDescription')}
         </p>
+        {written && (
+          <>
+            <div className="h-px bg-border-faint" />
+            <p className="flex items-start gap-2 text-[15px] leading-normal text-muted">
+              <span className="flex pt-0.5 text-primary">
+                <Icon name="check" size={18} />
+              </span>
+              {t('cv.writingChecks')}
+            </p>
+          </>
+        )}
       </Card>
     );
   } else if (lost) {
@@ -253,7 +287,7 @@ export const CvVersionScreen: React.FC = () => {
           <Icon name="alert" size={24} />
         </span>
         <h2 className="font-display text-[22px] leading-tight font-semibold">
-          {t('cv.failedTitle')}
+          {t(written ? 'cv.writeFailedTitle' : 'cv.failedTitle')}
         </h2>
         <p className="text-base leading-normal text-muted">
           {t(FAILURES[version.failure ?? 'internal'], {
@@ -284,6 +318,21 @@ export const CvVersionScreen: React.FC = () => {
           </ButtonLink>
         </div>
       </Card>
+    );
+  } else if (written) {
+    body = version.document ? (
+      <WrittenReview
+        version={{ ...version, document: version.document }}
+        fileTitle={t('cv.fileTitle', {
+          heading: versionHeading(t, version, applications),
+          date,
+        })}
+        writtenAgainDay={rewrittenFrom ? versionDay(rewrittenFrom) : undefined}
+      />
+    ) : (
+      <Banner tone="danger" role="alert">
+        {t('cv.loadErrorMessage')}
+      </Banner>
     );
   } else {
     body = (

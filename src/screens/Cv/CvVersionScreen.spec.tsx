@@ -5,10 +5,16 @@ import { Route, Routes, useLocation } from 'react-router';
 import { CvRoutes } from './CvRoutes';
 import { CvVersionScreen } from './CvVersionScreen';
 
-import { CV_CREATING_STALE_MS } from '@/core/profile/cvVersions';
+import {
+  CV_CREATING_STALE_MS,
+  type CvVersion,
+} from '@/core/profile/cvVersions';
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import { applicationFixture } from '@/testUtil/applicationFixtures';
-import { cvVersionFixture } from '@/testUtil/cvVersionFixtures';
+import {
+  cvVersionFixture,
+  writtenVersionFixture,
+} from '@/testUtil/cvVersionFixtures';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
 import { resourceFixture } from '@/testUtil/profileFixtures';
 import { renderCvPage } from '@/testUtil/renderCvPage';
@@ -21,7 +27,7 @@ vi.mock('@/core/logger', () => ({
 const Location = () => <p>{`at ${useLocation().pathname}`}</p>;
 
 const setUp = (
-  version: ReturnType<typeof cvVersionFixture> | null,
+  version: CvVersion | null,
   gateway = createMockProfileGateway(),
 ) => {
   gateway.getCvVersion.mockImplementation(async (_uid, id) =>
@@ -34,7 +40,7 @@ const setUp = (
     </Routes>,
     {
       gateway,
-      route: '/cv/versions/v1',
+      route: `/cv/versions/${version?.id ?? 'v1'}`,
       interviewProfile: {
         uid: 'uid-1',
         status: 'loaded',
@@ -169,6 +175,67 @@ describe('CvVersionScreen', () => {
     expect(
       screen.getByRole('article', { name: 'cv.yourCvTitle' }),
     ).toBeInTheDocument();
+  });
+
+  describe('a CV written from the profile (D83)', () => {
+    it('says it is being written, and how it is checked', () => {
+      setUp(
+        writtenVersionFixture({
+          status: 'creating',
+          document: undefined,
+          createdAt: Date.now(),
+        }),
+      );
+
+      expect(
+        screen.getByRole('heading', { name: 'cv.writingTitle' }),
+      ).toBeInTheDocument();
+      expect(screen.getByText('cv.writingChecks')).toBeInTheDocument();
+      expect(screen.getByText('cv.writtenJobSub')).toBeInTheDocument();
+    });
+
+    it('says it could not be written, and writes it again with the same target and length', async () => {
+      const gateway = createMockProfileGateway();
+      gateway.createCvVersion.mockResolvedValue({
+        versionId: 'w2',
+        status: 'creating',
+      });
+      setUp(
+        writtenVersionFixture({
+          status: 'failed',
+          failure: 'model',
+          document: undefined,
+          pages: 1,
+        }),
+        gateway,
+      );
+
+      expect(
+        screen.getByRole('heading', { name: 'cv.writeFailedTitle' }),
+      ).toBeInTheDocument();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'cv.tryAgainButton' }),
+      );
+
+      expect(gateway.createCvVersion).toHaveBeenCalledExactlyOnceWith({
+        mode: 'write',
+        target: { kind: 'job', applicationId: 'a1' },
+        pages: 1,
+      });
+      expect(gateway.removeCvVersion).toHaveBeenCalledWith('w1');
+    });
+
+    it('shows one that is written as the CV, with what we did and why', () => {
+      setUp(writtenVersionFixture());
+
+      expect(
+        screen.getByRole('article', { name: 'cv.yourCvTitle' }),
+      ).toHaveTextContent('Senior Backend Engineer · Fenwick Pay · London');
+      expect(
+        screen.getByRole('region', { name: 'cv.notesTitle' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('cv.reviewedProgress')).not.toBeInTheDocument();
+    });
   });
 
   it('is removed, asked first, and goes back to the CV list', async () => {

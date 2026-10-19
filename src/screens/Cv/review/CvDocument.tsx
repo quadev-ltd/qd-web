@@ -9,7 +9,7 @@ import Icon from '@/components/Icon';
 import {
   type CvChange,
   type CvQuestion,
-  type CvVersion,
+  type CvEditVersion,
   cvVersionText,
 } from '@/core/profile/cvVersions';
 
@@ -59,7 +59,9 @@ interface Line {
  * that runs over a line break (a sentence the PDF wrapped) joins its lines into one, so it is
  * marked once and replaced whole, as the text replaces it.
  */
-const linesOf = (version: Pick<CvVersion, 'cv' | 'changes' | 'questions'>) => {
+const linesOf = (
+  version: Pick<CvEditVersion, 'cv' | 'changes' | 'questions'>,
+) => {
   const { cv } = version;
   const marked: Span[] = [];
   const adds: { at: number; change: CvChange; number: number }[] = [];
@@ -138,7 +140,7 @@ const linesOf = (version: Pick<CvVersion, 'cv' | 'changes' | 'questions'>) => {
 };
 
 export interface CvDocumentProps {
-  version: Pick<CvVersion, 'cv' | 'changes' | 'questions'>;
+  version: Pick<CvEditVersion, 'cv' | 'changes' | 'questions'>;
   /** Marks on ("Show changes"), or the text as it would be downloaded. */
   marks: boolean;
 }

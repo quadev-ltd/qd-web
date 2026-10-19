@@ -38,13 +38,18 @@ import {
   type CvDetails,
   type CvDetailsField,
 } from './cvDetails';
+import { type CvDocument, type CvEntry, type CvLine } from './cvDocument';
 import {
   CV_DAILY_VERSIONS,
   CV_LINE_MAX_CHARS,
   CV_ROLE_MAX_CHARS,
   CV_VERSIONS_MAX,
+  type CvEditVersion,
   type CvVersion,
   type CvVersionFailure,
+  type CvVersionTarget,
+  type CvWrittenVersion,
+  isWrittenVersion,
   openReviews,
 } from './cvVersions';
 import { ProfileError, ProfileErrorCode } from './errors';
@@ -181,6 +186,11 @@ export interface PreviewProfileControls {
   failNextCv(reason: CvVersionFailure): void;
   /** How many CV versions were already made today. */
   setCvVersionsToday(count: number): void;
+  /**
+   * A version as they were made before D83: edits to the profile's CV (doc 18), made in the
+   * background like any other. The pages no longer ask for one; their review stays. Resolves its id.
+   */
+  createEditVersion(target?: CvVersionTarget): Promise<string>;
 }
 
 /** How long the fake takes to prepare a brief; the real one takes 10 to 20 seconds. */
@@ -204,7 +214,7 @@ const cvAnswerFor = (
   firstItem: SkillMapItem | undefined,
   jobDescription: string | undefined,
 ): Pick<
-  CvVersion,
+  CvEditVersion,
   'findings' | 'changes' | 'questions' | 'unsupportedJobTerms'
 > => {
   const lines = cvLines(cv);
@@ -268,6 +278,119 @@ const cvAnswerFor = (
     unsupportedJobTerms: jobDescription
       ? jobDescription.split(/\s+/).filter(Boolean).slice(0, 3)
       : [],
+  };
+};
+
+/** "Senior Backend Engineer at Fenwick Pay, 2021 to 2026: ..." as a role's heading. */
+const headingOf = (text: string) => {
+  const match = /^(.+?) at ([^,]+), (\d{4}) to (\d{4}|now)/i.exec(text);
+  return match
+    ? {
+        title: match[1],
+        organisation: match[2],
+        location: '',
+        start: match[3],
+        end: match[4],
+      }
+    : { title: text, organisation: '', location: '', start: '', end: '' };
+};
+
+/**
+ * What the fake writer answers for a written version (D83), shaped as the backend's: a CV made
+ * of the profile's visible items, the starred first, each line citing the item it comes from,
+ * with notes, a question about one line, and the job's first words as terms it doesn't show.
+ */
+const cvWriteAnswerFor = (
+  items: SkillMapItem[],
+  jobDescription: string | undefined,
+): Pick<
+  CvWrittenVersion,
+  'document' | 'notes' | 'questions' | 'unsupportedJobTerms' | 'dropped'
+> => {
+  const visible = [
+    ...items.filter(({ starred, hidden }) => starred && !hidden),
+    ...items.filter(({ starred, hidden }) => !starred && !hidden),
+  ];
+  let lines = 0;
+  const line = (item: SkillMapItem, label?: string): CvLine => {
+    lines += 1;
+    return {
+      id: `l${lines}`,
+      text: item.text,
+      ...(label ? { label } : {}),
+      sources: [{ kind: 'item', itemId: item.id }],
+      state: 'written',
+      proposed: item.text,
+    };
+  };
+  let entries = 0;
+  const entry = (item: SkillMapItem, bullets: CvLine[]): CvEntry => {
+    entries += 1;
+    const heading = headingOf(item.text);
+    return {
+      id: `e${entries}`,
+      ...heading,
+      sources: [{ kind: 'item', itemId: item.id }],
+      state: 'written',
+      proposedFields: heading,
+      bullets,
+    };
+  };
+  const of = (kind: SkillMapItem['kind']) =>
+    visible.filter(item => item.kind === kind);
+  const achievements = [...of('achievement'), ...of('story')];
+  const [lead] = achievements;
+  const summary = lead ? [line(lead)] : [];
+  const experience = of('experience').map((item, index) =>
+    entry(
+      item,
+      index === 0
+        ? achievements.slice(lead ? 1 : 0, 5).map(bullet => line(bullet))
+        : [],
+    ),
+  );
+  const projects = of('project').map(item => entry(item, []));
+  const skills = of('skill').length
+    ? [
+        line(of('skill')[0], 'Skills'),
+        ...of('skill')
+          .slice(1, 3)
+          .map(item => line(item, 'Skills')),
+      ]
+    : [];
+  const document: CvDocument = {
+    summary,
+    experience,
+    projects,
+    skills,
+    education: of('education').map(item => line(item)),
+    certifications: of('certification').map(item => line(item)),
+    languages: of('language').map(item => line(item)),
+  };
+  const asked = experience[0]?.bullets[0] ?? summary[0];
+  return {
+    document,
+    notes: [
+      'Put the results with numbers first, where a reader looks.',
+      jobDescription
+        ? 'Wrote the profile for this job: what it asks for, from what your profile shows.'
+        : 'Wrote the profile for the work your profile shows most.',
+      'Left out what your profile doesn’t back up, and asked about it instead.',
+    ],
+    questions: asked
+      ? [
+          {
+            id: 'q1',
+            lineId: asked.id,
+            text: 'How many people worked on this with you?',
+            status: 'open',
+          },
+        ]
+      : [],
+    unsupportedJobTerms: jobDescription
+      ? jobDescription.split(/\s+/).filter(Boolean).slice(0, 3)
+      : [],
+    dropped: { lines: 1, numbers: 0, names: 0 },
   };
 };
 
@@ -852,7 +975,9 @@ export const createPreviewProfileGateway = ({
           : undefined;
       Object.assign(
         version,
-        cvAnswerFor(version.cv, profile.items[0], job?.jobDescription),
+        isWrittenVersion(version)
+          ? cvWriteAnswerFor(profile.items, job?.jobDescription)
+          : cvAnswerFor(version.cv, profile.items[0], job?.jobDescription),
       );
       version.status = 'ready';
       version.readyAt = settlesAt;
@@ -1005,6 +1130,8 @@ export const createPreviewProfileGateway = ({
       currentProfile().cvVersionsToday = count;
       save();
     },
+    // Set once the gateway exists, below: it asks the gateway for the version.
+    createEditVersion: () => Promise.reject(new Error('Not ready')),
     setBriefsToday: count => {
       currentProfile().briefsToday = count;
       save();
@@ -1060,7 +1187,7 @@ export const createPreviewProfileGateway = ({
     },
   };
 
-  return {
+  const gateway: PreviewProfileGateway = {
     controls,
 
     getResources: async uid =>
@@ -1558,18 +1685,29 @@ export const createPreviewProfileGateway = ({
       const found = read(uid).cvVersions?.find(({ id }) => id === versionId);
       return found ? structuredClone(found) : null;
     },
-    createCvVersion: async ({ resourceId, target, length = 'same' }) => {
+    createCvVersion: async request => {
       const profile = currentProfile();
-      const resource = profile.resources.find(({ id }) => id === resourceId);
-      if (!resource) {
-        throw new ProfileError(ProfileErrorCode.NotFound);
-      }
-      if (resource.type !== 'cv') {
-        throw new ProfileError(ProfileErrorCode.Invalid);
-      }
-      const cv = profile.texts?.[resourceId]?.text;
-      if (!cv) {
-        throw new ProfileError(ProfileErrorCode.NoCvText);
+      const { target } = request;
+      // An edit (doc 18) starts from a CV with its text; a written CV (D83) from the items.
+      let cv = '';
+      if (request.mode === 'write') {
+        if (!profile.items.some(({ hidden }) => !hidden)) {
+          throw new ProfileError(ProfileErrorCode.NoItems);
+        }
+      } else {
+        const resource = profile.resources.find(
+          ({ id }) => id === request.resourceId,
+        );
+        if (!resource) {
+          throw new ProfileError(ProfileErrorCode.NotFound);
+        }
+        if (resource.type !== 'cv') {
+          throw new ProfileError(ProfileErrorCode.Invalid);
+        }
+        cv = profile.texts?.[request.resourceId]?.text ?? '';
+        if (!cv) {
+          throw new ProfileError(ProfileErrorCode.NoCvText);
+        }
       }
       let role: string | undefined;
       if (target.kind === 'job') {
@@ -1598,24 +1736,36 @@ export const createPreviewProfileGateway = ({
         throw new ProfileError(ProfileErrorCode.DailyLimit);
       }
       const at = now();
-      const version: CvVersion = {
+      const common = {
         id: newId('version'),
         target:
           target.kind === 'job'
-            ? { kind: 'job', applicationId: target.applicationId }
-            : { kind: 'general', ...(role ? { role } : {}) },
-        resourceId,
-        length,
-        status: 'creating',
-        cv,
-        findings: [],
-        changes: [],
+            ? { kind: 'job' as const, applicationId: target.applicationId }
+            : { kind: 'general' as const, ...(role ? { role } : {}) },
+        status: 'creating' as const,
         questions: [],
         unsupportedJobTerms: [],
         profileRevision: profile.revision ?? 0,
         createdAt: at,
         updatedAt: at,
       };
+      const version: CvVersion =
+        request.mode === 'write'
+          ? {
+              ...common,
+              mode: 'write',
+              pages: request.pages ?? 2,
+              notes: [],
+              statements: [],
+            }
+          : {
+              ...common,
+              resourceId: request.resourceId,
+              length: request.length ?? 'same',
+              cv,
+              findings: [],
+              changes: [],
+            };
       profile.cvVersions = [...(profile.cvVersions ?? []), version];
       profile.cvMaking = {
         ...profile.cvMaking,
@@ -1707,6 +1857,10 @@ export const createPreviewProfileGateway = ({
     },
     decideCvChange: async (versionId, changeId, decision, text) => {
       const version = readyVersion(versionId);
+      // A written version has lines to revise, not changes to decide.
+      if (isWrittenVersion(version)) {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
       const change = version.changes.find(({ id }) => id === changeId);
       if (!change) {
         throw new ProfileError(ProfileErrorCode.NotFound);
@@ -1759,7 +1913,11 @@ export const createPreviewProfileGateway = ({
       }
       version.updatedAt = now();
       save();
-      return { open: openReviews(version) };
+      return {
+        open: isWrittenVersion(version)
+          ? version.questions.filter(({ status }) => status === 'open').length
+          : openReviews(version),
+      };
     },
     copyCvVersion: async versionId => {
       const profile = currentProfile();
@@ -1814,6 +1972,23 @@ export const createPreviewProfileGateway = ({
       save();
     },
   };
+  controls.createEditVersion = async (target = { kind: 'general' }) => {
+    // The newest CV with its text, as the pages offered first.
+    const cv = currentProfile()
+      .resources.filter(
+        ({ id, type }) => type === 'cv' && currentProfile().texts?.[id],
+      )
+      .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0];
+    if (!cv) {
+      throw new ProfileError(ProfileErrorCode.NoCvText);
+    }
+    const { versionId } = await gateway.createCvVersion({
+      resourceId: cv.id,
+      target,
+    });
+    return versionId;
+  };
+  return gateway;
 };
 
 /**

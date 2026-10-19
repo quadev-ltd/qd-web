@@ -1,17 +1,12 @@
-// The CV section (C1, D69, D75): with no CV in the profile, "Add your CV first"; with no
-// version yet, the two ways in ("Tailor your CV for a job", "Improve your CV in general"); then
-// the versions, by application ("For a job") and "General", with one "New version".
+// The CV section (C1, D69, D75, D83, doc 13 §20.4): with nothing in the profile, "Add to your
+// profile first"; with no version yet, the two ways in ("Write a CV for a job", "Write a general
+// CV"); then the versions, by application ("For a job") and "General", with one "New version".
+// The CV's details ("At the top of every CV") are on both.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 
-import {
-  applicationOf,
-  cvsOf,
-  generalTitle,
-  startTitle,
-  versionDay,
-} from './cvMeta';
+import { applicationOf, generalTitle, versionDay, versionMeta } from './cvMeta';
 import CvDetailsCard from './details/CvDetailsCard';
 import CvDetailsPanel from './details/CvDetailsPanel';
 import NewCvVersionPanel, { type CvVersionKind } from './NewCvVersionPanel';
@@ -28,6 +23,7 @@ import { useApplications } from '@/core/profile/ApplicationsProvider';
 import {
   type CvVersion,
   isCreating,
+  isWrittenVersion,
   openReviews,
 } from '@/core/profile/cvVersions';
 import {
@@ -41,7 +37,6 @@ import {
   PROFILE_PATH,
 } from '@/core/profile/paths';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
-import { contentOf, formatDay } from '@/screens/Profile/Resource/resourceMeta';
 
 type Panel = { kind?: CvVersionKind; ask: boolean };
 
@@ -59,7 +54,7 @@ const VersionChips: React.FC<{ version: CvVersion }> = ({ version }) => {
     return isCreating(version) ? (
       <Chip>
         <Spinner size="tiny" decorative />
-        {t('cv.creatingChip')}
+        {t(isWrittenVersion(version) ? 'cv.writingChip' : 'cv.creatingChip')}
       </Chip>
     ) : (
       <Chip tone="danger" icon="alert">
@@ -71,6 +66,19 @@ const VersionChips: React.FC<{ version: CvVersion }> = ({ version }) => {
     return (
       <Chip tone="danger" icon="alert">
         {t('cv.failedChip')}
+      </Chip>
+    );
+  }
+  if (isWrittenVersion(version)) {
+    // A written version holds nothing back: its open questions are worth saying.
+    const asked = version.questions.filter(
+      ({ status }) => status === 'open',
+    ).length;
+    return asked > 0 ? (
+      <Chip icon="help">{t('cv.questionsChip', { count: asked })}</Chip>
+    ) : (
+      <Chip tone="success" icon="check">
+        {t('cv.readyChip')}
       </Chip>
     );
   }
@@ -171,7 +179,7 @@ export const CvScreen: React.FC = () => {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const detailsCard = <CvDetailsCard onEdit={() => setDetailsOpen(true)} />;
 
-  const cvs = cvsOf(profile.resources);
+  const empty = profile.resources.length === 0;
   const loading =
     profile.status === 'idle' ||
     profile.status === 'loading' ||
@@ -199,7 +207,7 @@ export const CvScreen: React.FC = () => {
         <Spinner />
       </div>
     );
-  } else if (cvs.length === 0) {
+  } else if (empty) {
     body = (
       <Card
         elevation="raised"
@@ -224,8 +232,6 @@ export const CvScreen: React.FC = () => {
       </Card>
     );
   } else if (versions.length === 0) {
-    const [cv] = cvs;
-    const content = contentOf(cv);
     body = (
       <>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] gap-5">
@@ -252,28 +258,20 @@ export const CvScreen: React.FC = () => {
             <span
               aria-hidden="true"
               className="flex size-11 flex-none items-center justify-center rounded-full bg-tint text-primary">
-              <Icon name="file" size={20} />
+              <Icon name="user" size={20} />
             </span>
             <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-0.5">
               <span className="text-sm leading-normal text-muted">
-                {t('cv.startsFromLabel')}
+                {t('cv.writtenFromLabel')}
               </span>
-              <span className="text-base leading-normal font-medium wrap-anywhere">
-                {[
-                  cv.title,
-                  'host' in content ? content.host : t(content.key),
-                  cv.createdAt === null ? '' : formatDay(cv.createdAt),
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
+              <span className="text-base leading-normal font-medium">
+                {t('cv.writtenFromResources', {
+                  count: profile.resources.length,
+                })}
               </span>
-              {profile.resources.length > 1 && (
-                <span className="text-sm leading-normal text-muted">
-                  {t('cv.otherResources', {
-                    count: profile.resources.length - 1,
-                  })}
-                </span>
-              )}
+              <span className="text-sm leading-normal text-muted">
+                {t('cv.writtenFromMore')}
+              </span>
             </div>
             <ButtonLink to={PROFILE_PATH} variant="quiet" size="small">
               {t('cv.openProfileButton')}
@@ -358,10 +356,10 @@ export const CvScreen: React.FC = () => {
                       <VersionRow
                         key={version.id}
                         version={version}
-                        title={t('cv.versionOf', { date: versionDay(version) })}
-                        meta={t('cv.versionFrom', {
-                          title: startTitle(t, version, profile.resources),
+                        title={t('cv.versionOf', {
+                          date: versionDay(version),
                         })}
+                        meta={versionMeta(t, version, profile.resources)}
                       />
                     ))}
                   </ul>
@@ -384,10 +382,7 @@ export const CvScreen: React.FC = () => {
                     key={version.id}
                     version={version}
                     title={generalTitle(t, version)}
-                    meta={t('cv.generalVersionMeta', {
-                      date: versionDay(version),
-                      title: startTitle(t, version, profile.resources),
-                    })}
+                    meta={versionMeta(t, version, profile.resources)}
                   />
                 ))}
               </ul>
@@ -410,7 +405,7 @@ export const CvScreen: React.FC = () => {
               {t('cv.description')}
             </p>
           </div>
-          {showNew && cvs.length > 0 && (
+          {showNew && !empty && (
             <Button onClick={() => setPanel({ ask: true })} className="gap-2">
               <Icon name="plus" size={18} />
               {t('cv.newVersionButton')}

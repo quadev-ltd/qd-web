@@ -1,14 +1,95 @@
-// The file of a CV version (research doc 15 Q6, doc 18): made in the browser from the version's
-// text (cvVersionText), as PDF or Word (.docx), in one plain layout that tracking systems read
-// well (doc 13 question 35): the name, the section headings, the lines, on A4 pages (a UK CV,
-// D80). The libraries are loaded only when a file is made, so no page carries them.
+// The file of a CV version (research doc 15 Q6, doc 18, doc 19 §3.5): made in the browser, as
+// PDF or Word (.docx), in one plain layout that tracking systems read well (doc 13 question 35):
+// the name, the section headings, the lines, on A4 pages (a UK CV, D80). A written version is
+// laid out from its structure (writtenBlocks); an edit version from its text, its headings
+// guessed (cvBlocks). The libraries are loaded only when a file is made, so no page carries them.
+import {
+  CV_SECTION_HEADINGS,
+  CV_SECTION_KEYS,
+  type CvDocument,
+  type CvHeaderDetails,
+  cvHeaderLines,
+  type CvLine,
+  cvLineText,
+} from '@/core/profile/cvDocument';
 
 /** One piece of the CV's text, as the file lays it out. */
 export type CvBlock =
   | { kind: 'name'; text: string }
+  /** A line of the header under the name: headline, contact lines, right to work. */
+  | { kind: 'contact'; text: string }
   | { kind: 'heading'; text: string }
+  /** A role's or project's heading, its dates on the right. */
+  | { kind: 'entry'; text: string; when: string }
   | { kind: 'bullet'; text: string }
   | { kind: 'paragraph'; text: string };
+
+const shown = (lines: CvLine[]) =>
+  lines.filter(({ state }) => state !== 'removed');
+
+/**
+ * The blocks of a written CV, from its structure: nothing is guessed. The header is the CV's
+ * details as they are now (cvHeaderLines), then each section with something in it, in the fixed
+ * order. The words are cvDocumentText's, laid out.
+ */
+export const writtenBlocks = (
+  document: CvDocument,
+  details?: CvHeaderDetails | null,
+): CvBlock[] => {
+  const blocks: CvBlock[] = [];
+  const header = cvHeaderLines(details);
+  const name = details?.name?.trim();
+  header.forEach(line =>
+    blocks.push(
+      name && line === name && blocks.length === 0
+        ? { kind: 'name', text: line }
+        : { kind: 'contact', text: line },
+    ),
+  );
+  for (const key of CV_SECTION_KEYS) {
+    const section: CvBlock[] = [];
+    if (key === 'summary') {
+      const lines = shown(document.summary);
+      if (lines.length > 0) {
+        section.push({
+          kind: 'paragraph',
+          text: lines.map(cvLineText).join(' '),
+        });
+      }
+    } else if (key === 'experience' || key === 'projects') {
+      for (const entry of document[key]) {
+        if (entry.state === 'removed') {
+          continue;
+        }
+        section.push({
+          kind: 'entry',
+          text: [entry.title, entry.organisation, entry.location]
+            .map(part => part.trim())
+            .filter(Boolean)
+            .join(', '),
+          when: [entry.start, entry.end]
+            .map(part => part.trim())
+            .filter(Boolean)
+            .join(' – '),
+        });
+        for (const line of shown(entry.bullets)) {
+          section.push({ kind: 'bullet', text: line.text });
+        }
+      }
+    } else {
+      for (const line of shown(document[key])) {
+        section.push({ kind: 'paragraph', text: cvLineText(line) });
+      }
+    }
+    if (section.length > 0) {
+      blocks.push(
+        { kind: 'heading', text: CV_SECTION_HEADINGS[key] },
+        ...section,
+      );
+    }
+  }
+  return blocks;
+};
 
 const LIST_MARK = /^\s*(?:[-•*▪◦–]\s+)/;
 
@@ -55,10 +136,13 @@ export const cvFileName = (parts: string[], extension: 'pdf' | 'docx') =>
 
 // ---------- PDF ----------
 
-/** A4 in points, with margins of about 20 mm. */
-const PAGE = { width: 595.28, height: 841.89, margin: 56 };
-const SIZES = { name: 20, heading: 11.5, text: 10.5 };
-const LEADING = 1.4;
+/**
+ * A4 in points, with margins of about 17 mm, at 10 pt: about 500 words a page with headings and
+ * spacing, the page the length check counts (CV_WORDS_PER_PAGE, doc 19 §3.4).
+ */
+const PAGE = { width: 595.28, height: 841.89, margin: 48 };
+const SIZES = { name: 18, heading: 11, text: 10 };
+const LEADING = 1.32;
 
 export const makePdf = async (blocks: CvBlock[]): Promise<Blob> => {
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
@@ -127,7 +211,36 @@ export const makePdf = async (blocks: CvBlock[]): Promise<Blob> => {
   for (const block of blocks) {
     if (block.kind === 'name') {
       write(block.text, bold, SIZES.name);
-      y -= 6;
+      y -= 4;
+    } else if (block.kind === 'contact') {
+      write(block.text, regular, SIZES.text);
+    } else if (block.kind === 'entry') {
+      y -= 4;
+      const when = writable(regular, block.when);
+      const whenWidth = when ? regular.widthOfTextAtSize(when, SIZES.text) : 0;
+      const what = writable(bold, block.text);
+      // The dates on the right of the heading's line, when both fit; under it otherwise.
+      if (
+        when &&
+        bold.widthOfTextAtSize(what, SIZES.text) + whenWidth + 16 <= width
+      ) {
+        room(SIZES.text * LEADING);
+        write(what, bold, SIZES.text);
+        page.drawText(when, {
+          x: PAGE.width - PAGE.margin - whenWidth,
+          y,
+          size: SIZES.text,
+          font: regular,
+          color: rgb(0.3, 0.3, 0.35),
+        });
+      } else {
+        if (what) {
+          write(what, bold, SIZES.text);
+        }
+        if (when) {
+          write(when, regular, SIZES.text);
+        }
+      }
     } else if (block.kind === 'heading') {
       y -= 10;
       room(SIZES.heading * LEADING + 4);
@@ -160,23 +273,37 @@ export const makePdf = async (blocks: CvBlock[]): Promise<Blob> => {
 
 // ---------- Word ----------
 
-/** A4 in twentieths of a point, with margins of about 20 mm. */
-const WORD_PAGE = { width: 11906, height: 16838, margin: 1134 };
+/** A4 in twentieths of a point, with margins of about 17 mm, as the PDF. */
+const WORD_PAGE = { width: 11906, height: 16838, margin: 964 };
+/** The PDF's sizes in half-points, as Word counts them. */
+const WORD_SIZES = { name: 36, heading: 22, text: 20 };
 
 export const makeDocx = async (blocks: CvBlock[]): Promise<Blob> => {
-  const { AlignmentType, Document, Packer, Paragraph, TextRun } =
+  const { AlignmentType, Document, Packer, Paragraph, TabStopType, TextRun } =
     await import('docx');
+  const text = WORD_SIZES.text;
   const children = blocks.map(block => {
     switch (block.kind) {
       case 'name':
         return new Paragraph({
           alignment: AlignmentType.LEFT,
-          spacing: { after: 160 },
-          children: [new TextRun({ text: block.text, bold: true, size: 40 })],
+          spacing: { after: 80 },
+          children: [
+            new TextRun({
+              text: block.text,
+              bold: true,
+              size: WORD_SIZES.name,
+            }),
+          ],
+        });
+      case 'contact':
+        return new Paragraph({
+          spacing: { after: 20 },
+          children: [new TextRun({ text: block.text, size: text })],
         });
       case 'heading':
         return new Paragraph({
-          spacing: { before: 240, after: 80 },
+          spacing: { before: 200, after: 60 },
           border: {
             bottom: { style: 'single', size: 4, color: 'BFBFCC', space: 2 },
           },
@@ -184,19 +311,36 @@ export const makeDocx = async (blocks: CvBlock[]): Promise<Blob> => {
             new TextRun({
               text: block.text.toUpperCase(),
               bold: true,
-              size: 23,
+              size: WORD_SIZES.heading,
             }),
+          ],
+        });
+      case 'entry':
+        // The dates at a right tab stop on the heading's line.
+        return new Paragraph({
+          spacing: { before: 100, after: 20 },
+          tabStops: [
+            {
+              type: TabStopType.RIGHT,
+              position: WORD_PAGE.width - 2 * WORD_PAGE.margin,
+            },
+          ],
+          children: [
+            new TextRun({ text: block.text, bold: true, size: text }),
+            ...(block.when
+              ? [new TextRun({ text: `\t${block.when}`, size: text })]
+              : []),
           ],
         });
       case 'bullet':
         return new Paragraph({
           bullet: { level: 0 },
-          children: [new TextRun({ text: block.text, size: 21 })],
+          children: [new TextRun({ text: block.text, size: text })],
         });
       default:
         return new Paragraph({
-          spacing: { after: 80 },
-          children: [new TextRun({ text: block.text, size: 21 })],
+          spacing: { after: 60 },
+          children: [new TextRun({ text: block.text, size: text })],
         });
     }
   });

@@ -1,12 +1,22 @@
-// CV versions (delivery 2b, D69), as quadev-backend keeps them (packages/shared/src/cvVersion.ts,
-// research doc 18): a new version of one of the candidate's CVs, improved in general or tailored
-// to one job, made by the `cv-version` skill pack and reviewed change by change. A version keeps
-// a copy of the CV's text and every change quotes it, so the text of a version is the CV's text
-// with the accepted changes applied (cvVersionText). The names, limits and that function are
-// mirrored here; the backend applies them again.
+// CV versions, as quadev-backend keeps them (packages/shared/src/cvVersion.ts), of two kinds:
+// - `write` (D83, research doc 19), the default for new versions: a whole CV written for its
+//   target from the profile, every line naming its sources (its text is cvDocumentText);
+// - `edit` (D69, research doc 18), the versions made before: edits to one of the candidate's CVs,
+//   reviewed change by change. Such a version keeps a copy of the CV's text and every change
+//   quotes it, so its text is the CV's text with the accepted changes applied (cvVersionText).
+//   A version without `mode` is one of these.
+// The names, limits and those functions are mirrored here; the backend applies them again.
 import { z } from 'zod';
 
 import { APPLICATION_NAME_MAX_CHARS } from './applications';
+import {
+  type CvDocument,
+  cvDocumentText,
+  CvDocumentSchema,
+  type CvEntryFields,
+  type CvHeaderDetails,
+  type CvPageCount,
+} from './cvDocument';
 
 // ---------- Limits ----------
 
@@ -55,11 +65,11 @@ export const CV_QUESTION_STATUSES = ['open', 'answered', 'skipped'] as const;
 export const CV_VERSION_STATUSES = ['creating', 'ready', 'failed'] as const;
 export type CvVersionStatus = (typeof CV_VERSION_STATUSES)[number];
 /**
- * How a version is made. `edit`: changes to the candidate's CV, decided one by one (doc 18); a
- * version with no `mode` is one. A version made another way (`write`, a whole CV written for its
- * target, doc 19) is left out until the website shows it.
+ * How a version is made. `write`: a whole CV written from the profile (D83). `edit`: changes to
+ * the candidate's CV, decided one by one (doc 18); a version with no `mode` is one. A version
+ * made a way the website doesn't know is left out.
  */
-export const CV_VERSION_MODES = ['edit'] as const;
+export const CV_VERSION_MODES = ['write', 'edit'] as const;
 
 /** The version was made a way the website shows. */
 export const hasKnownMode = ({ mode }: { mode?: unknown }) =>
@@ -133,22 +143,45 @@ export const CvQuestionSchema = z.object({
 });
 export type CvQuestion = z.infer<typeof CvQuestionSchema>;
 
-/** `users/{uid}/cvVersions/{versionId}`, with its id. */
-export const CvVersionSchema = z.object({
+/**
+ * Something the candidate said that a written version may use as a source: an answer to a
+ * question of the version it was written again from, or a line or heading in their own words.
+ */
+export const CvStatementSchema = z.object({
+  /** `A1`, `A2`, ... */
+  id: z.string(),
+  kind: z.enum(['answer', 'edit']).catch('answer'),
+  /** Answers only: the question. */
+  question: z.string().optional().catch(undefined),
+  text: z.string(),
+});
+export type CvStatement = z.infer<typeof CvStatementSchema>;
+
+/** A fact nobody gave, asked by the writer. Answering it changes nothing until the CV is written again. */
+export const CvWrittenQuestionSchema = z.object({
+  id: z.string(),
+  /** The line of the document it is about; none when it is about the whole CV. */
+  lineId: z.string().optional().catch(undefined),
+  text: z.string(),
+  status: z.enum(CV_QUESTION_STATUSES).catch('open'),
+  answer: z.string().optional().catch(undefined),
+});
+export type CvWrittenQuestion = z.infer<typeof CvWrittenQuestionSchema>;
+
+/** What the checks took out of the writer's answer before the version was stored. */
+export const CvDroppedSchema = z.object({
+  lines: z.number().catch(0),
+  numbers: z.number().catch(0),
+  names: z.number().catch(0),
+});
+export type CvDropped = z.infer<typeof CvDroppedSchema>;
+
+/** What both kinds of version have. */
+const versionBase = {
   id: z.string().min(1),
   target: CvVersionTargetSchema,
-  /** The CV it starts from: a resource of type `cv`. It may have been removed since. */
-  resourceId: z.string(),
-  length: z.enum(CV_VERSION_LENGTHS).catch('same'),
   status: z.enum(CV_VERSION_STATUSES),
-  /** None on the versions made before doc 19: they are edits. */
-  mode: z.enum(CV_VERSION_MODES).nullish().catch(undefined),
   failure: z.enum(CV_VERSION_FAILURES).optional().catch('internal'),
-  /** The CV's text when the version was made. Every passage quotes it. */
-  cv: z.string().catch(''),
-  findings: z.array(CvFindingSchema).catch([]),
-  changes: z.array(CvChangeSchema).catch([]),
-  questions: z.array(CvQuestionSchema).catch([]),
   /** For a job: its words that the CV and the profile don't show. Never added. */
   unsupportedJobTerms: z.array(z.string()).catch([]),
   applicationRevision: z.number().optional().catch(undefined),
@@ -160,8 +193,54 @@ export const CvVersionSchema = z.object({
   createdAt: timestamp,
   updatedAt: timestamp,
   readyAt: timestamp.optional(),
+};
+
+/** `users/{uid}/cvVersions/{versionId}` of a written version (D83), with its id. */
+export const CvWrittenVersionSchema = z.object({
+  ...versionBase,
+  mode: z.literal('write'),
+  pages: z.union([z.literal(1), z.literal(2)]).catch(2),
+  /** The CV, once `ready`. Its header is drawn from the CV's details as they are now. */
+  document: CvDocumentSchema.optional().catch(undefined),
+  /** "What we did and why", the most important first. */
+  notes: z.array(z.string()).catch([]),
+  questions: z.array(CvWrittenQuestionSchema).catch([]),
+  /** The candidate's statements its lines may cite, copied from the version written again. */
+  statements: z.array(CvStatementSchema).catch([]),
+  dropped: CvDroppedSchema.optional().catch(undefined),
+  /** The version it was written again from. */
+  rewrittenFrom: z.string().optional().catch(undefined),
 });
-export type CvVersion = z.infer<typeof CvVersionSchema>;
+export type CvWrittenVersion = z.infer<typeof CvWrittenVersionSchema>;
+
+/** `users/{uid}/cvVersions/{versionId}` of an edit version (doc 18), with its id. */
+export const CvEditVersionSchema = z.object({
+  ...versionBase,
+  /** None on the versions made before doc 19. */
+  mode: z.literal('edit').nullish(),
+  /** The CV it starts from: a resource of type `cv`. It may have been removed since. */
+  resourceId: z.string(),
+  length: z.enum(CV_VERSION_LENGTHS).catch('same'),
+  failure: z.enum(CV_VERSION_FAILURES).optional().catch('internal'),
+  /** The CV's text when the version was made. Every passage quotes it. */
+  cv: z.string().catch(''),
+  findings: z.array(CvFindingSchema).catch([]),
+  changes: z.array(CvChangeSchema).catch([]),
+  questions: z.array(CvQuestionSchema).catch([]),
+});
+export type CvEditVersion = z.infer<typeof CvEditVersionSchema>;
+
+/** `users/{uid}/cvVersions/{versionId}`: a written version, or an edit version. */
+export const CvVersionSchema = z.union([
+  CvWrittenVersionSchema,
+  CvEditVersionSchema,
+]);
+export type CvVersion = CvWrittenVersion | CvEditVersion;
+
+/** True for a version written from the profile. */
+export const isWrittenVersion = (
+  version: CvVersion,
+): version is CvWrittenVersion => version.mode === 'write';
 
 // ---------- Callables of the `interview-profile` codebase ----------
 
@@ -171,6 +250,8 @@ export const DECIDE_CV_CHANGE = 'decideCvChange';
 export const ANSWER_CV_QUESTION = 'answerCvQuestion';
 export const MARK_CV_VERSION_SENT = 'markCvVersionSent';
 export const COPY_CV_VERSION = 'copyCvVersion';
+export const REVISE_CV_LINE = 'reviseCvLine';
+export const REWRITE_CV_VERSION = 'rewriteCvVersion';
 
 /** Longest line the candidate writes: an edited change or an answer. */
 export const CV_LINE_MAX_CHARS = 800;
@@ -181,13 +262,34 @@ export const CV_LINE_MAX_CHARS = 800;
  */
 export type CvChangeDecisionRequest = 'accept' | 'edit' | 'keep' | 'reopen';
 
-/** What `createCvVersion` takes. A version is always a UK CV for now (D80). */
-export interface CreateCvVersionRequest {
-  resourceId: string;
-  target:
-    { kind: 'job'; applicationId: string } | { kind: 'general'; role?: string };
-  length?: CvVersionLength;
-}
+type CvVersionTargetRequest =
+  { kind: 'job'; applicationId: string } | { kind: 'general'; role?: string };
+
+/**
+ * What `createCvVersion` takes: a CV written from the profile, of `pages` A4 pages (2 by
+ * default), or edits to one of the candidate's CVs (no `mode`). A version is always a UK CV for
+ * now (D80).
+ */
+export type CreateCvVersionRequest =
+  | { mode: 'write'; target: CvVersionTargetRequest; pages?: CvPageCount }
+  | {
+      mode?: 'edit';
+      resourceId: string;
+      target: CvVersionTargetRequest;
+      length?: CvVersionLength;
+    };
+
+/**
+ * One line (`l…`) or one role or project (`e…`) of a written version revised: `edit` (a line
+ * takes `text`, a role `fields`), `remove`, or `restore` (back to what was written).
+ */
+export type ReviseCvLineRequest =
+  | { lineId: string; action: 'remove' | 'restore' }
+  | { lineId: string; action: 'edit'; text: string }
+  | { lineId: string; action: 'edit'; fields: Partial<CvEntryFields> };
+
+/** Longest field of a role's heading. */
+export const CV_FIELD_MAX_CHARS = 200;
 
 const documentId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 
@@ -204,6 +306,12 @@ export const RemoveCvVersionResponseSchema = z.object({
 export const CvReviewResponseSchema = z.object({
   versionId: documentId,
   open: z.number().int().nonnegative(),
+});
+export const ReviseCvLineResponseSchema = z.object({ versionId: documentId });
+/** "Write again": a new written version, made in the background like a new one. */
+export const RewriteCvVersionResponseSchema = z.object({
+  versionId: documentId,
+  status: z.literal('creating'),
 });
 /** "Restore": the copy, which keeps every decision and becomes the newest version. */
 export const CopyCvVersionResponseSchema = z.object({
@@ -227,13 +335,20 @@ export const CvRefusal = {
   NotEditable: 'not-editable',
   /** Only a version for a job is sent. */
   NotAJob: 'not-a-job',
+  /** A written CV needs a profile with visible items. */
+  NoItems: 'no-items',
+  /** Lines are revised, and CVs written again, in written versions only. */
+  NotWritten: 'not-written',
 } as const;
 
 // ---------- What the pages work out ----------
 
-/** Changes and questions not decided yet. The download waits until there are none. */
+/**
+ * Changes and questions of an edit version not decided yet. The download waits until there are
+ * none. A written version holds nothing back.
+ */
 export const openReviews = (
-  version: Pick<CvVersion, 'changes' | 'questions'>,
+  version: Pick<CvEditVersion, 'changes' | 'questions'>,
 ): number =>
   version.changes.filter(({ decision }) => decision === 'open').length +
   version.questions.filter(({ status }) => status === 'open').length;
@@ -246,7 +361,30 @@ export const isCreating = (
   version.status === 'creating' &&
   now - (version.createdAt ?? now) < CV_CREATING_STALE_MS;
 
-// ---------- The text of a version (the same as the backend's cvVersionText) ----------
+/** The document of a written version that has none yet: nothing to print. */
+const EMPTY_DOCUMENT: CvDocument = {
+  summary: [],
+  experience: [],
+  projects: [],
+  skills: [],
+  education: [],
+  certifications: [],
+  languages: [],
+};
+
+/**
+ * The text of any version: a written one with its header drawn from the CV's details as they are
+ * now, an edit one as its changes leave it.
+ */
+export const versionText = (
+  version: CvVersion,
+  details?: CvHeaderDetails | null,
+): string =>
+  isWrittenVersion(version)
+    ? cvDocumentText(version.document ?? EMPTY_DOCUMENT, details)
+    : cvVersionText(version);
+
+// ---------- The text of an edit version (the same as the backend's cvVersionText) ----------
 
 /** The list mark a line starts with ("- ", "• ", "* "), or an empty string. */
 const listMark = (line: string): string =>
@@ -322,7 +460,7 @@ const editOf = (cv: string, change: CvChange): Edit | undefined => {
  * what the backend says.
  */
 export const cvVersionText = (
-  version: Pick<CvVersion, 'cv' | 'changes' | 'questions'>,
+  version: Pick<CvEditVersion, 'cv' | 'changes' | 'questions'>,
 ): string => {
   const { cv } = version;
   const edits: Edit[] = [];
