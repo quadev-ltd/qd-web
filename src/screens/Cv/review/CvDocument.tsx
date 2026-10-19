@@ -54,15 +54,52 @@ interface Line {
   questions: { question: CvQuestion; number: number }[];
 }
 
-/** The CV's lines, each with the changes and questions it holds, found by position. */
+/**
+ * The CV's lines, each with the changes and questions it holds, found by position. A passage
+ * that runs over a line break (a sentence the PDF wrapped) joins its lines into one, so it is
+ * marked once and replaced whole, as the text replaces it.
+ */
 const linesOf = (version: Pick<CvVersion, 'cv' | 'changes' | 'questions'>) => {
   const { cv } = version;
-  let offset = 0;
-  const lines: Line[] = cv.split('\n').map(text => {
-    const line = { start: offset, text, spans: [], adds: [], questions: [] };
-    offset += text.length + 1;
-    return line;
+  const marked: Span[] = [];
+  const adds: { at: number; change: CvChange; number: number }[] = [];
+  version.changes.forEach((change, index) => {
+    const number = index + 1;
+    const passage = change.action === 'add' ? change.after : change.original;
+    const at = passage ? cv.indexOf(passage) : -1;
+    if (at === -1) {
+      return;
+    }
+    if (change.action === 'add') {
+      adds.push({ at: at + passage.length, change, number });
+      return;
+    }
+    const end = at + passage.length;
+    // A passage another change already marks is left to that one, as the text leaves it out.
+    if (!marked.some(span => at < span.end && span.start < end)) {
+      marked.push({ start: at, end, change, number });
+    }
   });
+
+  const lines: Line[] = [];
+  let start = 0;
+  for (let at = cv.indexOf('\n'); ; at = cv.indexOf('\n', at + 1)) {
+    if (at !== -1 && marked.some(span => span.start <= at && at < span.end)) {
+      continue;
+    }
+    const end = at === -1 ? cv.length : at;
+    lines.push({
+      start,
+      text: cv.slice(start, end),
+      spans: [],
+      adds: [],
+      questions: [],
+    });
+    if (at === -1) {
+      break;
+    }
+    start = at + 1;
+  }
   const lineAt = (index: number) => {
     let found = lines[0];
     for (const line of lines) {
@@ -73,26 +110,18 @@ const linesOf = (version: Pick<CvVersion, 'cv' | 'changes' | 'questions'>) => {
     }
     return found;
   };
+  for (const span of marked) {
+    const line = lineAt(span.start);
+    line.spans.push({
+      ...span,
+      start: span.start - line.start,
+      end: span.end - line.start,
+    });
+  }
+  for (const { at, change, number } of adds) {
+    lineAt(at).adds.push({ change, number });
+  }
   const trailing: { question: CvQuestion; number: number }[] = [];
-  version.changes.forEach((change, index) => {
-    const number = index + 1;
-    const passage = change.action === 'add' ? change.after : change.original;
-    const at = passage ? cv.indexOf(passage) : -1;
-    if (at === -1) {
-      return;
-    }
-    const line = lineAt(at);
-    if (change.action === 'add') {
-      lineAt(at + passage.length).adds.push({ change, number });
-      return;
-    }
-    const start = at - line.start;
-    const end = Math.min(line.text.length, start + passage.length);
-    // A passage another change already marks is left to that one, as the text leaves it out.
-    if (!line.spans.some(span => start < span.end && span.start < end)) {
-      line.spans.push({ start, end, change, number });
-    }
-  });
   version.questions.forEach((question, index) => {
     const number = index + 1;
     const at = question.passage ? cv.indexOf(question.passage) : -1;
