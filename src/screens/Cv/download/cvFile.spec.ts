@@ -226,3 +226,89 @@ describe('the layout, against the page estimate (doc 19 §3.4)', () => {
     expect(await pagesOf(two)).toBe(2);
   });
 });
+
+describe('writtenBlocks', () => {
+  const heading = {
+    title: '',
+    organisation: '',
+    location: '',
+    start: '',
+    end: '',
+  };
+  const entry = (
+    id: string,
+    fields: Partial<typeof heading>,
+    bullets: string[],
+  ) => ({
+    id,
+    ...heading,
+    ...fields,
+    sources: [],
+    state: 'written' as const,
+    proposedFields: { ...heading, ...fields },
+    bullets: bullets.map((text, index) => ({
+      id: `${id}-l${index}`,
+      text,
+      sources: [],
+      state: 'written' as const,
+      proposed: text,
+    })),
+  });
+  const document: CvDocument = {
+    summary: [],
+    experience: [
+      entry('e1', { organisation: 'Fenwick Pay', start: '2021' }, ['Ran it.']),
+      entry('e2', { title: 'Earlier career' }, [
+        'Backend Engineer, Kestrel Insurance, 2015 – 2018',
+      ]),
+    ],
+    projects: [],
+    skills: [],
+    education: [],
+    certifications: [],
+    languages: [],
+  };
+
+  it('lays out a role with no title, and "Earlier career" with no organisation or dates', () => {
+    const blocks = writtenBlocks(document);
+
+    expect(blocks).toEqual([
+      { kind: 'heading', text: 'Experience' },
+      { kind: 'entry', text: 'Fenwick Pay', when: '2021' },
+      { kind: 'bullet', text: 'Ran it.' },
+      { kind: 'entry', text: 'Earlier career', when: '' },
+      {
+        kind: 'bullet',
+        text: 'Backend Engineer, Kestrel Insurance, 2015 – 2018',
+      },
+    ]);
+  });
+
+  it('prints links shortened, and the right to work on its own line when the contact line is long', () => {
+    const blocks = writtenBlocks(document, {
+      name: 'Gustavo Franco',
+      headline: 'Staff Engineer',
+      location: 'London, United Kingdom',
+      phone: '+44 7700 900123',
+      email: 'gustavo.franco.long-address@example.com',
+      links: [
+        'https://play.google.com/store/apps/details?id=com.qdmobile&gl=UK',
+      ],
+      rightToWork: 'British citizen',
+    });
+
+    expect(blocks.slice(0, 5)).toEqual([
+      { kind: 'name', text: 'Gustavo Franco' },
+      { kind: 'headline', text: 'Staff Engineer' },
+      {
+        kind: 'contact',
+        text: 'London, United Kingdom · +44 7700 900123 · gustavo.franco.long-address@example.com',
+      },
+      {
+        kind: 'contact',
+        text: 'play.google.com/store/apps/details?id=com.qdmobile',
+      },
+      { kind: 'contact', text: 'Right to work in the UK: British citizen' },
+    ]);
+  });
+});

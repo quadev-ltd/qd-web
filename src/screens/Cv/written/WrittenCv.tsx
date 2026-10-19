@@ -20,6 +20,7 @@ import {
   cvEntryHeading,
   type CvLine,
   cvLineText,
+  cvLinkLabel,
   cvRightToWorkLine,
   type CvSectionKey,
 } from '@/core/profile/cvDocument';
@@ -113,7 +114,10 @@ export const WrittenCv: React.FC<WrittenCvProps> = ({
     .map(part => part?.trim())
     .filter(Boolean)
     .join(CV_HEADER_SEPARATOR);
-  const links = (details?.links ?? []).join(CV_HEADER_SEPARATOR);
+  const links = (details?.links ?? [])
+    .map(cvLinkLabel)
+    .filter(Boolean)
+    .join(CV_HEADER_SEPARATOR);
   const hasDetails = Boolean(
     details?.name || details?.headline || contact || links,
   );

@@ -147,6 +147,24 @@ Helvetica for "Łukasz Dvořák", Greek and Cyrillic, and the page count against
 journey on the preview build sets the name "Łukasz Dvořák" in the CV details, downloads the PDF and
 reads its fonts.
 
+## Less cluttered (after the owner's second CV, 19 Oct 2026)
+
+The owner found the downloaded PDF too cluttered and approved layout fixes on the website side. The
+writer's content (fewer full roles, "Earlier career") is changing separately, in cv-write 1.1.0.
+
+- **Links are printed short.** `cvLinkLabel` drops the scheme, "www.", any fragment and a trailing
+  "/", and keeps a query only for a Play store link's `id`. It is never cut short. `cvHeaderLines`
+  uses it, so the text, the compare view, the page and the file agree. The rule was agreed with
+  the backend chat, for `packages/shared` in its cv-write 1.1.0 change.
+- **The header is set apart.** The headline is at 12 pt under the name, and the contact lines are
+  at 9.5 pt in grey. The right to work goes on the contact line when the two stay within 100
+  characters, about a line.
+- **Roles stand apart from their bullets.** There is half a line more before each role's heading
+  than between bullets, and a heading is never left alone at a page's foot (Word: "keep with
+  next"). The page estimate still holds (the layout spec).
+- **A role with no title** prints its organisation alone. An entry with no organisation or dates
+  ("Earlier career") prints no date column. Both are checked, in the file and on the page.
+
 ## What follows
 
 Doc 19 slice 5 is complete on the website. What is left is in doc 19 §6: "Edit my CV" (a resource
