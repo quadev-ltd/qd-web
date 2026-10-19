@@ -85,6 +85,37 @@ describe('WrittenReview', () => {
     );
   });
 
+  it('shows a role with no title, and "Earlier career" with no organisation or dates, cleanly', () => {
+    const document = writtenDocumentFixture();
+    const [role] = document.experience;
+    document.experience = [
+      { ...role!, title: '', location: '', end: '' },
+      {
+        ...role!,
+        id: 'e2',
+        title: 'Earlier career',
+        organisation: '',
+        location: '',
+        start: '',
+        end: '',
+        bullets: [
+          {
+            ...role!.bullets[0]!,
+            id: 'l9',
+            text: 'Backend Engineer, Kestrel Insurance, 2015 – 2018',
+          },
+        ],
+      },
+    ];
+    setUp(ready({ document }));
+
+    const [first, earlier] = within(cv())
+      .getAllByRole('button', { name: /Fenwick Pay|Earlier career/ })
+      .map(button => button.firstElementChild?.textContent);
+    expect(first).toBe('Fenwick Pay2021');
+    expect(earlier).toBe('Earlier career');
+  });
+
   it('says where each line comes from, until the switch is off', async () => {
     setUp(ready(), '15 Oct 2026');
 

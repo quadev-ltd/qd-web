@@ -1,4 +1,5 @@
 import {
+  cvLinkLabel,
   CV_SECTION_HEADINGS,
   CV_SECTION_KEYS,
   CV_WORDS_PER_PAGE,
@@ -308,5 +309,44 @@ describe('the length and the lines of a document', () => {
       'Certifications',
       'Languages',
     ]);
+  });
+});
+
+describe('cvLinkLabel (proposed for packages/shared)', () => {
+  it('prints a link without its scheme, "www.", fragment, trailing "/" or query', () => {
+    expect(cvLinkLabel('https://www.linkedin.com/in/gus/')).toBe(
+      'linkedin.com/in/gus',
+    );
+    expect(cvLinkLabel(' github.com/gusfran ')).toBe('github.com/gusfran');
+    expect(cvLinkLabel('HTTP://example.com/talk?utm_source=cv#slides')).toBe(
+      'example.com/talk',
+    );
+    expect(cvLinkLabel('https://apps.apple.com/gb/app/quadev/id123?mt=8')).toBe(
+      'apps.apple.com/gb/app/quadev/id123',
+    );
+    // Only the scheme and "www." are matched whatever their case
+    expect(cvLinkLabel('HTTPS://WWW.Example.com/')).toBe('Example.com');
+  });
+
+  it('keeps the id of an app in the Play store, and nothing else of its query', () => {
+    expect(
+      cvLinkLabel(
+        'https://play.google.com/store/apps/details?id=com.qdmobile&gl=UK',
+      ),
+    ).toBe('play.google.com/store/apps/details?id=com.qdmobile');
+    expect(
+      cvLinkLabel('https://play.google.com/store/apps/details?gl=UK'),
+    ).toBe('play.google.com/store/apps/details');
+    expect(cvLinkLabel('play.google.com/store/apps/details?gl=UK')).toBe(
+      'play.google.com/store/apps/details',
+    );
+  });
+
+  it('is used for the links of the header', () => {
+    expect(
+      cvHeaderLines({
+        links: ['https://www.github.com/marta/', 'linkedin.com/in/marta'],
+      }),
+    ).toEqual(['github.com/marta · linkedin.com/in/marta']);
   });
 });

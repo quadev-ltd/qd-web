@@ -116,14 +116,19 @@ describe('DownloadButton', () => {
     );
 
     const [blocks] = mockFile.makePdf.mock.calls[0];
-    expect(blocks.slice(0, 2)).toEqual([
+    expect(blocks.slice(0, 4)).toEqual([
       { kind: 'name', text: 'Maya Okafor' },
-      { kind: 'contact', text: 'Senior Backend Engineer' },
+      { kind: 'headline', text: 'Senior Backend Engineer' },
+      // The right to work on the contact line, which it still keeps short
+      {
+        kind: 'contact',
+        text: 'London, UK · 07700 900123 · maya.okafor@example.com · Right to work in the UK: British citizen',
+      },
+      {
+        kind: 'contact',
+        text: 'linkedin.com/in/maya-okafor-example · github.com/maya-okafor-example',
+      },
     ]);
-    expect(blocks).toContainEqual({
-      kind: 'contact',
-      text: 'Right to work in the UK: British citizen',
-    });
     expect(blocks).toContainEqual({
       kind: 'entry',
       text: 'Senior Backend Engineer, Fenwick Pay, London',

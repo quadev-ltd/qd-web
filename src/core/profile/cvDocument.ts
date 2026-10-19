@@ -129,6 +129,33 @@ export interface CvHeaderDetails {
 /** Joins the parts of one header line. */
 export const CV_HEADER_SEPARATOR = ' · ';
 
+/** The hosts whose links keep a query: an app store's, for the app's id. */
+const STORE_QUERY: Readonly<Record<string, string>> = {
+  'play.google.com': 'id',
+};
+
+/**
+ * A link as printed: "https://play.google.com/store/apps/details?id=com.qdmobile&gl=UK" as
+ * "play.google.com/store/apps/details?id=com.qdmobile". No scheme, no "www.", no fragment, no
+ * trailing "/", and no query but an app store's id. Never cut short, so a label stays one link.
+ */
+export const cvLinkLabel = (link: string): string => {
+  const text = link
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/#.*$/, '');
+  const at = text.indexOf('?');
+  const path = (at === -1 ? text : text.slice(0, at)).replace(/\/$/, '');
+  const host = path.split('/')[0]?.toLowerCase() ?? '';
+  const kept = STORE_QUERY[host];
+  const value =
+    kept && at !== -1
+      ? new URLSearchParams(text.slice(at + 1)).get(kept)
+      : null;
+  return value ? `${path}?${kept}=${value}` : path;
+};
+
 /** What the right to work is printed after, for a UK CV (D80). */
 export const CV_RIGHT_TO_WORK_LABEL = 'Right to work in the UK';
 
@@ -164,7 +191,7 @@ export const cvHeaderLines = (
     details?.name?.trim() ?? '',
     details?.headline?.trim() ?? '',
     join([details?.location, details?.phone, details?.email]),
-    join(details?.links ?? []),
+    join((details?.links ?? []).map(cvLinkLabel)),
     cvRightToWorkLine(details?.rightToWork),
   ].filter(Boolean);
 };

@@ -4,19 +4,23 @@
 // laid out from its structure (writtenBlocks); an edit version from its text, its headings
 // guessed (cvBlocks). The libraries are loaded only when a file is made, so no page carries them.
 import {
+  CV_HEADER_SEPARATOR,
   CV_SECTION_HEADINGS,
   CV_SECTION_KEYS,
   type CvDocument,
   type CvHeaderDetails,
-  cvHeaderLines,
   type CvLine,
   cvLineText,
+  cvLinkLabel,
+  cvRightToWorkLine,
 } from '@/core/profile/cvDocument';
 
 /** One piece of the CV's text, as the file lays it out. */
 export type CvBlock =
   | { kind: 'name'; text: string }
-  /** A line of the header under the name: headline, contact lines, right to work. */
+  /** The line under the name ("Staff Engineer"), set apart from the contact lines. */
+  | { kind: 'headline'; text: string }
+  /** A line of the header under the headline: contact, links, right to work. */
   | { kind: 'contact'; text: string }
   | { kind: 'heading'; text: string }
   /** A role's or project's heading, its dates on the right. */
@@ -26,6 +30,9 @@ export type CvBlock =
 
 const shown = (lines: CvLine[]) =>
   lines.filter(({ state }) => state !== 'removed');
+
+/** The longest contact line the right to work is added to: about one line at 9.5 pt. */
+const CONTACT_LINE_CHARS = 100;
 
 /**
  * The blocks of a written CV, from its structure: nothing is guessed. The header is the CV's
@@ -37,15 +44,35 @@ export const writtenBlocks = (
   details?: CvHeaderDetails | null,
 ): CvBlock[] => {
   const blocks: CvBlock[] = [];
-  const header = cvHeaderLines(details);
+  // The header's words are cvHeaderLines'; the headline set apart, and the right to work on the
+  // contact line when the two still make a short line.
+  const join = (parts: (string | undefined)[]) =>
+    parts
+      .map(part => part?.trim() ?? '')
+      .filter(Boolean)
+      .join(CV_HEADER_SEPARATOR);
   const name = details?.name?.trim();
-  header.forEach(line =>
-    blocks.push(
-      name && line === name && blocks.length === 0
-        ? { kind: 'name', text: line }
-        : { kind: 'contact', text: line },
-    ),
-  );
+  const headline = details?.headline?.trim();
+  const contact = join([details?.location, details?.phone, details?.email]);
+  const links = join((details?.links ?? []).map(cvLinkLabel));
+  const rightToWork = cvRightToWorkLine(details?.rightToWork);
+  const together = join([contact, rightToWork]);
+  const joined =
+    Boolean(contact && rightToWork) && together.length <= CONTACT_LINE_CHARS;
+  if (name) {
+    blocks.push({ kind: 'name', text: name });
+  }
+  if (headline) {
+    blocks.push({ kind: 'headline', text: headline });
+  }
+  for (const line of [joined ? together : contact, links]) {
+    if (line) {
+      blocks.push({ kind: 'contact', text: line });
+    }
+  }
+  if (rightToWork && !joined) {
+    blocks.push({ kind: 'contact', text: rightToWork });
+  }
   for (const key of CV_SECTION_KEYS) {
     const section: CvBlock[] = [];
     if (key === 'summary') {
@@ -143,8 +170,10 @@ export const cvFileName = (parts: string[], extension: 'pdf' | 'docx') =>
  * to 2.2 two (cvFile.spec.ts).
  */
 const PAGE = { width: 595.28, height: 841.89, margin: 40 };
-const SIZES = { name: 18, heading: 11, text: 10 };
+const SIZES = { name: 18, headline: 12, heading: 11, text: 10, contact: 9.5 };
 const LEADING = 1.2;
+/** Before a role's heading: half a line more than between its bullets. */
+const ENTRY_GAP = 6;
 
 /** Noto Sans (SIL Open Font License, public/fonts/OFL.txt): Latin, Greek and Cyrillic letters. */
 export const UNICODE_FONTS = {
@@ -246,7 +275,15 @@ export const makePdf = async (
     }
   };
   /** Writes a text in lines that fit, from `indent`, and moves down. */
-  const write = (text: string, font: Font, size: number, indent = 0) => {
+  const ink = rgb(0.13, 0.13, 0.13);
+  const muted = rgb(0.3, 0.3, 0.35);
+  const write = (
+    text: string,
+    font: Font,
+    size: number,
+    indent = 0,
+    color = ink,
+  ) => {
     const words = writable(font, text).split(/\s+/);
     const lines: string[] = [];
     let line = '';
@@ -270,7 +307,7 @@ export const makePdf = async (
         y,
         size,
         font,
-        color: rgb(0.13, 0.13, 0.13),
+        color,
       });
     }
   };
@@ -278,11 +315,16 @@ export const makePdf = async (
   for (const block of blocks) {
     if (block.kind === 'name') {
       write(block.text, bold, SIZES.name);
-      y -= 4;
+      y -= 2;
+    } else if (block.kind === 'headline') {
+      write(block.text, regular, SIZES.headline);
+      y -= 2;
     } else if (block.kind === 'contact') {
-      write(block.text, regular, SIZES.text);
+      write(block.text, regular, SIZES.contact, 0, muted);
     } else if (block.kind === 'entry') {
-      y -= 4;
+      // More room before a role than between its bullets, and never alone at a page's foot.
+      y -= ENTRY_GAP;
+      room(SIZES.text * LEADING * 2);
       const when = writable(regular, block.when);
       const whenWidth = when ? regular.widthOfTextAtSize(when, SIZES.text) : 0;
       const what = writable(bold, block.text);
@@ -298,7 +340,7 @@ export const makePdf = async (
           y,
           size: SIZES.text,
           font: regular,
-          color: rgb(0.3, 0.3, 0.35),
+          color: muted,
         });
       } else {
         if (what) {
@@ -343,7 +385,13 @@ export const makePdf = async (
 /** A4 in twentieths of a point, with margins of about 14 mm, as the PDF. */
 const WORD_PAGE = { width: 11906, height: 16838, margin: 800 };
 /** The PDF's sizes in half-points, as Word counts them. */
-const WORD_SIZES = { name: 36, heading: 22, text: 20 };
+const WORD_SIZES = {
+  name: 36,
+  headline: 24,
+  heading: 22,
+  text: 20,
+  contact: 19,
+};
 
 export const makeDocx = async (blocks: CvBlock[]): Promise<Blob> => {
   const { AlignmentType, Document, Packer, Paragraph, TabStopType, TextRun } =
@@ -363,10 +411,23 @@ export const makeDocx = async (blocks: CvBlock[]): Promise<Blob> => {
             }),
           ],
         });
+      case 'headline':
+        return new Paragraph({
+          spacing: { after: 40 },
+          children: [
+            new TextRun({ text: block.text, size: WORD_SIZES.headline }),
+          ],
+        });
       case 'contact':
         return new Paragraph({
           spacing: { after: 20 },
-          children: [new TextRun({ text: block.text, size: text })],
+          children: [
+            new TextRun({
+              text: block.text,
+              size: WORD_SIZES.contact,
+              color: '4D4D59',
+            }),
+          ],
         });
       case 'heading':
         return new Paragraph({
@@ -385,7 +446,9 @@ export const makeDocx = async (blocks: CvBlock[]): Promise<Blob> => {
       case 'entry':
         // The dates at a right tab stop on the heading's line.
         return new Paragraph({
-          spacing: { before: 100, after: 20 },
+          // Half a line more before a role than between its bullets, kept with its first one.
+          spacing: { before: 120, after: 20 },
+          keepNext: true,
           tabStops: [
             {
               type: TabStopType.RIGHT,
