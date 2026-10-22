@@ -1,9 +1,11 @@
-// The cases of quadev-backend's packages/shared/src/cvVersion.test.ts (as of #35), so this
-// copy of cvVersionText says what the backend's says.
+// The cases of quadev-backend's packages/shared/src/cvVersion.test.ts (as of #35, and the
+// conventions of #49), so this copy of cvVersionText says what the backend's says.
 import {
   type CvChange,
+  cvConventionFor,
   type CvQuestion,
   CvVersionSchema,
+  defaultCvConvention,
   cvVersionsPath,
   cvVersionText,
   isCreating,
@@ -223,5 +225,42 @@ describe('CvVersionSchema', () => {
       updatedAt: 2,
     });
     expect(parsed).toMatchObject({ length: 'same', findings: [] });
+  });
+
+  it('reads a written version’s convention, `uk` for the versions written before D86', () => {
+    const written = {
+      id: 'w1',
+      mode: 'write',
+      target: { kind: 'general' },
+      pages: 2,
+      status: 'ready',
+      unsupportedJobTerms: [],
+      profileRevision: 3,
+      createdAt: 1,
+      updatedAt: 2,
+    };
+    expect(
+      CvVersionSchema.parse({ ...written, convention: 'international' }),
+    ).toMatchObject({ convention: 'international' });
+    expect(CvVersionSchema.parse(written)).toMatchObject({ convention: 'uk' });
+    expect(
+      CvVersionSchema.parse({ ...written, convention: 'fr' }),
+    ).toMatchObject({ convention: 'uk' });
+  });
+});
+
+describe('the convention of a written CV (D86)', () => {
+  it('follows the country of the job, and is international for a general CV', () => {
+    expect(cvConventionFor('GB')).toBe('uk');
+    expect(cvConventionFor('US')).toBe('us');
+    expect(cvConventionFor('DE')).toBe('international');
+    expect(cvConventionFor(undefined)).toBe('international');
+    const job = { kind: 'job', applicationId: 'a1' } as const;
+    expect(defaultCvConvention(job, { country: 'US' })).toBe('us');
+    expect(defaultCvConvention(job, {})).toBe('international');
+    expect(defaultCvConvention(job)).toBe('international');
+    expect(defaultCvConvention({ kind: 'general' }, { country: 'GB' })).toBe(
+      'international',
+    );
   });
 });

@@ -154,6 +154,19 @@ describe('cvHeaderLines', () => {
     ]);
   });
 
+  it('shows the right to work in a uk CV only', () => {
+    expect(cvHeaderLines(DETAILS, 'uk').at(-1)).toBe(
+      'Right to work in the UK: EU citizen',
+    );
+    expect(cvHeaderLines(DETAILS, 'us')).toHaveLength(4);
+    expect(cvHeaderLines(DETAILS, 'international').at(-1)).toBe(
+      'github.com/marta · linkedin.com/in/marta',
+    );
+    expect(cvDocumentText(DOCUMENT, DETAILS, 'international')).not.toContain(
+      'Right to work',
+    );
+  });
+
   it('prints the right to work after its label, unless the value already says what it is', () => {
     expect(cvRightToWorkLine('British citizen')).toBe(
       'Right to work in the UK: British citizen',

@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CONVENTION_TAG_KEYS } from '../conventions';
 import CvDetailsPanel from '../details/CvDetailsPanel';
 import DownloadButton from '../download/DownloadButton';
 import { TermsCard } from '../review/ReviewCards';
@@ -191,6 +192,7 @@ export const WrittenReview: React.FC<WrittenReviewProps> = ({
           <WrittenCv
             document={document}
             details={details}
+            convention={version.convention}
             sources={sources}
             context={context}
             onEditDetails={() => setDetailsOpen(true)}
@@ -237,7 +239,9 @@ export const WrittenReview: React.FC<WrittenReviewProps> = ({
               className="font-display text-[20px] leading-tight font-semibold">
               {aboutPages(t, document)}
             </h2>
-            <p className="text-sm leading-normal text-muted">{t('cv.ukA4')}</p>
+            <p className="text-sm leading-normal text-muted">
+              {t(CONVENTION_TAG_KEYS[version.convention])}
+            </p>
             {longer ? (
               <Banner tone="info">
                 {t('cv.longerThanAsked', { count: version.pages })}

@@ -118,6 +118,18 @@ export const ApplicationJobSchema = z.object({
 });
 export type ApplicationJob = z.infer<typeof ApplicationJobSchema>;
 
+/**
+ * A country as an application stores it: an ISO 3166-1 alpha-2 code in capitals, with "UK" read
+ * as "GB"; `undefined` for anything else (an empty string, a name, "remote").
+ */
+export const jobCountry = (value: string | undefined): string | undefined => {
+  const code = value?.trim().toUpperCase() ?? '';
+  if (code === 'UK') {
+    return 'GB';
+  }
+  return /^[A-Z]{2}$/.test(code) ? code : undefined;
+};
+
 /** `users/{uid}/applications/{applicationId}`. */
 export const JobApplicationSchema = z.object({
   id: z.string().min(1),
@@ -131,6 +143,12 @@ export const JobApplicationSchema = z.object({
   postingUrl: z.string().optional().catch(undefined),
   /** The candidate's own notes about this job. */
   notes: z.string().optional().catch(undefined),
+  /**
+   * The country the job is in, an ISO 3166-1 alpha-2 code ("GB", "US"), read from the job. None
+   * when the job doesn't say or was read before job-read 1.1.0. It suggests the CV's convention
+   * (D86).
+   */
+  country: z.string().transform(jobCountry).optional().catch(undefined),
   /** Goes up by one with every change the brief is built from. */
   revision: z.number().catch(0),
   brief: ApplicationBriefSchema.optional().catch(undefined),

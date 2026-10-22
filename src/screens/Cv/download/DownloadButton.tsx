@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   cvBlocks,
   cvFileName,
+  cvPaper,
   makeDocx,
   makePdf,
   saveFile,
@@ -68,10 +69,17 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
               languages: [],
             },
             details,
+            version.convention,
           )
         : cvBlocks(cvVersionText(version));
+      // A US resume on US Letter; every other CV, and an edit version, on A4.
+      const paper = cvPaper(
+        isWrittenVersion(version) ? version.convention : undefined,
+      );
       const file =
-        format === 'pdf' ? await makePdf(blocks) : await makeDocx(blocks);
+        format === 'pdf'
+          ? await makePdf(blocks, { paper })
+          : await makeDocx(blocks, paper);
       saveFile(file, cvFileName([fileTitle], format));
     } catch (error) {
       logProfileError(`downloadCv(${format})`, error, uid);

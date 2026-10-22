@@ -58,8 +58,14 @@ test('a general CV: written from the profile, read with its sources, downloaded,
   ).toBeVisible();
   await page.getByRole('button', { name: 'Write a general CV' }).click();
   const panel = page.getByRole('dialog', { name: 'Write a general CV' });
+  // A general CV is international (D86)
   await expect(
-    panel.getByText('Written as a UK CV: British spelling, A4 pages.'),
+    panel.getByRole('radio', { name: 'International' }),
+  ).toBeChecked();
+  await expect(
+    panel.getByText(
+      'International CV: clear English for any country, A4, no right-to-work line. Suggested for a general CV.',
+    ),
   ).toBeVisible();
   await expect(panel).toContainText('Maya Okafor · Senior Backend Engineer');
   await panel.getByLabel('Aim it at a role (optional)').fill('Data engineer');
@@ -76,6 +82,8 @@ test('a general CV: written from the profile, read with its sources, downloaded,
   await expect(cv).toContainText('Maya Okafor');
   await expect(cv).toContainText('Senior Backend Engineer · Fenwick Pay');
   await expect(cv).toContainText('From Maya Okafor CV 2026');
+  await expect(cv).not.toContainText('Right to work');
+  await expect(page.getByText('International CV · A4')).toBeVisible();
   await expect(
     page.getByRole('region', { name: 'What we did and why' }),
   ).toContainText('1 line left out: not backed by your profile.');
@@ -174,6 +182,67 @@ test('a CV for a job: asked in "New version", listed under its application, mark
   await expect(
     page.getByRole('dialog', { name: 'New CV version' }),
   ).toBeVisible();
+});
+
+test('the convention follows the job’s country unless changed, a US resume prints on US Letter, and writing again keeps it', async ({
+  page,
+}) => {
+  await openHome(page);
+  await seedApplications(page);
+  await openCv(page);
+  await page.getByRole('button', { name: 'Choose a job' }).click();
+  const panel = page.getByRole('dialog', { name: 'New CV version' });
+  const writtenAs = panel.getByRole('group', { name: 'Written as' });
+  const job = (name: string) =>
+    panel.getByRole('radio', { name: new RegExp(name) }).check();
+
+  // Each job suggests its own, and says why
+  await job('Senior Backend Engineer');
+  await expect(writtenAs.getByRole('radio', { name: 'UK CV' })).toBeChecked();
+  await expect(panel).toContainText(
+    'UK CV: British spelling, A4, with the right-to-work line. Suggested for a job in the United Kingdom.',
+  );
+  await job('Platform Engineer');
+  await expect(
+    writtenAs.getByRole('radio', { name: 'International' }),
+  ).toBeChecked();
+  await expect(panel).toContainText('Suggested for a job in Norway.');
+  await job('Engineering Manager');
+  await expect(
+    writtenAs.getByRole('radio', { name: 'US resume' }),
+  ).toBeChecked();
+  await expect(panel).toContainText(
+    'Suggested for a job in the United States.',
+  );
+
+  // Changed: only what it means, until another job is picked
+  await writtenAs.getByText('UK CV', { exact: true }).click();
+  await expect(panel).not.toContainText('Suggested');
+  await job('Platform Engineer');
+  await job('Engineering Manager');
+  await expect(
+    writtenAs.getByRole('radio', { name: 'US resume' }),
+  ).toBeChecked();
+  await writeCv(page, 'New CV version');
+
+  // A US resume: no UK right to work, on US Letter
+  const cv = page.getByRole('article', { name: 'Your CV' });
+  await expect(cv).toContainText('Maya Okafor');
+  await expect(cv).not.toContainText('Right to work');
+  await expect(page.getByText('US resume · Letter')).toBeVisible();
+  const pdf = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download PDF' }).click();
+  const file = await PDFDocument.load(readFileSync(await (await pdf).path()));
+  for (const sheet of file.getPages()) {
+    expect(sheet.getSize()).toEqual({ width: 612, height: 792 });
+  }
+
+  // Written again: still a US resume
+  const before = page.url();
+  await page.getByRole('button', { name: /^Write again/ }).click();
+  await expect(page).not.toHaveURL(before);
+  await expect(cv).toContainText('Maya Okafor');
+  await expect(page.getByText('US resume · Letter')).toBeVisible();
 });
 
 test('a written CV revised: a line edited, another removed and restored, a role’s end changed, a question answered, then written again', async ({

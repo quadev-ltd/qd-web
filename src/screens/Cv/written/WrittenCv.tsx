@@ -24,10 +24,13 @@ import {
   cvRightToWorkLine,
   type CvSectionKey,
 } from '@/core/profile/cvDocument';
+import { type CvVersionConvention } from '@/core/profile/cvVersions';
 
 export interface WrittenCvProps {
   document: CvDocument;
   details: CvDetails | null;
+  /** Only a UK CV shows the right to work (D86). */
+  convention: CvVersionConvention;
   /** "Show where each line comes from": also shows a removed line's place, to restore it. */
   sources: boolean;
   context: SourceContext;
@@ -48,6 +51,7 @@ const shown = (lines: CvLine[]) =>
 export const WrittenCv: React.FC<WrittenCvProps> = ({
   document,
   details,
+  convention,
   sources,
   context,
   onEditDetails,
@@ -294,7 +298,7 @@ export const WrittenCv: React.FC<WrittenCvProps> = ({
               )}
               {contact && <p className="text-[14px] text-muted">{contact}</p>}
               {links && <p className="text-[14px] text-muted">{links}</p>}
-              {details?.rightToWork?.trim() && (
+              {convention === 'uk' && details?.rightToWork?.trim() && (
                 <p className="text-[14px] text-muted">
                   {cvRightToWorkLine(details.rightToWork)}
                 </p>

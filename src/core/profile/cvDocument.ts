@@ -1,8 +1,10 @@
 // A CV written from the profile (research doc 19, D83): the document a written version keeps,
 // and the functions that print it. A copy of quadev-backend's packages/shared/src/cvDocument.ts
-// (as of 31b27ad), with zod schemas to read the document, so the website's text, compare and
+// (as of d5d1146), with zod schemas to read the document, so the website's text, compare and
 // download say what the backend's says. Its spec copies the backend's fixtures.
 import { z } from 'zod';
+
+import { type CvVersionConvention } from './cvVersions';
 
 /** How many words fill one A4 page of the download: the length check and the layout aim at this number. */
 export const CV_WORDS_PER_PAGE = 500;
@@ -184,10 +186,12 @@ export const cvRightToWorkLine = (value: string | undefined): string => {
 /**
  * The lines at the top of a written CV: the name, the headline, the location, phone and email on
  * one line, the links on one line, and the right to work. Empty lines are left out; no details
- * give no header.
+ * give no header. The right to work is the UK's, so only a `uk` CV shows it (D86); without a
+ * convention, it is shown.
  */
 export const cvHeaderLines = (
   details: CvHeaderDetails | undefined | null,
+  convention?: CvVersionConvention,
 ): string[] => {
   const join = (parts: (string | undefined)[]) =>
     parts
@@ -199,7 +203,9 @@ export const cvHeaderLines = (
     details?.headline?.trim() ?? '',
     join([details?.location, details?.phone, details?.email]),
     join((details?.links ?? []).map(cvLinkLabel)),
-    cvRightToWorkLine(details?.rightToWork),
+    convention === undefined || convention === 'uk'
+      ? cvRightToWorkLine(details?.rightToWork)
+      : '',
   ].filter(Boolean);
 };
 
@@ -254,8 +260,9 @@ const sectionLines = (document: CvDocument, key: CvSectionKey): string[] => {
 export const cvDocumentText = (
   document: CvDocument,
   details?: CvHeaderDetails | null,
+  convention?: CvVersionConvention,
 ): string => {
-  const blocks = [cvHeaderLines(details).join('\n')];
+  const blocks = [cvHeaderLines(details, convention).join('\n')];
   for (const key of CV_SECTION_KEYS) {
     const lines = sectionLines(document, key);
     if (lines.length > 0) {

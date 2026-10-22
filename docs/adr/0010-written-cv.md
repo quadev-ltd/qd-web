@@ -187,7 +187,38 @@ applied by the backend for every AI service.
   daily limit still show their defaults, so an override for those services waits until their pages
   read it too.
 
+## UK, US or international (D86, 22 Oct 2026)
+
+The owner asked why a CV must be UK or US, and chose three conventions, suggested from the job's
+country, which the candidate can change. Against quadev-backend `d5d1146` (#49): `job-read` 1.1.0
+reads the job's `country` (ISO code) into the application, and `createCvVersion` takes a
+`convention`.
+
+- **The contract copies follow the backend**: `CV_VERSION_CONVENTIONS`, `cvConventionFor` and
+  `defaultCvConvention` in `cvVersions.ts`, `jobCountry` and the application's `country` in
+  `applications.ts`, and the convention in `cvHeaderLines` and `cvDocumentText`, with the
+  backend's fixtures. A written version read without a convention is `uk`: every version written
+  before D86 is.
+- **"Written as" sits under "Length" in the new-version panel**, as the same radio group: UK CV, US
+  resume or International. It starts at the suggestion and goes back to it when the job, or job and
+  general, change. Under it, what the one chosen means, and why it was suggested when it is the
+  suggestion: "Suggested for a job in the United States", "Suggested: we don't know the job's
+  country" (no country, or a job read before 1.1.0), "Suggested for a general CV". The country's
+  name comes from `Intl.DisplayNames`, with "the" where English puts it. Drawn with the design
+  chat, which advised the wording and the place.
+- **The request always names the convention shown**, so the CV is what the panel said even when
+  the application the page holds is older than the backend's. "Try again" keeps a written
+  version's convention; "Write again" leaves it to the backend, which keeps it.
+- **Only a UK CV shows the right to work**, on the page, in the text and in the files. The CV
+  details say so under the field.
+- **A US resume prints on US Letter**, the PDF and the Word file; the others on A4. Letter holds
+  about 3% less than A4 and the layout had room: "about 2 pages" still prints as two, measured.
+- **The written CV says which it is**: "UK CV · A4", "US resume · Letter", "International CV · A4".
+- **The preview reads a country** from a job's text (a few places only), and its three seeded jobs
+  are in the UK, the US and Norway.
+
 ## What follows
 
 Doc 19 slice 5 is complete on the website. What is left is in doc 19 §6: "Edit my CV" (a resource
-marked as "my CV"), saving an answer to the profile, "private" and "do not name", and US resumes.
+marked as "my CV"), saving an answer to the profile, and "private" and "do not name". US resumes
+came with D86.

@@ -1,13 +1,19 @@
-// "New CV version" (C3, D69, D80, D83, doc 13 §20.2): one panel for a CV written for a job or in
-// general, from everything in the profile. Opened from "New version" it asks what the CV is for;
-// the first screen's two cards open it with that chosen. It asks the length (1 or 2 pages, 2 by
-// default), shows the CV's details that go at the top ("Edit" opens them over it), and says every
-// CV is a UK CV instead of asking.
+// "New CV version" (C3, D69, D80, D83, D86, doc 13 §20.2): one panel for a CV written for a job
+// or in general, from everything in the profile. Opened from "New version" it asks what the CV is
+// for; the first screen's two cards open it with that chosen. It asks the length (1 or 2 pages, 2
+// by default) and the convention ("Written as": UK CV, US resume or international, suggested from
+// the job's country and back to the suggestion when the target changes), and shows the CV's
+// details that go at the top ("Edit" opens them over it).
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
 import ChoiceGroup from './ChoiceGroup';
+import {
+  CONVENTION_MEANING_KEYS,
+  CONVENTION_OPTION_KEYS,
+  countryName,
+} from './conventions';
 import { detailsLines } from './details/CvDetailsCard';
 import CvDetailsPanel from './details/CvDetailsPanel';
 
@@ -20,7 +26,13 @@ import SidePanel from '@/components/ui/SidePanel';
 import { type JobApplication, jobStatusOf } from '@/core/profile/applications';
 import { useApplications } from '@/core/profile/ApplicationsProvider';
 import { CV_PAGE_COUNTS, type CvPageCount } from '@/core/profile/cvDocument';
-import { CV_ROLE_MAX_CHARS, CV_VERSIONS_MAX } from '@/core/profile/cvVersions';
+import {
+  CV_ROLE_MAX_CHARS,
+  CV_VERSION_CONVENTIONS,
+  CV_VERSIONS_MAX,
+  type CvVersionConvention,
+  defaultCvConvention,
+} from '@/core/profile/cvVersions';
 import {
   useCvDailyLimit,
   useCvVersions,
@@ -77,6 +89,8 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
   );
   const [role, setRole] = useState('');
   const [pages, setPages] = useState<CvPageCount>(2);
+  // The convention the candidate picked instead of the suggestion, until the target changes.
+  const [chosen, setChosen] = useState<CvVersionConvention>();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
@@ -89,6 +103,18 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
   const roleTooLong = trimmedRole.length > CV_ROLE_MAX_CHARS;
   const blocked =
     limitReached || full || (kind === 'job' ? !applicationId : roleTooLong);
+  const application =
+    kind === 'job' ? jobs.find(({ id }) => id === applicationId) : undefined;
+  const suggested = defaultCvConvention({ kind }, application);
+  const convention = chosen ?? suggested;
+  const why =
+    kind === 'general'
+      ? t('cv.conventionSuggestedGeneral')
+      : application?.country
+        ? t('cv.conventionSuggestedFor', {
+            country: countryName(application.country),
+          })
+        : t('cv.conventionSuggestedUnknown');
   const [who, contact] = detailsLines(details, count =>
     t('cv.detailsLinksCount', { count }),
   );
@@ -127,6 +153,8 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
                 ...(trimmedRole ? { role: trimmedRole } : {}),
               },
         pages,
+        // Always the one shown, so the CV is what the panel said.
+        convention,
       });
       // Into the list before its page opens; the page follows it while it is written.
       await refreshVersion(versionId).catch(() => null);
@@ -167,7 +195,10 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
           <ChoiceGroup
             label={t('cv.forLabel')}
             value={kind}
-            onChange={setKind}
+            onChange={value => {
+              setKind(value);
+              setChosen(undefined);
+            }}
             disabled={isBusy}
             choices={[
               { value: 'job', title: t('cv.forJob'), meta: t('cv.forJobMeta') },
@@ -184,7 +215,10 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
             <ChoiceGroup
               label={t('cv.jobLabel')}
               value={applicationId}
-              onChange={setApplicationId}
+              onChange={value => {
+                setApplicationId(value);
+                setChosen(undefined);
+              }}
               disabled={isBusy}
               choices={jobs.map(job => ({
                 value: job.id,
@@ -227,6 +261,22 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
             {t('cv.pagesHint')}
           </p>
         </div>
+        <div className="flex flex-col gap-1.5">
+          <SegmentedControl
+            label={t('cv.conventionLabel')}
+            options={CV_VERSION_CONVENTIONS.map(value => ({
+              value,
+              label: t(CONVENTION_OPTION_KEYS[value]),
+            }))}
+            value={convention}
+            onChange={setChosen}
+            disabled={isBusy}
+          />
+          <p className="text-sm leading-normal text-muted">
+            {t(CONVENTION_MEANING_KEYS[convention])}
+            {convention === suggested && ` ${why}`}
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-border-subtle px-3.5 py-3">
           <div className="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
             <span className="text-sm leading-normal font-medium">
@@ -252,12 +302,6 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
             {t('cv.atTheTopEdit')}
           </Button>
         </div>
-        <p className="flex items-start gap-2 text-sm leading-normal text-muted">
-          <span className="flex pt-0.5 text-primary">
-            <Icon name="file" size={18} />
-          </span>
-          {t('cv.ukLine')}
-        </p>
         <p className="flex items-start gap-2 text-sm leading-normal text-muted">
           <span className="flex pt-0.5 text-primary">
             <Icon name="user" size={18} />

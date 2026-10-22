@@ -60,6 +60,7 @@ describe('DownloadButton', () => {
 
     expect(mockFile.makePdf).toHaveBeenCalledWith(
       expect.arrayContaining([{ kind: 'name', text: 'Maya Okafor' }]),
+      { paper: 'a4' },
     );
     expect(mockFile.saveFile).toHaveBeenCalledExactlyOnceWith(
       pdf,
@@ -139,5 +140,36 @@ describe('DownloadButton', () => {
       kind: 'paragraph',
       text: 'Languages and data: Go · PostgreSQL · Java',
     });
+  });
+
+  it('prints a US resume on US Letter and an international CV on A4, neither with the UK’s right to work', async () => {
+    const { unmount } = setUp(writtenVersionFixture({ convention: 'us' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'cv.downloadPdfButton' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'cv.otherFormats' }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'cv.downloadWord' }),
+    );
+    unmount();
+    setUp(writtenVersionFixture({ convention: 'international' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'cv.downloadPdfButton' }),
+    );
+
+    const [[us, usOptions], [international, internationalOptions]] =
+      mockFile.makePdf.mock.calls;
+    expect(usOptions).toEqual({ paper: 'letter' });
+    expect(mockFile.makeDocx.mock.calls[0]?.[1]).toBe('letter');
+    expect(internationalOptions).toEqual({ paper: 'a4' });
+    for (const blocks of [us, international]) {
+      expect(blocks[2]).toEqual({
+        kind: 'contact',
+        text: 'London, UK · 07700 900123 · maya.okafor@example.com',
+      });
+      expect(JSON.stringify(blocks)).not.toContain('Right to work');
+    }
   });
 });
