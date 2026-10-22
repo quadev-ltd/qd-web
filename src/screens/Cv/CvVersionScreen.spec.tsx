@@ -195,7 +195,7 @@ describe('CvVersionScreen', () => {
       expect(screen.getByText('cv.writtenJobSub')).toBeInTheDocument();
     });
 
-    it('says it could not be written, and writes it again with the same target and length', async () => {
+    it('says it could not be written, and writes it again with the same target, length and convention', async () => {
       const gateway = createMockProfileGateway();
       gateway.createCvVersion.mockResolvedValue({
         versionId: 'w2',
@@ -207,6 +207,7 @@ describe('CvVersionScreen', () => {
           failure: 'model',
           document: undefined,
           pages: 1,
+          convention: 'us',
         }),
         gateway,
       );
@@ -222,6 +223,7 @@ describe('CvVersionScreen', () => {
         mode: 'write',
         target: { kind: 'job', applicationId: 'a1' },
         pages: 1,
+        convention: 'us',
       });
       expect(gateway.removeCvVersion).toHaveBeenCalledWith('w1');
     });

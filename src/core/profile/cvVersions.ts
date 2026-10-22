@@ -49,6 +49,40 @@ const timestamp = z.number().nullable().catch(null);
 export const CV_VERSION_LENGTHS = ['same', 'one-page', 'two-pages'] as const;
 export type CvVersionLength = (typeof CV_VERSION_LENGTHS)[number];
 
+/**
+ * CV conventions (D80, D86): a British CV, an American resume, or an international CV (British
+ * spelling unless the job writes American, A4, no personal details, no right to work). Edit
+ * versions are always `uk`.
+ */
+export const CV_VERSION_CONVENTIONS = ['uk', 'us', 'international'] as const;
+export type CvVersionConvention = (typeof CV_VERSION_CONVENTIONS)[number];
+
+/** The convention for a job in `country` (an application's `country`): `uk` for GB, `us` for US, else international. */
+export const cvConventionFor = (
+  country: string | undefined,
+): CvVersionConvention => {
+  if (country === 'GB') {
+    return 'uk';
+  }
+  if (country === 'US') {
+    return 'us';
+  }
+  return 'international';
+};
+
+/**
+ * The convention a new written version gets when the request names none (D86): from the country
+ * of the application's job, and international for a general CV or a job in no known country. The
+ * new-version panel suggests it, and the candidate can change it.
+ */
+export const defaultCvConvention = (
+  target: { kind: 'job' | 'general' },
+  application?: { country?: string },
+): CvVersionConvention =>
+  target.kind === 'job'
+    ? cvConventionFor(application?.country)
+    : 'international';
+
 export const CV_FINDING_KINDS = [
   'structure',
   'clarity',
@@ -203,6 +237,8 @@ const versionBase = {
 export const CvWrittenVersionSchema = z.object({
   ...versionBase,
   mode: z.literal('write'),
+  /** The versions written before D86 are all `uk`. */
+  convention: z.enum(CV_VERSION_CONVENTIONS).catch('uk'),
   pages: z.union([z.literal(1), z.literal(2)]).catch(2),
   /** The CV, once `ready`. Its header is drawn from the CV's details as they are now. */
   document: CvDocumentSchema.optional().catch(undefined),
@@ -270,12 +306,17 @@ type CvVersionTargetRequest =
   { kind: 'job'; applicationId: string } | { kind: 'general'; role?: string };
 
 /**
- * What `createCvVersion` takes: a CV written from the profile, of `pages` A4 pages (2 by
- * default), or edits to one of the candidate's CVs (no `mode`). A version is always a UK CV for
- * now (D80).
+ * What `createCvVersion` takes: a CV written from the profile, of `pages` pages (2 by default), in
+ * `convention` (by default {@link defaultCvConvention}, D86), or edits to one of the candidate's
+ * CVs (no `mode`), always a UK CV.
  */
 export type CreateCvVersionRequest =
-  | { mode: 'write'; target: CvVersionTargetRequest; pages?: CvPageCount }
+  | {
+      mode: 'write';
+      target: CvVersionTargetRequest;
+      pages?: CvPageCount;
+      convention?: CvVersionConvention;
+    }
   | {
       mode?: 'edit';
       resourceId: string;
@@ -387,7 +428,11 @@ export const versionText = (
   details?: CvHeaderDetails | null,
 ): string =>
   isWrittenVersion(version)
-    ? cvDocumentText(version.document ?? EMPTY_DOCUMENT, details)
+    ? cvDocumentText(
+        version.document ?? EMPTY_DOCUMENT,
+        details,
+        version.convention,
+      )
     : cvVersionText(version);
 
 // ---------- The text of an edit version (the same as the backend's cvVersionText) ----------

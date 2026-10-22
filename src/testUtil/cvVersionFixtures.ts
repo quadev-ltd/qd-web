@@ -136,6 +136,7 @@ export const writtenVersionFixture = (
   id: 'w1',
   mode: 'write',
   target: { kind: 'job', applicationId: 'a1' },
+  convention: 'uk',
   pages: 2,
   status: 'ready',
   document: writtenDocumentFixture(),

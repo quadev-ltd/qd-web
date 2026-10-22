@@ -179,6 +179,8 @@ export interface PreviewSeedApplication {
   jobDescription: string;
   postingUrl?: string;
   notes?: string;
+  /** The country read from the job (D86): it suggests the CV's convention. */
+  country?: string;
   /** What its brief is: none yet, ready with this many gaps, or built before the job changed. */
   brief: 'none' | { gaps: number } | 'jobChanged';
 }
@@ -194,6 +196,7 @@ export const PREVIEW_SEED_APPLICATIONS: PreviewSeedApplication[] = [
     postingUrl: 'https://northwind-logistics.example/careers/1482',
     notes:
       'Recruiter call on 8 Oct: two technical rounds, then the hiring manager. They asked about on-call experience.',
+    country: 'GB',
     brief: { gaps: 2 },
   },
   {
@@ -201,6 +204,7 @@ export const PREVIEW_SEED_APPLICATIONS: PreviewSeedApplication[] = [
     company: 'Harbour Health',
     jobDescription:
       'Harbour Health is hiring an Engineering Manager for its patient records platform: a team of seven backend and mobile engineers, delivery across three time zones, and hiring for two open roles.',
+    country: 'US',
     brief: 'jobChanged',
   },
   {
@@ -208,6 +212,7 @@ export const PREVIEW_SEED_APPLICATIONS: PreviewSeedApplication[] = [
     company: 'Halvorsen',
     jobDescription:
       'Halvorsen builds the platform its product teams deploy on: Kubernetes, Terraform and an internal developer portal. You will run the clusters and the paved road for 40 engineers.',
+    country: 'NO',
     brief: 'none',
   },
 ];

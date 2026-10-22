@@ -14,6 +14,7 @@ import {
   cvLinkLabel,
   cvRightToWorkLine,
 } from '@/core/profile/cvDocument';
+import { type CvVersionConvention } from '@/core/profile/cvVersions';
 
 /** One piece of the CV's text, as the file lays it out. */
 export type CvBlock =
@@ -36,12 +37,13 @@ const CONTACT_LINE_CHARS = 100;
 
 /**
  * The blocks of a written CV, from its structure: nothing is guessed. The header is the CV's
- * details as they are now (cvHeaderLines), then each section with something in it, in the fixed
- * order. The words are cvDocumentText's, laid out.
+ * details as they are now (cvHeaderLines: the right to work in a UK CV only), then each section
+ * with something in it, in the fixed order. The words are cvDocumentText's, laid out.
  */
 export const writtenBlocks = (
   document: CvDocument,
   details?: CvHeaderDetails | null,
+  convention?: CvVersionConvention,
 ): CvBlock[] => {
   const blocks: CvBlock[] = [];
   // The header's words are cvHeaderLines'; the headline set apart, and the right to work on the
@@ -55,7 +57,10 @@ export const writtenBlocks = (
   const headline = details?.headline?.trim();
   const contact = join([details?.location, details?.phone, details?.email]);
   const links = join((details?.links ?? []).map(cvLinkLabel));
-  const rightToWork = cvRightToWorkLine(details?.rightToWork);
+  const rightToWork =
+    convention === undefined || convention === 'uk'
+      ? cvRightToWorkLine(details?.rightToWork)
+      : '';
   const together = join([contact, rightToWork]);
   const joined =
     Boolean(contact && rightToWork) && together.length <= CONTACT_LINE_CHARS;
@@ -161,15 +166,27 @@ export const cvFileName = (parts: string[], extension: 'pdf' | 'docx') =>
     .trim()
     .slice(0, 120)}.${extension}`;
 
+// ---------- Paper ----------
+
+/** The paper a CV is printed on: A4, or US Letter for a US resume (D86). */
+export type CvPaper = 'a4' | 'letter';
+
+export const cvPaper = (convention?: CvVersionConvention): CvPaper =>
+  convention === 'us' ? 'letter' : 'a4';
+
 // ---------- PDF ----------
 
 /**
- * A4 in points, with margins of about 14 mm, at 10 pt with single line spacing: a page holds the
- * CV_WORDS_PER_PAGE (500) words the length check counts (doc 19 §3.4), headings and spacing
- * included, so "about 2 pages" downloads as 2. Measured: an estimate up to 1.1 fills one page, up
- * to 2.2 two (cvFile.spec.ts).
+ * A4 or US Letter in points, with margins of about 14 mm, at 10 pt with single line spacing: a
+ * page holds the CV_WORDS_PER_PAGE (500) words the length check counts (doc 19 §3.4), headings
+ * and spacing included, so "about 2 pages" downloads as 2. Measured: an estimate up to 1.1 fills
+ * one A4 page, up to 2.2 two; Letter holds about 3% less (cvFile.spec.ts).
  */
-const PAGE = { width: 595.28, height: 841.89, margin: 40 };
+const PAPERS: Readonly<Record<CvPaper, { width: number; height: number }>> = {
+  a4: { width: 595.28, height: 841.89 },
+  letter: { width: 612, height: 792 },
+};
+const MARGIN = 40;
 const SIZES = { name: 18, headline: 12, heading: 11, text: 10, contact: 9.5 };
 const LEADING = 1.2;
 /** Before a role's heading: half a line more than between its bullets. */
@@ -196,14 +213,17 @@ const fetchFonts = async (): Promise<[ArrayBuffer, ArrayBuffer]> => {
 };
 
 export interface MakePdfOptions {
+  /** A4 by default. */
+  paper?: CvPaper;
   /** Where the Unicode fonts come from; the site's own files by default. */
   loadFonts?: () => Promise<[ArrayBuffer, ArrayBuffer]>;
 }
 
 export const makePdf = async (
   blocks: CvBlock[],
-  { loadFonts = fetchFonts }: MakePdfOptions = {},
+  { paper = 'a4', loadFonts = fetchFonts }: MakePdfOptions = {},
 ): Promise<Blob> => {
+  const PAGE = { ...PAPERS[paper], margin: MARGIN };
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
   const pdf = await PDFDocument.create();
 
@@ -382,8 +402,14 @@ export const makePdf = async (
 
 // ---------- Word ----------
 
-/** A4 in twentieths of a point, with margins of about 14 mm, as the PDF. */
-const WORD_PAGE = { width: 11906, height: 16838, margin: 800 };
+/** A4 and US Letter in twentieths of a point, with margins of about 14 mm, as the PDF. */
+const WORD_PAPERS: Readonly<
+  Record<CvPaper, { width: number; height: number }>
+> = {
+  a4: { width: 11906, height: 16838 },
+  letter: { width: 12240, height: 15840 },
+};
+const WORD_MARGIN = 800;
 /** The PDF's sizes in half-points, as Word counts them. */
 const WORD_SIZES = {
   name: 36,
@@ -393,7 +419,11 @@ const WORD_SIZES = {
   contact: 19,
 };
 
-export const makeDocx = async (blocks: CvBlock[]): Promise<Blob> => {
+export const makeDocx = async (
+  blocks: CvBlock[],
+  paper: CvPaper = 'a4',
+): Promise<Blob> => {
+  const WORD_PAGE = { ...WORD_PAPERS[paper], margin: WORD_MARGIN };
   const { AlignmentType, Document, Packer, Paragraph, TabStopType, TextRun } =
     await import('docx');
   const text = WORD_SIZES.text;

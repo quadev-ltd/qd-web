@@ -1,4 +1,4 @@
-import { briefStateOf, JobApplicationSchema } from './applications';
+import { briefStateOf, jobCountry, JobApplicationSchema } from './applications';
 
 import { applicationFixture } from '@/testUtil/applicationFixtures';
 
@@ -81,5 +81,37 @@ describe('JobApplicationSchema', () => {
       importance: 'required',
       itemIds: [],
     });
+  });
+});
+
+describe('the country of the job (D86)', () => {
+  // The cases of quadev-backend's packages/shared/src/jobApplication.test.ts (#49).
+  it('keeps a two-letter code in capitals, reads UK as GB, and drops anything else', () => {
+    expect(jobCountry(' de ')).toBe('DE');
+    expect(jobCountry('UK')).toBe('GB');
+    expect(jobCountry('US')).toBe('US');
+    for (const value of ['', 'remote', 'United Kingdom', 'GBR', undefined]) {
+      expect(jobCountry(value)).toBeUndefined();
+    }
+  });
+
+  it('is read from an application when it is a country, and absent otherwise', () => {
+    const application = {
+      id: 'a1',
+      title: 'Platform Engineer',
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 2,
+    };
+    expect(
+      JobApplicationSchema.parse({ ...application, country: 'US' }).country,
+    ).toBe('US');
+    expect(JobApplicationSchema.parse(application).country).toBeUndefined();
+    expect(
+      JobApplicationSchema.parse({ ...application, country: 'remote' }).country,
+    ).toBeUndefined();
+    expect(
+      JobApplicationSchema.parse({ ...application, country: 44 }).country,
+    ).toBeUndefined();
   });
 });

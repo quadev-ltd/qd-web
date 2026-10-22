@@ -78,10 +78,13 @@ test('a general CV: written in the background from the profile, read back, then 
     page.getByRole('region', { name: /^Questions · / }),
   ).toContainText('fake-question:');
 
-  // Read back from the backend's document after a reload, with its header from the details
+  // Read back from the backend's document after a reload, with its header from the details;
+  // a general CV is international (D86): no UK right to work
   await page.reload();
   await expect(cv).toContainText('fake-profile:');
   await expect(cv).toContainText(/fake-.*·.*fake-/);
+  await expect(page.getByText('International CV · A4')).toBeVisible();
+  await expect(cv).not.toContainText('Right to work');
 
   // removeCvVersion: gone from the backend, not only from the page
   await page.getByRole('button', { name: 'Remove this version' }).click();
@@ -258,6 +261,66 @@ test('a written CV revised (reviseCvLine), a question answered, then written aga
   await expect(
     page.getByRole('link', { name: /^Open the version of/ }),
   ).toBeVisible();
+});
+
+test('the convention chosen (D86): kept by the backend, the UK’s right to work on a UK CV only, kept when written again', async ({
+  page,
+}) => {
+  const account = await createAccount({
+    interviewAssistant: true,
+    cvTool: true,
+  });
+  await signIn(page, account);
+  await openProfile(page);
+  // Its reading fills every CV detail, the right to work too
+  await addCv(page);
+  const write = async (convention: string) => {
+    await page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'CV', exact: true })
+      .click();
+    await page
+      .getByRole('button', { name: /^(Write a general CV|New version)$/ })
+      .first()
+      .click();
+    const panel = page.getByRole('dialog', {
+      name: /^(New CV version|Write a general CV)$/,
+    });
+    const writtenAs = panel.getByRole('group', { name: 'Written as' });
+    await expect(writtenAs).toBeVisible();
+    // "New version" asks what it is for
+    if (await panel.getByText('What is it for?').isVisible()) {
+      await panel.getByRole('radio', { name: /^No job in particular/ }).check();
+    }
+    await expect(
+      writtenAs.getByRole('radio', { name: 'International' }),
+    ).toBeChecked();
+    await writtenAs.getByText(convention, { exact: true }).click();
+    await panel.getByRole('button', { name: 'Write my CV' }).click();
+    await expect(page).toHaveURL(/\/cv\/versions\/.+/);
+  };
+  const cv = page.getByRole('article', { name: 'Your CV' });
+
+  // A UK CV, chosen over a general CV's international: with the right to work
+  await write('UK CV');
+  await expect(cv).toContainText('Right to work in the UK: fake-');
+  await page.reload();
+  await expect(page.getByText('UK CV · A4')).toBeVisible();
+
+  // A US resume: without it, read back from the backend's document
+  await write('US resume');
+  await expect(cv).toContainText('fake-profile:');
+  await page.reload();
+  await expect(page.getByText('US resume · Letter')).toBeVisible();
+  await expect(cv).not.toContainText('Right to work');
+
+  // rewriteCvVersion keeps the version's convention
+  await page.getByRole('button', { name: /^Write again/ }).click();
+  await expect(
+    page.getByText(/^Written again from the version of/),
+  ).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('US resume · Letter')).toBeVisible();
 });
 
 test('a per-user daily limit (usageLimits/{uid}): the backend lets a sixth CV through with an override of 6', async ({

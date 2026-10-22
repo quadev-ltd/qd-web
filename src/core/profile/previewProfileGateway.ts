@@ -56,6 +56,7 @@ import {
   type CvVersionFailure,
   type CvVersionTarget,
   type CvWrittenVersion,
+  defaultCvConvention,
   isWrittenVersion,
   openReviews,
 } from './cvVersions';
@@ -667,6 +668,16 @@ export const createPreviewProfileGateway = ({
     };
   };
 
+  /** The country a job's text names, as job-read 1.1.0 reads it: a few places only. */
+  const countryIn = (text: string): string | undefined =>
+    /\b(London|Manchester|United Kingdom|UK)\b/.test(text)
+      ? 'GB'
+      : /\b(New York|San Francisco|United States|USA|US)\b/.test(text)
+        ? 'US'
+        : /\b(Berlin|Munich|Germany)\b/.test(text)
+          ? 'DE'
+          : undefined;
+
   /** Ends the readings whose time has come, as the backend's trigger would. */
   const settleJobs = (profile: PreviewProfile) => {
     const time = now();
@@ -700,6 +711,7 @@ export const createPreviewProfileGateway = ({
       } else if (reading.source === 'file') {
         application.jobDescription = `Read from ${reading.from}. You will design and run services in production and mentor engineers on the team.`;
       }
+      application.country ??= countryIn(application.jobDescription ?? '');
     }
     // The postings read again: a new copy replaces the job's text and dates the brief.
     const postings = dueRereads(profile.postingRereads, time);
@@ -1266,6 +1278,7 @@ export const createPreviewProfileGateway = ({
           jobDescription: entry.jobDescription,
           postingUrl: entry.postingUrl,
           notes: entry.notes,
+          country: entry.country,
           revision,
           ...(entry.brief === 'none'
             ? {}
@@ -1807,8 +1820,9 @@ export const createPreviewProfileGateway = ({
         }
       }
       let role: string | undefined;
+      let application: JobApplication | undefined;
       if (target.kind === 'job') {
-        const application = applicationsOf(profile).find(
+        application = applicationsOf(profile).find(
           ({ id }) => id === target.applicationId,
         );
         if (!application) {
@@ -1851,6 +1865,8 @@ export const createPreviewProfileGateway = ({
           ? {
               ...common,
               mode: 'write',
+              convention:
+                request.convention ?? defaultCvConvention(target, application),
               pages: request.pages ?? 2,
               notes: [],
               statements: [],
@@ -2139,6 +2155,7 @@ export const createPreviewProfileGateway = ({
         id: newId('version'),
         mode: 'write',
         target: structuredClone(version.target),
+        convention: version.convention,
         pages: version.pages,
         status: 'creating',
         notes: [],

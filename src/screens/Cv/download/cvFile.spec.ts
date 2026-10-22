@@ -5,6 +5,8 @@ import { PDFDict, PDFDocument, PDFName } from 'pdf-lib';
 import {
   cvBlocks,
   cvFileName,
+  type CvPaper,
+  cvPaper,
   makeDocx,
   makePdf,
   writtenBlocks,
@@ -203,18 +205,23 @@ describe('the layout, against the page estimate (doc 19 §3.4)', () => {
       languages: [line(3)],
     };
   };
-  const pagesOf = async (document: CvDocument) => {
-    const blob = await makePdf(
-      writtenBlocks(document, {
-        name: 'Maya Okafor',
-        headline: 'Senior Backend Engineer',
-        email: 'maya.okafor@example.com',
-        phone: '07700 900123',
-        location: 'London, UK',
-      }),
+  const pdfOf = async (document: CvDocument, paper?: CvPaper) =>
+    PDFDocument.load(
+      await bytesOf(
+        await makePdf(
+          writtenBlocks(document, {
+            name: 'Maya Okafor',
+            headline: 'Senior Backend Engineer',
+            email: 'maya.okafor@example.com',
+            phone: '07700 900123',
+            location: 'London, UK',
+          }),
+          { paper },
+        ),
+      ),
     );
-    return (await PDFDocument.load(await bytesOf(blob))).getPageCount();
-  };
+  const pagesOf = async (document: CvDocument, paper?: CvPaper) =>
+    (await pdfOf(document, paper)).getPageCount();
 
   it('downloads "about 1 page" as one page and "about 2 pages" as two', async () => {
     const one = cvOf(4);
@@ -224,6 +231,26 @@ describe('the layout, against the page estimate (doc 19 §3.4)', () => {
 
     expect(await pagesOf(one)).toBe(1);
     expect(await pagesOf(two)).toBe(2);
+  });
+
+  it('prints a US resume on US Letter, A4 otherwise, with "about 2 pages" still two', async () => {
+    const two = cvOf(9);
+    const sizeOf = async (paper?: CvPaper) =>
+      (await pdfOf(two, paper))
+        .getPages()
+        .map(page => page.getSize())
+        .map(({ width, height }) => [Math.round(width), Math.round(height)]);
+
+    expect(await sizeOf()).toEqual([
+      [595, 842],
+      [595, 842],
+    ]);
+    expect(await sizeOf(cvPaper('international'))).toEqual(await sizeOf());
+    expect(await sizeOf(cvPaper('us'))).toEqual([
+      [612, 792],
+      [612, 792],
+    ]);
+    expect(await pagesOf(cvOf(4), 'letter')).toBe(1);
   });
 });
 

@@ -85,6 +85,25 @@ describe('WrittenReview', () => {
     );
   });
 
+  it('says a UK CV is on A4 with the right to work, and leaves the UK’s right to work out of the others', () => {
+    setUp(ready());
+    expect(screen.getByText('cv.conventionTagUk')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['us', 'cv.conventionTagUs'],
+    ['international', 'cv.conventionTagInternational'],
+  ] as const)(
+    'leaves the right to work out of a %s CV, and says what it is',
+    (convention, tag) => {
+      setUp(ready({ convention }));
+
+      expect(cv()).toHaveTextContent('Maya Okafor');
+      expect(cv()).not.toHaveTextContent('Right to work');
+      expect(screen.getByText(tag)).toBeInTheDocument();
+    },
+  );
+
   it('shows a role with no title, and "Earlier career" with no organisation or dates, cleanly', () => {
     const document = writtenDocumentFixture();
     const [role] = document.experience;

@@ -196,7 +196,17 @@ describe('CvScreen', () => {
       expect(
         within(panel).getAllByRole('radio', { name: 'cv.pagesOption' })[1],
       ).toBeChecked();
-      expect(within(panel).getByText('cv.ukLine')).toBeInTheDocument();
+      // The job doesn't say its country: an international CV is suggested
+      expect(
+        within(panel).getByRole('radio', {
+          name: 'cv.conventionOptionInternational',
+        }),
+      ).toBeChecked();
+      expect(
+        within(panel).getByText(
+          'cv.conventionMeaningInternational cv.conventionSuggestedUnknown',
+        ),
+      ).toBeInTheDocument();
       expect(
         within(panel).getByText('cv.writtenFromProfile'),
       ).toBeInTheDocument();
@@ -209,6 +219,7 @@ describe('CvScreen', () => {
         mode: 'write',
         target: { kind: 'job', applicationId: 'a1' },
         pages: 2,
+        convention: 'international',
       });
       expect(gateway.getCvVersion).toHaveBeenCalledWith('uid-1', 'v9');
       expect(
@@ -240,6 +251,84 @@ describe('CvScreen', () => {
         mode: 'write',
         target: { kind: 'general', role: 'Data engineer' },
         pages: 1,
+        convention: 'international',
+      });
+    });
+
+    it('suggests the convention from the job’s country, sends the one chosen, and suggests again for another target', async () => {
+      const gateway = createMockProfileGateway();
+      setUp({
+        versions: [cvVersionFixture()],
+        applications: [
+          applicationFixture({ country: 'US' }),
+          applicationFixture({
+            id: 'a2',
+            title: 'Platform Engineer',
+            company: 'Halvorsen',
+            country: 'GB',
+          }),
+        ],
+        gateway,
+      });
+      const panel = await openPanel();
+      const option = (name: string) =>
+        within(panel).getByRole('radio', { name });
+
+      expect(option('cv.conventionOptionUs')).toBeChecked();
+      expect(
+        within(panel).getByText(
+          'cv.conventionMeaningUs cv.conventionSuggestedFor',
+        ),
+      ).toBeInTheDocument();
+
+      // Chosen instead of the suggestion: only what it means
+      await userEvent.click(option('cv.conventionOptionInternational'));
+      expect(
+        within(panel).getByText('cv.conventionMeaningInternational'),
+      ).toBeInTheDocument();
+      expect(
+        within(panel).queryByText(/cv.conventionSuggested/),
+      ).not.toBeInTheDocument();
+
+      // Another job: its own suggestion, and back again: the suggestion again
+      await userEvent.click(
+        within(panel).getByRole('radio', { name: /Platform Engineer/ }),
+      );
+      expect(option('cv.conventionOptionUk')).toBeChecked();
+      await userEvent.click(
+        within(panel).getByRole('radio', { name: /Senior Backend Engineer/ }),
+      );
+      expect(option('cv.conventionOptionUs')).toBeChecked();
+      await userEvent.click(
+        within(panel).getByRole('radio', { name: /Platform Engineer/ }),
+      );
+      // A general CV: international
+      await userEvent.click(
+        within(panel).getByRole('radio', { name: /cv.forGeneral/ }),
+      );
+      expect(option('cv.conventionOptionInternational')).toBeChecked();
+      expect(
+        within(panel).getByText(
+          'cv.conventionMeaningInternational cv.conventionSuggestedGeneral',
+        ),
+      ).toBeInTheDocument();
+
+      await userEvent.click(
+        within(panel).getByRole('radio', { name: /cv.forJob/ }),
+      );
+      await userEvent.click(
+        within(panel).getByRole('radio', { name: /Platform Engineer/ }),
+      );
+      await userEvent.click(option('cv.conventionOptionUs'));
+      await userEvent.click(
+        within(panel).getByRole('button', { name: 'cv.createButton' }),
+      );
+
+      expect(gateway.createCvVersion).toHaveBeenCalledExactlyOnceWith({
+        mode: 'write',
+        target: { kind: 'job', applicationId: 'a2' },
+        pages: 2,
+        convention: 'us',
       });
     });
 

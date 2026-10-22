@@ -87,7 +87,11 @@ const useTryAgain = (version: CvVersion | undefined) => {
       const { versionId } = await gateway.createCvVersion({
         mode: 'write',
         target: version.target,
-        pages: isWrittenVersion(version) ? version.pages : 2,
+        // A written version tried again keeps its length and convention; an old edit version
+        // is written in the one its job suggests.
+        ...(isWrittenVersion(version)
+          ? { pages: version.pages, convention: version.convention }
+          : { pages: 2 as const }),
       });
       // The failed one keeps nothing: it goes, so the list has the new one only.
       await gateway.removeCvVersion(version.id).catch(() => undefined);
