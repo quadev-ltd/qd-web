@@ -91,8 +91,27 @@ test('sign up with an email that already has an account shows the error on the e
   await page.getByLabel('Email').fill(SAMPLE_USER.email);
   await page.getByLabel(/Date of birth/).fill('10121815');
   await expect(page.getByLabel(/Date of birth/)).toHaveValue('10/12/1815');
-  await page.getByLabel('Password', { exact: true }).fill(SAMPLE_USER.password);
-  await page.getByLabel('Confirm password').fill(SAMPLE_USER.password);
+  const password = page.getByLabel('Password', { exact: true });
+  const confirmation = page.getByLabel('Confirm password');
+  await password.fill(SAMPLE_USER.password);
+  await confirmation.fill(SAMPLE_USER.password);
+
+  // Each Show button shows only its own field
+  await page
+    .getByRole('button', { name: 'Show password', exact: true })
+    .click();
+  await expect(password).toHaveAttribute('type', 'text');
+  await expect(confirmation).toHaveAttribute('type', 'password');
+  await page
+    .getByRole('button', { name: 'Show password confirmation' })
+    .click();
+  await expect(confirmation).toHaveAttribute('type', 'text');
+  await page
+    .getByRole('button', { name: 'Hide password', exact: true })
+    .click();
+  await expect(password).toHaveAttribute('type', 'password');
+  await expect(confirmation).toHaveAttribute('type', 'text');
+
   await page.getByRole('checkbox', { name: /I agree to the/ }).check();
   await page.getByRole('button', { name: 'Sign up', exact: true }).click();
 

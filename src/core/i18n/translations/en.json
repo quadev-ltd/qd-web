@@ -931,6 +931,8 @@
   "password": {
     "hideAccessibilityLabel": "Hide password",
     "showAccessibilityLabel": "Show password",
+    "hideConfirmationAccessibilityLabel": "Hide password confirmation",
+    "showConfirmationAccessibilityLabel": "Show password confirmation",
     "showButton": "Show",
     "hideButton": "Hide"
   },

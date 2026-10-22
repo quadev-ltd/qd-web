@@ -32,4 +32,34 @@ describe('PasswordVisibilityToggle', () => {
       screen.getByRole('button', { name: 'password.hideAccessibilityLabel' }),
     ).toHaveTextContent('password.hideButton');
   });
+
+  it('names the confirmation field’s button apart from the password’s', () => {
+    const { rerender } = render(
+      <PasswordVisibilityToggle
+        isPasswordVisible={false}
+        onToggle={vi.fn()}
+        confirmation
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', {
+        name: 'password.showConfirmationAccessibilityLabel',
+      }),
+    ).toHaveTextContent('password.showButton');
+
+    rerender(
+      <PasswordVisibilityToggle
+        isPasswordVisible
+        onToggle={vi.fn()}
+        confirmation
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', {
+        name: 'password.hideConfirmationAccessibilityLabel',
+      }),
+    ).toHaveTextContent('password.hideButton');
+  });
 });

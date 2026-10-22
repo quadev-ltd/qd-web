@@ -1,6 +1,7 @@
 // The web version of qd-mobile src/components/HookFormInputs/HookFormPasswordInput.tsx: the
-// same show/hide control (one state for the password and its confirmation), the same live
-// hints for the rules that are not met yet, and the optional "Forgot password?" action.
+// same show/hide control, the same live hints for the rules that are not met yet, and the
+// optional "Forgot password?" action. Unlike the app, the password and its confirmation are
+// shown and hidden each on its own: each button shows only its field.
 import { useState } from 'react';
 import {
   type Control,
@@ -61,6 +62,7 @@ export const HookFormPasswordInput = <TFormSchema extends FieldValues>({
   passwordConfirmationField,
 }: HookFormPasswordInputProps<TFormSchema>) => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isConfirmationVisible, setIsConfirmationVisible] = useState(false);
   const { t } = useTranslation();
   const validations: PasswordValidityAttributes =
     usePasswordValidation(password);
@@ -83,14 +85,10 @@ export const HookFormPasswordInput = <TFormSchema extends FieldValues>({
       }
     });
   const { isValid } = validations;
-  const togglePasswordVisibility = () => {
-    setIsPasswordVisible(!isPasswordVisible);
-  };
-
   const visibilityToggle = (
     <PasswordVisibilityToggle
       isPasswordVisible={isPasswordVisible}
-      onToggle={togglePasswordVisibility}
+      onToggle={() => setIsPasswordVisible(visible => !visible)}
     />
   );
 
@@ -130,9 +128,15 @@ export const HookFormPasswordInput = <TFormSchema extends FieldValues>({
           name={passwordConfirmationField.name}
           control={control}
           error={passwordConfirmationField.error}
-          type={isPasswordVisible ? 'text' : 'password'}
+          type={isConfirmationVisible ? 'text' : 'password'}
           autoComplete={autoComplete}
-          trailing={visibilityToggle}
+          trailing={
+            <PasswordVisibilityToggle
+              isPasswordVisible={isConfirmationVisible}
+              onToggle={() => setIsConfirmationVisible(visible => !visible)}
+              confirmation
+            />
+          }
         />
       )}
     </>
