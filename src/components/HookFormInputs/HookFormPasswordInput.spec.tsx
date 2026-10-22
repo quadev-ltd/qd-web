@@ -206,29 +206,39 @@ describe('HookFormPasswordInput', () => {
     ).toHaveAttribute('type', 'button');
   });
 
-  it('shows and hides the confirmation together with the password', async () => {
+  it('shows and hides the password and the confirmation each on its own', async () => {
     renderWithProviders(<TestComponent withConfirmation />);
     const password = screen.getByLabelText('password');
     const confirmation = screen.getByLabelText('confirmation');
     expect(confirmation).toHaveAttribute('type', 'password');
-    const showButtons = screen.getAllByRole('button', {
-      name: 'password.showAccessibilityLabel',
-    });
-    expect(showButtons).toHaveLength(2);
 
-    await userEvent.click(showButtons[1]);
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'password.showConfirmationAccessibilityLabel',
+      }),
+    );
+
+    expect(confirmation).toHaveAttribute('type', 'text');
+    expect(password).toHaveAttribute('type', 'password');
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'password.showAccessibilityLabel' }),
+    );
 
     expect(password).toHaveAttribute('type', 'text');
     expect(confirmation).toHaveAttribute('type', 'text');
 
     await userEvent.click(
-      screen.getAllByRole('button', {
-        name: 'password.hideAccessibilityLabel',
-      })[0],
+      screen.getByRole('button', {
+        name: 'password.hideConfirmationAccessibilityLabel',
+      }),
     );
 
-    expect(password).toHaveAttribute('type', 'password');
     expect(confirmation).toHaveAttribute('type', 'password');
+    expect(password).toHaveAttribute('type', 'text');
+    expect(
+      screen.getByRole('button', { name: 'password.hideAccessibilityLabel' }),
+    ).toBeInTheDocument();
   });
 
   it('keeps what is typed in each field', async () => {
