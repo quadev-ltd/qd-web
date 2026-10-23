@@ -49,8 +49,11 @@ test('E4: a pasted job is read and named, shown on its page and the home, edited
     'Northwind Logistics',
   );
 
-  // On the home, with no brief yet
-  await page.getByRole('link', { name: 'Home', exact: true }).last().click();
+  // In Applications, with no brief yet: the application's back link leads there (D85)
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: 'Applications', exact: true })
+    .click();
   const card = page.getByRole('listitem').filter({ hasText: FAKE_NAME });
   await expect(card).toContainText('No brief yet');
 
@@ -62,7 +65,7 @@ test('E4: a pasted job is read and named, shown on its page and the home, edited
     .getByRole('dialog', { name: 'Remove this application?' })
     .getByRole('button', { name: 'Remove the application' })
     .click();
-  await expect(page).toHaveURL('/home');
+  await expect(page).toHaveURL('/applications');
   await page.reload();
   await expect(
     page.getByRole('heading', { name: 'What do you want to do?' }),

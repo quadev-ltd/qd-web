@@ -107,14 +107,28 @@ test('email account: sign up, verify, complete the profile, home, sign out, sign
   await expect(
     page.getByRole('heading', { level: 1, name: 'Welcome back, Grace' }),
   ).toBeVisible();
-  const account = page.getByRole('region', { name: 'Your account' });
-  await expect(account).toContainText('Grace Hopper');
-  await expect(account).toContainText(email);
-  await expect(account).toContainText('09/12/1906');
-  await expect(account).toContainText('Email and password');
-  // The feature flags are off by default: every tool is "Coming soon"
+  // The feature flags are off by default: every tool is "Coming soon", and the bar is
+  // Home · Profile. The account is behind the name, on its own page (D85).
   await expect(page.getByRole('article')).toHaveCount(3);
   await expect(page.getByText('Coming soon')).toHaveCount(3);
+  await expect(
+    page.getByRole('navigation', { name: 'Main' }).getByRole('link'),
+  ).toHaveText(['Home', 'Profile']);
+  await expect(page.getByText('Sign-in and security')).toHaveCount(0);
+  await page.getByRole('button', { name: /Account menu for/ }).click();
+  await page.getByRole('menuitem', { name: 'Account' }).click();
+  await expect(page).toHaveURL('/account');
+  const personal = page.getByRole('region', { name: 'Personal details' });
+  await expect(personal).toContainText('Grace Hopper');
+  await expect(personal).toContainText(email);
+  await expect(personal).toContainText('09/12/1906');
+  // No CV tool, so nothing about the CV's details
+  await expect(personal).not.toContainText('CVs');
+  await expect(
+    page.getByRole('region', { name: 'Sign-in and security' }),
+  ).toContainText('Email and password');
+  await page.getByRole('link', { name: 'QUADEV', exact: true }).click();
+  await expect(page).toHaveURL('/home');
 
   // The two steps are behind: their pages lead back home
   await page.goto('/verify-email');
@@ -162,7 +176,9 @@ test('email account: sign up, verify, complete the profile, home, sign out, sign
     page.getByRole('heading', { level: 1, name: 'Welcome back, Grace' }),
   ).toBeVisible();
 
-  // Delete account: the question first, and Cancel leads back
+  // Delete account, from the account page: the question first, and Cancel leads back
+  await page.getByRole('button', { name: /Account menu for/ }).click();
+  await page.getByRole('menuitem', { name: 'Account' }).click();
   await page.getByRole('link', { name: 'Delete account' }).click();
   await expect(page).toHaveURL('/account/delete');
   await expect(
@@ -172,7 +188,7 @@ test('email account: sign up, verify, complete the profile, home, sign out, sign
     'Deleting your account will permanently erase all your data',
   );
   await page.getByRole('link', { name: 'Cancel' }).click();
-  await expect(page).toHaveURL('/home');
+  await expect(page).toHaveURL('/account');
   await page.getByRole('link', { name: 'Delete account' }).click();
 
   // The password is asked for, and a wrong one is refused
@@ -283,7 +299,7 @@ test('delete account with Google: no password, the confirmation on the public ho
   // The sample account has Google among its sign-in methods: it confirms with Google (the
   // preview has no Google window) and, being built in, is only signed out.
   await signIn(page);
-  await expect(page).toHaveURL('/home');
+  await expect(page).toHaveURL('/applications');
   await page.goto('/account/delete');
   await expect(
     page.getByRole('heading', { level: 1, name: 'Are you sure?' }),
@@ -297,5 +313,5 @@ test('delete account with Google: no password, the confirmation on the public ho
   await expect(page).toHaveURL('/sign-in');
   // (the sample account can still sign in: the other tests need it)
   await signIn(page, SAMPLE_USER.email, SAMPLE_USER.password);
-  await expect(page).toHaveURL('/home');
+  await expect(page).toHaveURL('/applications');
 });

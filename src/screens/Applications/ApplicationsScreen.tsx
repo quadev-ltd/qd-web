@@ -1,13 +1,17 @@
-// The home of an account with the interview tools (D58, delivery 2a): while it has no
-// application, "Add your CV" and the three paths; then "Your applications", with each one's
-// brief and "Your profile" beside them. Practice is not built yet; the CV tool has its own flag.
+// Applications (D58, D85, delivery 2a): where an account with the interview tools lands after
+// signing in. While it has no application, "Welcome", "Add your CV" and the three paths; then
+// "Your applications", with each one's brief and "Your profile" beside them. Practice is not
+// built yet; the CV tool has its own flag. The profile's and the applications' routes
+// (ProfileRoutes, ApplicationRoutes) give it the flag, the gateway, the profile and the list.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 
+import NewApplicationPanel from './NewApplicationPanel';
 import { StartCardContent } from './StartCard';
 
 import Icon, { type IconName } from '@/components/Icon';
+import SignedInShell from '@/components/layout/SignedInShell';
 import Spinner from '@/components/Spinner';
 import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
@@ -22,17 +26,15 @@ import {
   jobStatusOf,
 } from '@/core/profile/applications';
 import {
-  ApplicationsProvider,
   useApplications,
   useApplicationsActions,
 } from '@/core/profile/ApplicationsProvider';
-import {
-  InterviewProfileProvider,
-  useInterviewProfile,
-} from '@/core/profile/InterviewProfileProvider';
+import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
 import { applicationPath, CV_PATH, PROFILE_PATH } from '@/core/profile/paths';
-import { ProfileGatewayProvider } from '@/core/profile/ProfileGatewayProvider';
-import NewApplicationPanel from '@/screens/Applications/NewApplicationPanel';
+import { useProfile } from '@/core/session/hooks';
+import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
+
+const TITLE = 'font-display text-[28px] leading-tight font-semibold';
 
 interface PathCardProps {
   icon: IconName;
@@ -145,14 +147,14 @@ const ApplicationCard: React.FC<{
     <Card as="article" elevation="raised" className="relative gap-3 p-4">
       <div className="flex items-start gap-3">
         <div className="flex min-w-0 flex-1 flex-col">
-          <h3 className="text-[17px] leading-normal font-bold wrap-anywhere">
+          <h2 className="text-[17px] leading-normal font-bold wrap-anywhere">
             {/* The whole card opens the application. */}
             <Link
               to={applicationPath(application.id)}
               className="text-text no-underline after:absolute after:inset-0 after:rounded-card hover:text-text hover:underline">
               {application.title || t('applications.untitled')}
             </Link>
-          </h3>
+          </h2>
           {application.company && (
             <p className="text-[15px] leading-normal text-muted wrap-anywhere">
               {application.company}
@@ -199,8 +201,9 @@ const ProfileCard: React.FC = () => {
   );
 };
 
-const Content: React.FC = () => {
+export const ApplicationsScreen: React.FC = () => {
   const { t } = useTranslation();
+  const firstName = useProfile()?.firstName ?? '';
   const { status, applications, profileRevision } = useApplications();
   const { reload } = useApplicationsActions();
   const [adding, setAdding] = useState(false);
@@ -209,23 +212,38 @@ const Content: React.FC = () => {
   // The CV tool has its own flag (delivery 2b): without it, its path is "Coming soon".
   const cvTool = useFlag('cvTool');
 
-  let body: React.ReactNode = null;
+  const listTitle = (
+    <h1 className={`flex-1 ${TITLE}`}>{t('home.applicationsTitle')}</h1>
+  );
+
+  let body: React.ReactNode;
   if (status === 'error') {
     body = (
-      <Banner
-        tone="danger"
-        role="alert"
-        action={
-          <Button variant="quiet" size="small" onClick={reload}>
-            {t('applications.retryButton')}
-          </Button>
-        }>
-        {t('applications.loadErrorMessage')}
-      </Banner>
+      <>
+        {listTitle}
+        <Banner
+          tone="danger"
+          role="alert"
+          action={
+            <Button variant="quiet" size="small" onClick={reload}>
+              {t('applications.retryButton')}
+            </Button>
+          }>
+          {t('applications.loadErrorMessage')}
+        </Banner>
+      </>
     );
   } else if (status === 'loaded' && applications.length === 0) {
     body = (
       <>
+        <div className="flex flex-col gap-1">
+          <h1 className={TITLE}>
+            {t('applications.welcomeTitle', { firstName })}
+          </h1>
+          <p className="text-[16px] leading-normal text-muted">
+            {t('applications.welcomeDescription')}
+          </p>
+        </div>
         <StartCardContent />
         <section aria-labelledby="home-paths" className="flex flex-col gap-4">
           <h2
@@ -257,15 +275,9 @@ const Content: React.FC = () => {
     );
   } else if (status === 'loaded') {
     body = (
-      <section
-        aria-labelledby="home-applications"
-        className="flex flex-col gap-5">
+      <>
         <div className="flex flex-wrap items-center gap-4">
-          <h2
-            id="home-applications"
-            className="flex-1 font-display text-[clamp(24px,4vw,30px)] leading-tight font-semibold">
-            {t('home.applicationsTitle')}
-          </h2>
+          {listTitle}
           <Button
             onClick={() => setAdding(true)}
             disabled={full}
@@ -294,30 +306,24 @@ const Content: React.FC = () => {
             <ProfileCard />
           </div>
         </div>
-      </section>
+      </>
+    );
+  } else {
+    body = (
+      <div className="flex justify-center py-16 text-primary">
+        <Spinner />
+      </div>
     );
   }
 
   return (
-    <>
-      {body}
+    <SignedInShell
+      title={t('applications.listDocumentTitle')}
+      mainClassName={PROFILE_MAIN}>
+      <div className="mx-auto flex max-w-[1120px] flex-col gap-6">{body}</div>
       {adding && <NewApplicationPanel onClose={() => setAdding(false)} />}
-    </>
+    </SignedInShell>
   );
 };
 
-/**
- * Reads the profile and the applications: render it only for an account with the
- * interview tools on. What it reads stays in the store for the profile and application pages.
- */
-export const InterviewHome: React.FC = () => (
-  <ProfileGatewayProvider>
-    <InterviewProfileProvider>
-      <ApplicationsProvider>
-        <Content />
-      </ApplicationsProvider>
-    </InterviewProfileProvider>
-  </ProfileGatewayProvider>
-);
-
-export default InterviewHome;
+export default ApplicationsScreen;

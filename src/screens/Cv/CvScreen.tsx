@@ -1,10 +1,12 @@
 // The CV section (C1, D69, D75, D83, doc 13 §20.4): with nothing in the profile, "Add to your
 // profile first"; with no version yet, the two ways in ("Write a CV for a job", "Write a general
 // CV"); then the versions, by application ("For a job") and "General", with one "New version".
-// The CV's details ("At the top of every CV") are on both.
+// The CV's details ("At the top of every CV") are on both. At /cv/details, where the account
+// page leads (D85), "Your CV details" opens over the page once it is read; closed, the address
+// is /cv again.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router';
+import { Link, useMatch, useNavigate } from 'react-router';
 
 import { applicationOf, generalTitle, versionDay, versionMeta } from './cvMeta';
 import CvDetailsCard from './details/CvDetailsCard';
@@ -33,6 +35,8 @@ import {
 import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
 import {
   applicationPath,
+  CV_DETAILS_PATH,
+  CV_PATH,
   cvVersionPath,
   PROFILE_PATH,
 } from '@/core/profile/paths';
@@ -172,11 +176,12 @@ export const CvScreen: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const profile = useInterviewProfile();
-  const { status, versions } = useCvVersions();
+  const { status, versions, detailsStatus } = useCvVersions();
   const { reload } = useCvVersionsActions();
   const { applications } = useApplications();
   const [panel, setPanel] = useState<Panel>();
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const atDetails = useMatch(CV_DETAILS_PATH) !== null;
   const detailsCard = <CvDetailsCard onEdit={() => setDetailsOpen(true)} />;
 
   const empty = profile.resources.length === 0;
@@ -421,7 +426,20 @@ export const CvScreen: React.FC = () => {
           onClose={() => setPanel(undefined)}
         />
       )}
-      {detailsOpen && <CvDetailsPanel onClose={() => setDetailsOpen(false)} />}
+      {/* The form is filled once, from the details and the profile: it waits for both. */}
+      {(detailsOpen ||
+        (atDetails &&
+          profile.status === 'loaded' &&
+          detailsStatus === 'loaded')) && (
+        <CvDetailsPanel
+          onClose={() => {
+            setDetailsOpen(false);
+            if (atDetails) {
+              navigate(CV_PATH, { replace: true });
+            }
+          }}
+        />
+      )}
     </SignedInShell>
   );
 };

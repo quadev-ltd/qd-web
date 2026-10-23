@@ -318,12 +318,15 @@ test('open a failed resource, read why, and remove it in the dialog: it is gone 
   ).toBeVisible();
 });
 
-test('the home starts with "Add your CV", and leads to it once it is in the profile', async ({
+test('Applications starts with "Add your CV", and leads to it once it is in the profile', async ({
   page,
 }) => {
-  // The sample account has the interview tools on.
+  // The sample account has the interview tools on: it lands on its applications (D85).
   await signIn(page);
-  await expect(page).toHaveURL('/home');
+  await expect(page).toHaveURL('/applications');
+  await expect(
+    page.getByText('Your applications will show here. Start with your CV.'),
+  ).toBeVisible();
   await expect(page.getByText('Start here')).toBeVisible();
   await expect(
     page.getByText(
@@ -355,12 +358,12 @@ test('the home starts with "Add your CV", and leads to it once it is in the prof
   ).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
-  // Back on the home: the invitation became one line that leads to the CV's page
+  // Back in Applications: the invitation became one line that leads to the CV's page
   await page
     .getByRole('navigation', { name: 'Main' })
-    .getByRole('link', { name: 'Home' })
+    .getByRole('link', { name: 'Applications' })
     .click();
-  await expect(page).toHaveURL('/home');
+  await expect(page).toHaveURL('/applications');
   const done = page.getByRole('link', { name: /Your CV is in your profile/ });
   await expect(done).toContainText('maya-okafor-cv');
   await expect(page.getByText('Start here')).toHaveCount(0);
@@ -371,20 +374,24 @@ test('the home starts with "Add your CV", and leads to it once it is in the prof
   ).toBeVisible();
 });
 
-test('an account without the interview tools has the home as before: no starting card', async ({
+test('an account without the interview tools has the home as before: no starting card, and Applications leads there', async ({
   page,
 }) => {
   await signIn(page);
   await page.evaluate(() =>
     window.qdPreview?.setFlag('interviewAssistant', false),
   );
-  await page.reload();
+  await page.goto('/applications');
 
+  await expect(page).toHaveURL('/home');
   await expect(
     page.getByRole('heading', { level: 1, name: /Welcome back/ }),
   ).toBeVisible();
   await expect(page.getByText('Coming soon')).toHaveCount(3);
   await expect(page.getByText('Start here')).toHaveCount(0);
+  await expect(
+    page.getByRole('navigation', { name: 'Main' }).getByRole('link'),
+  ).toHaveText(['Home', 'Profile']);
 });
 
 test('the text kept of a resource: a note as added, a file’s text without its layout, "Show all"', async ({

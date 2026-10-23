@@ -1,23 +1,16 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { InterviewHome } from './InterviewHome';
+import { ApplicationsScreen } from './ApplicationsScreen';
 
-import { selectProfileGateway } from '@/core/profile/selectProfileGateway';
 import { type ApplicationsState } from '@/core/state/slices/applicationsSlice';
 import { type InterviewProfileState } from '@/core/state/slices/interviewProfileSlice';
-import { SessionStatus } from '@/core/state/slices/sessionSlice';
 import { applicationFixture } from '@/testUtil/applicationFixtures';
-import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
 import { resourceFixture } from '@/testUtil/profileFixtures';
-import { PROFILE_TEST_USER } from '@/testUtil/renderProfilePage';
-import { renderWithProviders } from '@/testUtil/renderWithProviders';
+import { renderProfilePage } from '@/testUtil/renderProfilePage';
 
 vi.mock('@/core/logger', () => ({
   default: vi.fn(() => ({ logError: vi.fn(), logMessage: vi.fn() })),
-}));
-vi.mock('@/core/profile/selectProfileGateway', () => ({
-  selectProfileGateway: vi.fn(),
 }));
 
 const brief = (gaps: number, applicationRevision = 1, profileRevision = 3) => ({
@@ -38,17 +31,15 @@ const setUp = ({
 }: {
   applications?: Partial<ApplicationsState>;
   interviewProfile?: Partial<InterviewProfileState>;
-} = {}) => {
-  const gateway = createMockProfileGateway();
-  vi.mocked(selectProfileGateway).mockReturnValue(gateway);
-  const utils = renderWithProviders(<InterviewHome />, {
-    route: '/home',
+} = {}) =>
+  renderProfilePage(<ApplicationsScreen />, {
+    route: '/applications',
     applications,
     interviewProfile,
-    session: { status: SessionStatus.Ready, user: PROFILE_TEST_USER },
   });
-  return { gateway, ...utils };
-};
+
+/** The cards of the page, not the footer's links. */
+const items = () => within(screen.getByRole('main')).getAllByRole('listitem');
 
 const loaded = (
   overrides: Partial<ApplicationsState> = {},
@@ -59,24 +50,43 @@ const loaded = (
   ...overrides,
 });
 
-beforeEach(() => {
-  vi.mocked(selectProfileGateway).mockReset();
-});
-
-describe('InterviewHome', () => {
-  it('reads the applications when nothing has read them yet', async () => {
+describe('ApplicationsScreen', () => {
+  it('reads the applications when nothing has read them yet, and waits for them', async () => {
     const { gateway } = setUp();
 
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
     expect(
       await screen.findByRole('heading', { name: 'home.pathsTitle' }),
     ).toBeInTheDocument();
     expect(gateway.getApplications).toHaveBeenCalledExactlyOnceWith('uid-1');
   });
 
+  it('is Applications in the bar and in the tab, with no banner (D85)', () => {
+    setUp({ applications: loaded() });
+
+    expect(document.title).toBe('applications.listDocumentTitle');
+    expect(
+      screen.getByRole('link', { name: 'applications.title' }),
+    ).toHaveAttribute('aria-current', 'page');
+    expect(
+      screen.queryByText('home.welcomeDescription'),
+    ).not.toBeInTheDocument();
+  });
+
   describe('with no application yet', () => {
-    it('starts with "Add your CV", then the three paths', () => {
+    it('welcomes the new account, then "Add your CV" and the three paths', () => {
       setUp({ applications: loaded() });
 
+      expect(
+        screen.getByRole('heading', {
+          level: 1,
+          name: 'applications.welcomeTitle',
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('applications.welcomeDescription'),
+      ).toBeInTheDocument();
       expect(screen.getByText('home.startTitle')).toBeInTheDocument();
       const paths = screen.getByRole('region', { name: 'home.pathsTitle' });
       expect(
@@ -128,9 +138,15 @@ describe('InterviewHome', () => {
       setUp({ applications: loaded({ applications }) });
 
       expect(
-        screen.getByRole('heading', { name: 'home.applicationsTitle' }),
+        screen.getByRole('heading', {
+          level: 1,
+          name: 'home.applicationsTitle',
+        }),
       ).toBeInTheDocument();
-      const cards = screen.getAllByRole('listitem');
+      expect(
+        screen.queryByRole('heading', { name: 'applications.welcomeTitle' }),
+      ).not.toBeInTheDocument();
+      const cards = items();
       expect(cards).toHaveLength(3);
       expect(cards[0]).toHaveTextContent('home.briefReadyChip');
       expect(cards[0]).toHaveTextContent('home.briefGapsChip');
@@ -170,7 +186,7 @@ describe('InterviewHome', () => {
         }),
       });
 
-      const cards = screen.getAllByRole('listitem');
+      const cards = items();
       expect(cards[0]).toHaveTextContent('applications.untitled');
       expect(cards[0]).toHaveTextContent('home.readingChip');
       expect(cards[1]).toHaveTextContent('home.unreadableChip');
@@ -184,9 +200,7 @@ describe('InterviewHome', () => {
         }),
       });
 
-      expect(screen.getByRole('listitem')).toHaveTextContent(
-        'home.briefOutOfDateChip',
-      );
+      expect(items()[0]).toHaveTextContent('home.briefOutOfDateChip');
     });
 
     it('shows "Your profile" beside them, with how many resources it has', () => {
@@ -241,6 +255,10 @@ describe('InterviewHome', () => {
 
   it('says the applications could not be loaded, and reads them again on "Try again"', async () => {
     const { gateway } = setUp({ applications: loaded({ status: 'error' }) });
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'home.applicationsTitle' }),
+    ).toBeInTheDocument();
 
     await userEvent.click(
       within(screen.getByRole('alert')).getByRole('button', {

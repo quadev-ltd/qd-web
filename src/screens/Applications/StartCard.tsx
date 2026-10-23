@@ -1,6 +1,6 @@
-// The starting point of the home for an account with the interview tools (D58): "Add your
-// CV", which everything else builds on; once a CV is in the profile, one line that says so
-// and leads to it.
+// The starting point of the applications page while it has none (D58, D85): "Add your CV",
+// which everything else builds on; once a CV is in the profile, one line that says so and
+// leads to it.
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 

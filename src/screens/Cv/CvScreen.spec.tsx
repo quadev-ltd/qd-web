@@ -44,7 +44,9 @@ const setUp = ({
   madeToday = 1,
   limits = null,
   gateway = createMockProfileGateway(),
+  route,
 }: {
+  route?: string;
   resources?: ReturnType<typeof resourceFixture>[];
   versions?: CvVersion[];
   applications?: ReturnType<typeof applicationFixture>[];
@@ -55,9 +57,11 @@ const setUp = ({
   renderCvPage(
     <Routes>
       <Route path="/cv" element={<CvScreen />} />
+      <Route path="/cv/details" element={<CvScreen />} />
       <Route path="*" element={<Location />} />
     </Routes>,
     {
+      ...(route ? { route } : {}),
       gateway,
       interviewProfile: { uid: 'uid-1', status: 'loaded', resources },
       applications: { uid: 'uid-1', status: 'loaded', applications },
@@ -447,6 +451,30 @@ describe('CvScreen', () => {
       );
       expect(
         screen.getByRole('dialog', { name: 'cv.detailsTitle' }),
+      ).toBeInTheDocument();
+    });
+
+    it('open by themselves at their own address, the account page’s link, and leave it when closed (D85)', async () => {
+      const gateway = createMockProfileGateway();
+      gateway.getCvDetails.mockResolvedValue(cvDetailsFixture());
+      setUp({ gateway, route: '/cv/details' });
+
+      const panel = await screen.findByRole('dialog', {
+        name: 'cv.detailsTitle',
+      });
+      // Filled from the details once they are read.
+      expect(
+        within(panel).getByDisplayValue('Maya Okafor'),
+      ).toBeInTheDocument();
+      await userEvent.click(
+        within(panel).getByRole('button', {
+          name: 'sidePanel.closeAccessibilityLabel',
+        }),
+      );
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'cv.title' }),
       ).toBeInTheDocument();
     });
 

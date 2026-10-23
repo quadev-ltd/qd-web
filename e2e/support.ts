@@ -127,10 +127,10 @@ export const expectInsideViewport = async (page: Page, locator: Locator) => {
 
 // Job applications (delivery 2a), with the same preview gateway.
 
-/** Signs in as the sample account and waits for its home, which lists applications. */
-export const openHome = async (page: Page) => {
+/** Signs in as the sample account and waits for where it lands: its applications (D85). */
+export const openApplications = async (page: Page) => {
   await signIn(page);
-  await expect(page).toHaveURL('/home');
+  await expect(page).toHaveURL('/applications');
   await expect(
     page.getByRole('heading', { name: 'What do you want to do?' }),
   ).toBeVisible();
@@ -138,10 +138,10 @@ export const openHome = async (page: Page) => {
 
 /**
  * The profile and the three applications of the designs: a brief with two gaps, one the job
- * changed since, none yet. The home reads them again.
+ * changed since, none yet. The applications page reads them again.
  */
 export const seedApplications = async (page: Page) => {
-  // The controls come with the home's gateway, which is loaded on demand.
+  // The controls come with the profile's gateway, which is loaded on demand.
   await page.waitForFunction(() => Boolean(window.qdPreviewProfile));
   await page.evaluate(() => {
     window.qdPreviewProfile?.seed();

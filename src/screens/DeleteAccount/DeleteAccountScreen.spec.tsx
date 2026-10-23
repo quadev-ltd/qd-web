@@ -69,7 +69,7 @@ describe('DeleteAccountScreen', () => {
     expect(deleteButton()).toHaveAttribute('type', 'submit');
     expect(
       screen.getByRole('link', { name: 'deleteAccount.cancelButton' }),
-    ).toHaveAttribute('href', '/home');
+    ).toHaveAttribute('href', '/account');
     expect(
       screen.queryByLabelText('deleteAccount.passwordLabel'),
     ).not.toBeInTheDocument();
@@ -155,7 +155,7 @@ describe('DeleteAccountScreen', () => {
       expect(deleteButton()).toBeDisabled();
       expect(
         screen.getByRole('link', { name: 'deleteAccount.cancelButton' }),
-      ).toHaveAttribute('href', '/home');
+      ).toHaveAttribute('href', '/account');
 
       await userEvent.type(passwordField(), 'Passw0rd!e2e');
       expect(deleteButton()).toBeEnabled();
@@ -363,7 +363,7 @@ describe('DeleteAccountScreen', () => {
       ).toHaveAttribute('href', 'mailto:support@quadev.net');
       expect(
         screen.getByRole('link', { name: 'forgotPassword.backToHomeLink' }),
-      ).toHaveAttribute('href', '/home');
+      ).toHaveAttribute('href', '/account');
       expect(
         screen.queryByRole('button', { name: 'deleteAccount.deleteButton' }),
       ).not.toBeInTheDocument();

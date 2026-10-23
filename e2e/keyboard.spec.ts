@@ -64,7 +64,7 @@ test('the sign-in form can be filled and sent with the keyboard only', async ({
   await page.keyboard.type('Preview123!');
   await page.keyboard.press('Enter');
 
-  await expect(page).toHaveURL('/home');
+  await expect(page).toHaveURL('/applications');
 });
 
 test('the account menu works with the keyboard', async ({ page }) => {
@@ -73,17 +73,19 @@ test('the account menu works with the keyboard', async ({ page }) => {
   await expect(menuButton).toBeVisible();
   await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
 
-  // Enter opens the menu and moves the focus to the first item
+  // Enter opens the menu and moves the focus to the first item: the name and email above it
+  // are not items (D85)
   await menuButton.focus();
   await page.keyboard.press('Enter');
   await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.getByRole('menuitem', { name: 'Home' })).toBeFocused();
-
-  // The arrow keys move between the items
-  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menuitem')).toHaveText(['Account', 'Sign out']);
   await expect(page.getByRole('menuitem', { name: 'Account' })).toBeFocused();
+
+  // The arrow keys move between the two items, round and round
   await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menuitem', { name: 'Account' })).toBeFocused();
 
   // Escape closes it and returns the focus to the button
   await page.keyboard.press('Escape');
@@ -91,11 +93,10 @@ test('the account menu works with the keyboard', async ({ page }) => {
   await expect(menuButton).toBeFocused();
   await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
 
-  // "Account" leads to the account section
-  await page.keyboard.press('ArrowDown');
+  // "Account" leads to its own page
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL('/home#account');
+  await expect(page).toHaveURL('/account');
   await expect(page.getByRole('menu')).toBeHidden();
 
   // Sign out with the keyboard (ArrowUp opens the menu at its last item)

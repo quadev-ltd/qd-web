@@ -14,7 +14,7 @@ import ErrorMessage from '@/components/SignIn/ErrorMessage';
 import Spinner from '@/components/Spinner';
 import Button from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/ButtonLink';
-import { HOME_PATH } from '@/core/auth/paths';
+import { ACCOUNT_PATH } from '@/core/auth/paths';
 
 const TEXT = 'text-base leading-[1.55] text-muted';
 
@@ -105,7 +105,7 @@ export const DeleteAccountForm: React.FC = () => {
           </Button>
         ) : (
           <ButtonLink
-            to={HOME_PATH}
+            to={ACCOUNT_PATH}
             variant="secondary"
             className="flex-[1_1_140px]">
             {t('deleteAccount.cancelButton')}

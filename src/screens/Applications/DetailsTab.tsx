@@ -15,9 +15,8 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { type JobApplication } from '@/core/profile/applications';
 import { parseProfileLink } from '@/core/profile/contract';
+import { APPLICATIONS_PATH } from '@/core/profile/paths';
 import { shortAddress } from '@/screens/Profile/Resource/resourceMeta';
-
-const HOME_PATH = '/home';
 
 const Row: React.FC<{ label: string; children: React.ReactNode }> = ({
   label,
@@ -150,7 +149,7 @@ export const DetailsTab: React.FC<{ application: JobApplication }> = ({
         <RemoveApplicationDialog
           applicationId={application.id}
           onCancel={() => setRemoving(false)}
-          onRemoved={() => navigate(HOME_PATH, { replace: true })}
+          onRemoved={() => navigate(APPLICATIONS_PATH, { replace: true })}
         />
       )}
     </>

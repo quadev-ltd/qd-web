@@ -13,6 +13,8 @@ export interface PageShellProps {
   title: string;
   /** Shown next to the brand in the header: the main navigation of the signed-in pages. */
   headerNav?: ReactNode;
+  /** Where the brand in the header leads (the public home by default). */
+  brandPath?: string;
   /** Shown on the right of the header. */
   headerActions?: ReactNode;
   /** Layout classes for the main area. */
@@ -26,6 +28,7 @@ export const PageShell: React.FC<PageShellProps> = ({
   arcs = 'home',
   title,
   headerNav,
+  brandPath,
   headerActions,
   mainClassName,
   children,
@@ -37,7 +40,10 @@ export const PageShell: React.FC<PageShellProps> = ({
     }`}>
     <title>{title}</title>
     {tone === 'brand' && <Arcs variant={arcs} />}
-    <SiteHeader tone={tone === 'brand' ? 'brand' : 'solid'} nav={headerNav}>
+    <SiteHeader
+      tone={tone === 'brand' ? 'brand' : 'solid'}
+      nav={headerNav}
+      brandPath={brandPath}>
       {headerActions}
     </SiteHeader>
     <main className={`relative flex-1 ${mainClassName ?? ''}`}>{children}</main>
