@@ -60,7 +60,7 @@ test('a general CV: written in the background from the profile, read back, then 
   // createCvVersion answers at once; the page follows the document until it is written
   await page
     .getByRole('navigation', { name: 'Main' })
-    .getByRole('link', { name: 'CV', exact: true })
+    .getByRole('link', { name: 'CVs', exact: true })
     .click();
   await page.getByRole('button', { name: 'Write a general CV' }).click();
   await page
@@ -108,7 +108,7 @@ test('without the CV tool, the CV pages say "not available", and the navigation 
   await expect(
     page
       .getByRole('navigation', { name: 'Main' })
-      .getByRole('link', { name: 'CV', exact: true }),
+      .getByRole('link', { name: 'CVs', exact: true }),
   ).toHaveCount(0);
   await page.goto('/cv');
   await expect(
@@ -129,7 +129,7 @@ test('a written CV restored (copyCvVersion): compared with a later one, copied, 
   const cv = () =>
     page
       .getByRole('navigation', { name: 'Main' })
-      .getByRole('link', { name: 'CV', exact: true })
+      .getByRole('link', { name: 'CVs', exact: true })
       .click();
   const written = page.getByRole('article', { name: 'Your CV' });
 
@@ -177,7 +177,7 @@ test('the CV details: filled by reading the CV, corrected with updateCvDetails, 
   // profile-extract 1.3.0 filled details/cv: the fake writes every field as fake-<digest>
   await page
     .getByRole('navigation', { name: 'Main' })
-    .getByRole('link', { name: 'CV', exact: true })
+    .getByRole('link', { name: 'CVs', exact: true })
     .click();
   const card = page.getByRole('region', { name: 'At the top of every CV' });
   await expect(card).toContainText(/fake-.* · fake-/);
@@ -215,7 +215,7 @@ test('a written CV revised (reviseCvLine), a question answered, then written aga
   await addCv(page);
   await page
     .getByRole('navigation', { name: 'Main' })
-    .getByRole('link', { name: 'CV', exact: true })
+    .getByRole('link', { name: 'CVs', exact: true })
     .click();
   await page.getByRole('button', { name: 'Write a general CV' }).click();
   await page
@@ -277,7 +277,7 @@ test('the convention chosen (D86): kept by the backend, the UK’s right to work
   const write = async (convention: string) => {
     await page
       .getByRole('navigation', { name: 'Main' })
-      .getByRole('link', { name: 'CV', exact: true })
+      .getByRole('link', { name: 'CVs', exact: true })
       .click();
     await page
       .getByRole('button', { name: /^(Write a general CV|New version)$/ })
@@ -337,7 +337,7 @@ test('a per-user daily limit (usageLimits/{uid}): the backend lets a sixth CV th
   const cv = () =>
     page
       .getByRole('navigation', { name: 'Main' })
-      .getByRole('link', { name: 'CV', exact: true })
+      .getByRole('link', { name: 'CVs', exact: true })
       .click();
 
   // The default: 5 a day, all made

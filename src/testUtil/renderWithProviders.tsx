@@ -1,7 +1,12 @@
 import { render } from '@testing-library/react';
 import { type ReactElement, type ReactNode } from 'react';
 import { Provider } from 'react-redux';
-import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router';
+import {
+  createMemoryRouter,
+  MemoryRouter,
+  parsePath,
+  RouterProvider,
+} from 'react-router';
 
 import { createRoutes } from '@/app/routes';
 import { AuthGatewayProvider } from '@/core/auth/AuthGatewayProvider';
@@ -114,9 +119,8 @@ export const renderWithProviders = (
         <MemoryRouter
           initialEntries={[
             {
-              // A route may carry a query ("/cv/compare?later=v1").
-              pathname: route.split('?')[0],
-              search: route.includes('?') ? `?${route.split('?')[1]}` : '',
+              // A route may carry a query ("/cv/compare?later=v1") or a hash ("/home#account").
+              ...parsePath(route),
               state: routeState,
             },
           ]}>

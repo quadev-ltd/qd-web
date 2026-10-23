@@ -23,12 +23,11 @@ import {
   applicationCvPath,
   applicationDetailsPath,
   applicationPath,
+  APPLICATIONS_PATH,
 } from '@/core/profile/paths';
 import ApplicationCvTab from '@/screens/Cv/ApplicationCvTab';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 import { shortAddress } from '@/screens/Profile/Resource/resourceMeta';
-
-const HOME_PATH = '/home';
 
 const TAB =
   'flex min-h-11 items-center border-b-2 px-4 text-[16px] leading-natural font-medium no-underline';
@@ -37,7 +36,7 @@ const BackLink: React.FC = () => {
   const { t } = useTranslation();
   return (
     <Link
-      to={HOME_PATH}
+      to={APPLICATIONS_PATH}
       className="flex min-h-11 items-center gap-1 self-start text-[15px] leading-natural font-medium no-underline hover:underline">
       <Icon name="left" size={18} />
       {t('applications.backLink')}
@@ -102,7 +101,7 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
         <p className="text-[16px] leading-normal text-muted">
           {t('applications.notFoundDescription')}
         </p>
-        <ButtonLink to={HOME_PATH} variant="secondary" size="small">
+        <ButtonLink to={APPLICATIONS_PATH} variant="secondary" size="small">
           {t('applications.notFoundLink')}
         </ButtonLink>
       </Card>,

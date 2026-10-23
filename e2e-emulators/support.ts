@@ -20,6 +20,8 @@ export interface TestAccount {
   uid: string;
   email: string;
   password: string;
+  /** Where signing in leads: the applications with the interview tools (D85), else the home. */
+  landing: '/applications' | '/home';
 }
 
 const send = async (
@@ -94,7 +96,12 @@ export const createAccount = async ({
       OWNER,
     );
   }
-  return { uid, email, password: PASSWORD };
+  return {
+    uid,
+    email,
+    password: PASSWORD,
+    landing: interviewAssistant ? '/applications' : '/home',
+  };
 };
 
 /** A user's override of one service's daily calls, as quadev-backend's set-limit writes it. */
@@ -156,13 +163,16 @@ export const setUsageToday = async (
   );
 };
 
-/** Signs in with the form, as a user does, and waits for the signed-in home. */
-export const signIn = async (page: Page, { email, password }: TestAccount) => {
+/** Signs in with the form, as a user does, and waits for where the account lands. */
+export const signIn = async (
+  page: Page,
+  { email, password, landing }: TestAccount,
+) => {
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page).toHaveURL('/home');
+  await expect(page).toHaveURL(landing);
 };
 
 /** Opens the profile from the main navigation. */

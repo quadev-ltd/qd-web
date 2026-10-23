@@ -2,7 +2,7 @@
 // together in a browser. The same use case against the backend's code is in e2e-emulators/.
 import { expect, test } from '@playwright/test';
 
-import { openHome, seedApplications } from './support';
+import { openApplications, seedApplications } from './support';
 
 // The in-memory reading takes the title and the company from the first two lines.
 const JOB =
@@ -11,7 +11,7 @@ const JOB =
 test('an application: added from the home, its page, edited, removed', async ({
   page,
 }) => {
-  await openHome(page);
+  await openApplications(page);
 
   // "Prepare for a job" opens "New application"
   await page.getByRole('button', { name: /Prepare for a job/ }).click();
@@ -65,11 +65,19 @@ test('an application: added from the home, its page, edited, removed', async ({
     }),
   ).toHaveAttribute('target', '_blank');
 
-  // Still there after a reload, and listed on the home
+  // Still there after a reload, and listed in Applications: the back link says so (D85)
   await page.reload();
   await expect(details).toContainText('Northwind Logistics Ltd');
-  await page.getByRole('link', { name: 'Home', exact: true }).last().click();
-  await expect(page).toHaveURL('/home');
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'Applications' }),
+  ).toHaveAttribute('aria-current', 'page');
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: 'Applications', exact: true })
+    .click();
+  await expect(page).toHaveURL('/applications');
   const card = page
     .getByRole('listitem')
     .filter({ hasText: 'Senior Backend Engineer' });
@@ -77,7 +85,7 @@ test('an application: added from the home, its page, edited, removed', async ({
   await card.getByRole('link').click();
   await page.getByRole('link', { name: 'Details' }).click();
 
-  // Removed after asking: back on the home, which has no application again
+  // Removed after asking: back in Applications, which has none again
   await page.getByRole('button', { name: 'Remove this application' }).click();
   const dialog = page.getByRole('dialog', {
     name: 'Remove this application?',
@@ -86,7 +94,7 @@ test('an application: added from the home, its page, edited, removed', async ({
   await expect(dialog).toBeHidden();
   await page.getByRole('button', { name: 'Remove this application' }).click();
   await dialog.getByRole('button', { name: 'Remove the application' }).click();
-  await expect(page).toHaveURL('/home');
+  await expect(page).toHaveURL('/applications');
   await expect(
     page.getByRole('heading', { name: 'What do you want to do?' }),
   ).toBeVisible();
@@ -95,7 +103,7 @@ test('an application: added from the home, its page, edited, removed', async ({
 test('the home lists the applications with where their brief is', async ({
   page,
 }) => {
-  await openHome(page);
+  await openApplications(page);
   await seedApplications(page);
 
   const cards = page.getByRole('listitem');
@@ -119,7 +127,7 @@ test('the home lists the applications with where their brief is', async ({
 test('the brief: prepared, opened on a gap and a question, out of date when the job changes, refreshed', async ({
   page,
 }) => {
-  await openHome(page);
+  await openApplications(page);
   await page.evaluate(() => window.qdPreviewProfile?.seed());
   await page.reload();
 
@@ -206,7 +214,7 @@ test('the brief: prepared, opened on a gap and a question, out of date when the 
 test('a posting that cannot be read: "Paste the text instead", named in the same form, then the brief', async ({
   page,
 }) => {
-  await openHome(page);
+  await openApplications(page);
   await page.getByRole('button', { name: /Prepare for a job/ }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel.getByText('Link', { exact: true }).click();
@@ -245,7 +253,7 @@ test('a posting that cannot be read: "Paste the text instead", named in the same
 test('a posting read again: the same posting, a changed one that dates the brief, and an edited text replaced only once asked', async ({
   page,
 }) => {
-  await openHome(page);
+  await openApplications(page);
   await page.getByRole('button', { name: /Prepare for a job/ }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel.getByText('Link', { exact: true }).click();
@@ -312,7 +320,7 @@ test('a posting read again: the same posting, a changed one that dates the brief
 test('a posting that could not be read is tried again, and read', async ({
   page,
 }) => {
-  await openHome(page);
+  await openApplications(page);
   await page.evaluate(() =>
     window.qdPreviewProfile?.failNextJob('link-unreadable'),
   );
@@ -339,7 +347,7 @@ test('a posting that could not be read is tried again, and read', async ({
 test('a job as a file: uploaded, read, named from the file, its source on Details', async ({
   page,
 }) => {
-  await openHome(page);
+  await openApplications(page);
   await page.getByRole('button', { name: /Prepare for a job/ }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel.getByText('File', { exact: true }).click();

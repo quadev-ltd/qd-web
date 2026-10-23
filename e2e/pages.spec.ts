@@ -8,7 +8,7 @@ import {
   expectNoHorizontalScroll,
   expectNoSeriousAccessibilityViolations,
   loseProfile,
-  openHome,
+  openApplications,
   openProfile,
   openVerificationLink,
   PASSWORD,
@@ -70,30 +70,56 @@ for (const { name, path, heading } of PUBLIC_PAGES) {
   });
 }
 
-test('signed-in home: accessible and no horizontal scroll, also with the account menu open', async ({
+test('Applications for a new account, the account menu open, and "Your account": accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  // The sample account has the interview and CV tools: it lands on Applications (D85)
+  await signIn(page);
+  await expect(page).toHaveURL('/applications');
+  await expect(
+    page.getByRole('heading', { level: 1, name: /Welcome, / }),
+  ).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page);
+  await expectNoHorizontalScroll(page);
+
+  await page.getByRole('button', { name: /Account menu for/ }).click();
+  await expect(page.getByRole('menu')).toBeVisible();
+  await expectInsideViewport(page, page.getByRole('menu'));
+  await expectNoSeriousAccessibilityViolations(page);
+  await expectNoHorizontalScroll(page);
+
+  await page.getByRole('menuitem', { name: 'Account' }).click();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Your account' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Open your CV details' }),
+  ).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page);
+  await expectNoHorizontalScroll(page);
+});
+
+test('the home of an account without the interview tools: accessible and no horizontal scroll', async ({
   page,
 }) => {
   await signIn(page);
+  await page.evaluate(() =>
+    window.qdPreview?.setFlag('interviewAssistant', false),
+  );
+  await page.goto('/home');
   await expect(
     page.getByRole('heading', { level: 1, name: /Welcome back/ }),
   ).toBeVisible();
 
   await expectNoSeriousAccessibilityViolations(page);
   await expectNoHorizontalScroll(page);
-
-  await page.getByRole('button', { name: /Account menu for/ }).click();
-  await expect(page.getByRole('menu')).toBeVisible();
-
-  await expectInsideViewport(page, page.getByRole('menu'));
-  await expectNoSeriousAccessibilityViolations(page);
-  await expectNoHorizontalScroll(page);
 });
 
-test('applications: the home without and with them, a new one, an application, its edit panel and remove dialog: accessible and no horizontal scroll', async ({
+test('applications: the list without and with them, a new one, an application, its edit panel and remove dialog: accessible and no horizontal scroll', async ({
   page,
 }) => {
   // No application yet: "Add your CV" and the three paths
-  await openHome(page);
+  await openApplications(page);
   await expectAccessibleAndNotTooWide(page);
 
   // "New application", with its messages
@@ -121,7 +147,7 @@ test('applications: the home without and with them, a new one, an application, i
     'We couldn’t read this page',
   );
   await expectAccessibleAndNotTooWide(page);
-  await page.goto('/home');
+  await page.goto('/applications');
 
   // The list, with every state of a brief
   await seedApplications(page);
@@ -156,10 +182,10 @@ test('applications: the home without and with them, a new one, an application, i
 test('the brief, not prepared, ready with a requirement and a question open, out of date and failed: accessible and no horizontal scroll', async ({
   page,
 }) => {
-  await openHome(page);
+  await openApplications(page);
   await seedApplications(page);
   const open = async (title: string) => {
-    await page.goto('/home');
+    await page.goto('/applications');
     await page
       .getByRole('listitem')
       .filter({ hasText: title })
@@ -319,7 +345,7 @@ test('a resource, ready, being read and failed, a link that was read, and the re
 test('a posting read again, its outcome and "Replace your edited text?": accessible and no horizontal scroll', async ({
   page,
 }) => {
-  await openHome(page);
+  await openApplications(page);
   await page.getByRole('button', { name: /Prepare for a job/ }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel.getByText('Link', { exact: true }).click();
@@ -365,7 +391,7 @@ test('CV versions: nothing in the profile, no version yet, the panel, the detail
   const cv = () =>
     page
       .getByRole('navigation', { name: 'Main' })
-      .getByRole('link', { name: 'CV', exact: true })
+      .getByRole('link', { name: 'CVs', exact: true })
       .click();
 
   // Nothing in the profile
@@ -493,12 +519,12 @@ test('CV versions: nothing in the profile, no version yet, the panel, the detail
 test('CV versions compared, and the application’s CV tab: accessible and no horizontal scroll', async ({
   page,
 }) => {
-  await openHome(page);
+  await openApplications(page);
   await seedApplications(page);
   const cv = () =>
     page
       .getByRole('navigation', { name: 'Main' })
-      .getByRole('link', { name: 'CV', exact: true })
+      .getByRole('link', { name: 'CVs', exact: true })
       .click();
   const write = async () => {
     await page

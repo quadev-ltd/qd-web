@@ -1,8 +1,14 @@
 // The paths of the account pages. The routes (src/app/routes.tsx), the route guards and the
 // screens use these constants.
 
-/** The signed-in home. */
+/**
+ * The signed-in home, where signing in leads. An account with the interview tools has the
+ * applications instead (D85), and this address leads there; everyone else keeps the home.
+ */
 export const HOME_PATH = '/home';
+
+/** "Your account": the personal details, and how the user signs in (D85). */
+export const ACCOUNT_PATH = '/account';
 
 export const SIGN_IN_PATH = '/sign-in';
 

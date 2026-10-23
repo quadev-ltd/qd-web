@@ -10,7 +10,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { PDFDict, PDFDocument, PDFName } from 'pdf-lib';
 
 import {
-  openHome,
+  openApplications,
   openProfile,
   seedApplications,
   seedProfile,
@@ -27,11 +27,11 @@ const today = () =>
 const openCv = async (page: Page) => {
   await page
     .getByRole('navigation', { name: 'Main' })
-    .getByRole('link', { name: 'CV', exact: true })
+    .getByRole('link', { name: 'CVs', exact: true })
     .click();
   await expect(page).toHaveURL('/cv');
   await expect(
-    page.getByRole('heading', { level: 1, name: 'CV' }),
+    page.getByRole('heading', { level: 1, name: 'CVs' }),
   ).toBeVisible();
 };
 
@@ -120,7 +120,7 @@ test('a general CV: written from the profile, read with its sources, downloaded,
   ).toBe('PK');
 
   // In the list under "General", then removed
-  await page.getByRole('link', { name: 'CV', exact: true }).first().click();
+  await page.getByRole('link', { name: 'CVs', exact: true }).first().click();
   const general = page.getByRole('region', { name: 'General' });
   await expect(general.getByText('Data engineer, in general')).toBeVisible();
   await expect(general).toContainText('written from your profile');
@@ -137,7 +137,7 @@ test('a general CV: written from the profile, read with its sources, downloaded,
 test('a CV for a job: asked in "New version", listed under its application, marked as sent', async ({
   page,
 }) => {
-  await openHome(page);
+  await openApplications(page);
   await seedApplications(page);
   await openCv(page);
   await page.getByRole('button', { name: 'Choose a job' }).click();
@@ -151,7 +151,7 @@ test('a CV for a job: asked in "New version", listed under its application, mark
   await page.getByRole('button', { name: 'Mark as sent' }).click();
   await expect(page.getByText('Sent with your application')).toBeVisible();
 
-  await page.getByRole('link', { name: 'CV', exact: true }).first().click();
+  await page.getByRole('link', { name: 'CVs', exact: true }).first().click();
   const forJob = page.getByRole('region', { name: 'For a job' });
   await expect(
     forJob.getByRole('heading', { name: 'Platform Engineer' }),
@@ -187,7 +187,7 @@ test('a CV for a job: asked in "New version", listed under its application, mark
 test('the convention follows the job’s country unless changed, a US resume prints on US Letter, and writing again keeps it', async ({
   page,
 }) => {
-  await openHome(page);
+  await openApplications(page);
   await seedApplications(page);
   await openCv(page);
   await page.getByRole('button', { name: 'Choose a job' }).click();
@@ -381,7 +381,7 @@ test('a tester with a higher daily limit writes a sixth CV, counted against it',
   await writeCv(page, 'Write a general CV');
 
   // The limit reached: the panel says so, and writes nothing more today
-  await page.getByRole('link', { name: 'CV', exact: true }).first().click();
+  await page.getByRole('link', { name: 'CVs', exact: true }).first().click();
   await page.getByRole('button', { name: 'New version' }).click();
   await expect(
     page.getByRole('dialog', { name: 'New CV version' }),
@@ -407,7 +407,7 @@ test('a CV that could not be written is tried again, and written', async ({
   await expect(page.getByRole('article', { name: 'Your CV' })).toBeVisible();
 
   // The failed one is gone: one version in the list
-  await page.getByRole('link', { name: 'CV', exact: true }).first().click();
+  await page.getByRole('link', { name: 'CVs', exact: true }).first().click();
   await expect(
     page.getByRole('region', { name: 'General' }).getByRole('listitem'),
   ).toHaveCount(1);
@@ -454,7 +454,7 @@ test('a version made before D83 is still reviewed to the end, compared with a wr
   ).toBeVisible();
 
   // A written one for the same purpose, then the two compared
-  await page.getByRole('link', { name: 'CV', exact: true }).first().click();
+  await page.getByRole('link', { name: 'CVs', exact: true }).first().click();
   await page.getByRole('button', { name: 'New version' }).click();
   await page
     .getByRole('dialog', { name: 'New CV version' })

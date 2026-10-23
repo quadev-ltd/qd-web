@@ -82,7 +82,7 @@ describe('ForgotPasswordScreen', () => {
     expect(screen.getByLabelText('forgotPassword.emailLabel')).toHaveValue('');
   });
 
-  it('leads a signed-in user back to their home, without the sign-up prompt', () => {
+  it('leads a signed-in user back to their account page, without the sign-up prompt', () => {
     renderWithProviders(<ForgotPasswordScreen />, {
       route: '/forgot-password',
       routeState: { email: 'ada@example.com' },
@@ -91,7 +91,7 @@ describe('ForgotPasswordScreen', () => {
 
     expect(
       screen.getByRole('link', { name: 'forgotPassword.backToHomeLink' }),
-    ).toHaveAttribute('href', '/home');
+    ).toHaveAttribute('href', '/account');
     expect(
       screen.queryByText('forgotPassword.rememberedPrompt'),
     ).not.toBeInTheDocument();

@@ -15,6 +15,7 @@ import {
 } from './guards';
 
 import {
+  ACCOUNT_PATH,
   COMPLETE_PROFILE_PATH,
   DELETE_ACCOUNT_PATH,
   HOME_PATH,
@@ -26,7 +27,9 @@ import {
   APPLICATION_CV_PATH,
   APPLICATION_DETAILS_PATH,
   APPLICATION_PATH,
+  APPLICATIONS_PATH,
   CV_COMPARE_PATH,
+  CV_DETAILS_PATH,
   CV_PATH,
   CV_VERSION_PATH,
   PROFILE_PATH,
@@ -97,6 +100,13 @@ const accountRoutes: RouteObject[] = [
         }),
       },
       {
+        path: ACCOUNT_PATH,
+        lazy: async () => ({
+          Component: (await import('@/screens/Account/AccountScreen'))
+            .AccountScreen,
+        }),
+      },
+      {
         path: DELETE_ACCOUNT_PATH,
         lazy: async () => ({
           Component: (
@@ -128,6 +138,7 @@ const accountRoutes: RouteObject[] = [
             }),
           },
           // The job applications (delivery 2a): behind the same flag, with the applications.
+          // Their list is where an account with the flag lands (D85).
           {
             lazy: async () => ({
               Component: (
@@ -135,6 +146,14 @@ const accountRoutes: RouteObject[] = [
               ).ApplicationRoutes,
             }),
             children: [
+              {
+                path: APPLICATIONS_PATH,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/screens/Applications/ApplicationsScreen')
+                  ).ApplicationsScreen,
+                }),
+              },
               {
                 path: APPLICATION_PATH,
                 lazy: async () => ({
@@ -170,6 +189,13 @@ const accountRoutes: RouteObject[] = [
             children: [
               {
                 path: CV_PATH,
+                lazy: async () => ({
+                  Component: (await import('@/screens/Cv/CvScreen')).CvScreen,
+                }),
+              },
+              // The same page with "Your CV details" open: the account page links here.
+              {
+                path: CV_DETAILS_PATH,
                 lazy: async () => ({
                   Component: (await import('@/screens/Cv/CvScreen')).CvScreen,
                 }),
@@ -223,7 +249,7 @@ const accountRoutes: RouteObject[] = [
     ],
   },
   // For everyone: a signed-out visitor who forgot the password, and a signed-in user who
-  // wants to change it (the link on the signed-in home).
+  // wants to change it (the link on the account page).
   {
     path: '/forgot-password',
     lazy: async () => ({

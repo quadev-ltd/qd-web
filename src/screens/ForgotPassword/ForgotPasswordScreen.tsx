@@ -10,7 +10,7 @@ import { FooterPrompt } from '@/components/SignIn/FooterPrompt';
 import { Layout } from '@/components/SignIn/Layout';
 import { ScreenType } from '@/components/SignIn/types';
 import ButtonLink from '@/components/ui/ButtonLink';
-import { HOME_PATH, SIGN_IN_PATH } from '@/core/auth/paths';
+import { ACCOUNT_PATH, SIGN_IN_PATH } from '@/core/auth/paths';
 import { useSessionStatus } from '@/core/session/hooks';
 import { SessionStatus } from '@/core/state/slices/sessionSlice';
 
@@ -23,9 +23,9 @@ const emailFromState = (state: unknown): string => {
 export const ForgotPasswordScreen: React.FC = () => {
   const { t } = useTranslation();
   const location = useLocation();
-  // A signed-in user comes here from "Change password" on their home.
+  // A signed-in user comes here from "Change password" on their account page.
   const isSignedIn = useSessionStatus() === SessionStatus.Ready;
-  const backPath = isSignedIn ? HOME_PATH : SIGN_IN_PATH;
+  const backPath = isSignedIn ? ACCOUNT_PATH : SIGN_IN_PATH;
 
   return (
     <Layout

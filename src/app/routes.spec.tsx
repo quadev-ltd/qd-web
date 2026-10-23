@@ -71,6 +71,8 @@ describe('routes', () => {
       '/sign-up',
       '/forgot-password',
       '/home',
+      '/applications',
+      '/account',
       '/verify-email',
       '/complete-profile',
       '/account/delete',
@@ -104,6 +106,8 @@ describe('routes', () => {
 
     it.each([
       '/home',
+      '/applications',
+      '/account',
       '/verify-email',
       '/complete-profile',
       '/account/delete',
@@ -163,6 +167,53 @@ describe('routes', () => {
         expect(
           screen.queryByText('access.notAvailableChip'),
         ).not.toBeInTheDocument();
+      });
+    });
+
+    describe('where a signed-in user lands (D85)', () => {
+      const signedIn = {
+        session: {
+          status: SessionStatus.Ready,
+          profile: { firstName: 'Maya', lastName: 'Okafor' },
+        },
+      };
+
+      it('sends the home to the applications for an account with the interview tools', async () => {
+        const { router } = await renderRoute('/home', {
+          ...signedIn,
+          flags: { interviewAssistant: true },
+        });
+
+        expect(
+          await screen.findByRole('link', {
+            name: 'applications.title',
+            current: 'page',
+          }),
+        ).toBeInTheDocument();
+        expect(router.state.location.pathname).toBe('/applications');
+      });
+
+      it('sends the applications to the home for an account without them', async () => {
+        const { router } = await renderRoute('/applications', signedIn);
+
+        expect(
+          await screen.findByRole('heading', {
+            level: 1,
+            name: 'home.welcomeTitle',
+          }),
+        ).toBeInTheDocument();
+        expect(router.state.location.pathname).toBe('/home');
+      });
+
+      it('shows "Your account" at /account', async () => {
+        await renderRoute('/account', signedIn);
+
+        expect(
+          await screen.findByRole('heading', {
+            level: 1,
+            name: 'home.accountTitle',
+          }),
+        ).toBeInTheDocument();
       });
     });
 

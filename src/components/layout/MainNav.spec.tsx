@@ -4,96 +4,100 @@ import { MainNav } from './MainNav';
 
 import { renderWithProviders } from '@/testUtil/renderWithProviders';
 
-const renderNav = (route: string) =>
+/** With the interview tools: Applications · CVs (with the CV tool) · Profile (D85). */
+const renderTools = (route: string, { cvTool = true } = {}) =>
   renderWithProviders(
     <MainNav
-      homePath="/home"
+      applicationsPath="/applications"
+      cvPath={cvTool ? '/cv' : undefined}
       profilePath="/profile"
-      accountPath="/home#account"
     />,
     { route },
   );
 
-describe('MainNav', () => {
-  it('links to the home, the profile and the account section, and marks the current page', () => {
-    renderNav('/home');
+/** Without them: Home · Profile. */
+const renderHome = (route: string) =>
+  renderWithProviders(<MainNav homePath="/home" profilePath="/profile" />, {
+    route,
+  });
 
-    const nav = screen.getByRole('navigation', {
+const labels = () =>
+  within(
+    screen.getByRole('navigation', {
       name: 'header.mainNavAccessibilityLabel',
-    });
-    const links = within(nav).getAllByRole('link');
-    expect(links.map(link => link.textContent)).toEqual([
-      'drawerMenu.home',
+    }),
+  )
+    .getAllByRole('link')
+    .map(link => link.textContent);
+
+const current = () =>
+  screen
+    .getAllByRole('link')
+    .filter(link => link.getAttribute('aria-current') === 'page')
+    .map(link => link.textContent);
+
+describe('MainNav', () => {
+  it('reads Applications · CVs · Profile with the interview and CV tools, and has no Account', () => {
+    renderTools('/applications');
+
+    expect(labels()).toEqual([
+      'applications.title',
+      'cv.title',
       'profile.title',
-      'home.accountLink',
     ]);
-    const [home, profile, account] = links;
-    expect(home).toHaveAttribute('href', '/home');
-    expect(home).toHaveAttribute('aria-current', 'page');
-    expect(profile).toHaveAttribute('href', '/profile');
-    expect(profile).not.toHaveAttribute('aria-current');
-    expect(account).toHaveAttribute('href', '/home#account');
-    expect(account).not.toHaveAttribute('aria-current');
-  });
-
-  it.each(['/profile', '/profile/resources/r1'])(
-    'marks the profile as current at %s',
-    route => {
-      renderNav(route);
-
-      expect(
-        screen.getByRole('link', { name: 'profile.title' }),
-      ).toHaveAttribute('aria-current', 'page');
-      expect(
-        screen.getByRole('link', { name: 'drawerMenu.home' }),
-      ).not.toHaveAttribute('aria-current');
-    },
-  );
-
-  it('keeps the home marked on the page of an application, which belongs to it', () => {
-    renderNav('/applications/a1');
-
-    const home = screen.getByRole('link', { name: 'drawerMenu.home' });
-    expect(home).toHaveClass('bg-white/14');
-    // Marked to the eye only: the page itself is the application, not the home.
-    expect(home).not.toHaveAttribute('aria-current');
-    expect(screen.getByRole('link', { name: 'profile.title' })).not.toHaveClass(
-      'bg-white/14',
-    );
-  });
-
-  it('marks nothing as current on another page', () => {
-    renderNav('/forgot-password');
-
-    for (const link of screen.getAllByRole('link')) {
-      expect(link).not.toHaveAttribute('aria-current');
-    }
-  });
-
-  it.each(['/cv', '/cv/versions/v1'])(
-    'links to the CV section for an account with the CV tool, current at %s',
-    route => {
-      renderWithProviders(
-        <MainNav
-          homePath="/home"
-          profilePath="/profile"
-          cvPath="/cv"
-          accountPath="/home#account"
-        />,
-        { route },
-      );
-
-      const cv = screen.getByRole('link', { name: 'cv.title' });
-      expect(cv).toHaveAttribute('href', '/cv');
-      expect(cv).toHaveAttribute('aria-current', 'page');
-    },
-  );
-
-  it('has no CV link without the CV tool', () => {
-    renderNav('/home');
-
     expect(
-      screen.queryByRole('link', { name: 'cv.title' }),
+      screen.getByRole('link', { name: 'applications.title' }),
+    ).toHaveAttribute('href', '/applications');
+    expect(screen.getByRole('link', { name: 'cv.title' })).toHaveAttribute(
+      'href',
+      '/cv',
+    );
+    expect(screen.getByRole('link', { name: 'profile.title' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
+    expect(
+      screen.queryByRole('link', { name: 'home.accountLink' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('reads Applications · Profile without the CV tool', () => {
+    renderTools('/applications', { cvTool: false });
+
+    expect(labels()).toEqual(['applications.title', 'profile.title']);
+  });
+
+  it('reads Home · Profile without the interview tools', () => {
+    renderHome('/home');
+
+    expect(labels()).toEqual(['drawerMenu.home', 'profile.title']);
+    expect(current()).toEqual(['drawerMenu.home']);
+  });
+
+  it.each([
+    ['/applications', 'applications.title'],
+    ['/applications/a1', 'applications.title'],
+    ['/applications/a1/details', 'applications.title'],
+    ['/cv', 'cv.title'],
+    ['/cv/versions/v1', 'cv.title'],
+    ['/cv/details', 'cv.title'],
+    ['/profile', 'profile.title'],
+    ['/profile/resources/r1', 'profile.title'],
+  ])('marks only its section at %s', (route, label) => {
+    renderTools(route);
+
+    expect(current()).toEqual([label]);
+  });
+
+  it.each(['/account', '/forgot-password'])('marks nothing at %s', route => {
+    renderTools(route);
+
+    expect(current()).toEqual([]);
+  });
+
+  it('marks the profile, not the home, on a resource without the interview tools', () => {
+    renderHome('/profile/resources/r1');
+
+    expect(current()).toEqual(['profile.title']);
   });
 });

@@ -28,6 +28,7 @@ const pathFor = (status: SessionStatus): string | undefined => {
     case SessionStatus.NeedsProfile:
       return COMPLETE_PROFILE_PATH;
     case SessionStatus.Ready:
+      // The home sends an account with the interview tools on to its applications (D85).
       return HOME_PATH;
     default:
       return undefined;

@@ -14,14 +14,14 @@ const renderMenu = () => {
         firstName="Ada"
         fullName="Ada Lovelace"
         initials="AL"
-        homePath="/home"
-        accountPath="/home#account"
+        email="ada@example.com"
+        accountPath="/account"
         onSignOut={onSignOut}
       />
       <button type="button">next control</button>
       <Routes>
         <Route path="/" element={<p>start page</p>} />
-        <Route path="/home" element={<p>home page</p>} />
+        <Route path="/account" element={<p>account page</p>} />
       </Routes>
     </>,
   );
@@ -45,19 +45,22 @@ describe('AccountMenu', () => {
     expect(menu()).not.toBeInTheDocument();
   });
 
-  it('opens on click, with Home, Account and Sign out, and focuses the first item', async () => {
+  it('opens on click with the name and email at the top, then Account and Sign out, and focuses the first item', async () => {
     renderMenu();
 
     await userEvent.click(menuButton());
 
     expect(menuButton()).toHaveAttribute('aria-expanded', 'true');
     expect(menuButton()).toHaveAttribute('aria-controls', menu()?.id);
+    // The name and email head the menu but are not items of it (D85).
+    const popup = menu()?.parentElement;
+    expect(popup).toHaveTextContent(/^Ada Lovelace\s*ada@example\.com/);
+    expect(menu()).not.toHaveTextContent('Ada Lovelace');
     expect(
       screen.getAllByRole('menuitem').map(element => element.textContent),
-    ).toEqual(['drawerMenu.home', 'home.accountLink', 'drawerMenu.signOut']);
-    expect(item('drawerMenu.home')).toHaveAttribute('href', '/home');
-    expect(item('home.accountLink')).toHaveAttribute('href', '/home#account');
-    expect(item('drawerMenu.home')).toHaveFocus();
+    ).toEqual(['home.accountLink', 'drawerMenu.signOut']);
+    expect(item('home.accountLink')).toHaveAttribute('href', '/account');
+    expect(item('home.accountLink')).toHaveFocus();
   });
 
   it('closes on a second click of the button', async () => {
@@ -78,7 +81,7 @@ describe('AccountMenu', () => {
 
       await userEvent.keyboard(key);
 
-      expect(item('drawerMenu.home')).toHaveFocus();
+      expect(item('home.accountLink')).toHaveFocus();
     },
   );
 
@@ -87,7 +90,7 @@ describe('AccountMenu', () => {
     menuButton().focus();
 
     await userEvent.keyboard('{ArrowDown}');
-    expect(item('drawerMenu.home')).toHaveFocus();
+    expect(item('home.accountLink')).toHaveFocus();
 
     await userEvent.keyboard('{Escape}');
     await userEvent.keyboard('{ArrowUp}');
@@ -99,15 +102,13 @@ describe('AccountMenu', () => {
     await userEvent.click(menuButton());
 
     await userEvent.keyboard('{ArrowDown}');
-    expect(item('home.accountLink')).toHaveFocus();
-    await userEvent.keyboard('{ArrowDown}');
     expect(item('drawerMenu.signOut')).toHaveFocus();
     await userEvent.keyboard('{ArrowDown}');
-    expect(item('drawerMenu.home')).toHaveFocus();
+    expect(item('home.accountLink')).toHaveFocus();
     await userEvent.keyboard('{ArrowUp}');
     expect(item('drawerMenu.signOut')).toHaveFocus();
     await userEvent.keyboard('{Home}');
-    expect(item('drawerMenu.home')).toHaveFocus();
+    expect(item('home.accountLink')).toHaveFocus();
     await userEvent.keyboard('{End}');
     expect(item('drawerMenu.signOut')).toHaveFocus();
   });
@@ -159,14 +160,23 @@ describe('AccountMenu', () => {
     expect(onSignOut).toHaveBeenCalledTimes(1);
   });
 
-  it('goes to the home from the menu and closes it', async () => {
+  it('goes to the account page from the menu and closes it', async () => {
     renderMenu();
     await userEvent.click(menuButton());
 
-    await userEvent.click(item('drawerMenu.home'));
+    await userEvent.click(item('home.accountLink'));
 
-    expect(screen.getByText('home page')).toBeInTheDocument();
+    expect(screen.getByText('account page')).toBeInTheDocument();
     expect(menu()).not.toBeInTheDocument();
+  });
+
+  it('stays open on a click on the name and email, which are not items', async () => {
+    renderMenu();
+    await userEvent.click(menuButton());
+
+    await userEvent.click(screen.getByText('ada@example.com'));
+
+    expect(menu()).toBeInTheDocument();
   });
 
   describe('placement', () => {
@@ -185,8 +195,8 @@ describe('AccountMenu', () => {
 
       await userEvent.click(menuButton());
 
-      expect(menu()).toHaveClass('right-0');
-      expect(menu()).not.toHaveClass('left-0');
+      expect(menu()?.parentElement).toHaveClass('right-0');
+      expect(menu()?.parentElement).not.toHaveClass('left-0');
     });
 
     it('hangs from the left edge of the button when the button is near the left of the screen', async () => {
@@ -195,8 +205,8 @@ describe('AccountMenu', () => {
 
       await userEvent.click(menuButton());
 
-      expect(menu()).toHaveClass('left-0');
-      expect(menu()).not.toHaveClass('right-0');
+      expect(menu()?.parentElement).toHaveClass('left-0');
+      expect(menu()?.parentElement).not.toHaveClass('right-0');
     });
   });
 });

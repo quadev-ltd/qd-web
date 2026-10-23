@@ -7,6 +7,8 @@ export interface SiteHeaderProps {
   tone?: 'brand' | 'solid';
   /** Shown next to the brand: the main navigation of the signed-in pages. */
   nav?: ReactNode;
+  /** Where the brand leads (the public home by default). */
+  brandPath?: string;
   /** Shown on the right: navigation or account actions. */
   children?: ReactNode;
 }
@@ -14,6 +16,7 @@ export interface SiteHeaderProps {
 export const SiteHeader: React.FC<SiteHeaderProps> = ({
   tone = 'brand',
   nav,
+  brandPath,
   children,
 }) => {
   const surface = `relative flex flex-wrap items-center px-gutter text-white ${
@@ -24,7 +27,7 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
       <header
         data-surface="dark"
         className={`${surface} justify-between gap-x-6 gap-y-3`}>
-        <BrandLink />
+        <BrandLink to={brandPath} />
         {children}
       </header>
     );
@@ -34,7 +37,7 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
   // account button stays in the corner (the interview tools artboards at 390).
   return (
     <header data-surface="dark" className={`${surface} gap-x-9 gap-y-2`}>
-      <BrandLink />
+      <BrandLink to={brandPath} />
       <div className="order-3 basis-full min-[721px]:order-none min-[721px]:basis-auto">
         {nav}
       </div>

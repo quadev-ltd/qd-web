@@ -7,8 +7,13 @@ export const RESOURCE_PATH = `${PROFILE_PATH}/resources/:resourceId`;
 export const resourcePath = (resourceId: string) =>
   `${PROFILE_PATH}/resources/${encodeURIComponent(resourceId)}`;
 
-/** The job applications (delivery 2a). Their list is the signed-in home. */
-export const APPLICATIONS_PREFIX = '/applications/';
+/**
+ * The job applications (delivery 2a): their list, the first page after signing in for an
+ * account with the interview tools (D85).
+ */
+export const APPLICATIONS_PATH = '/applications';
+
+export const APPLICATIONS_PREFIX = `${APPLICATIONS_PATH}/`;
 
 /** One job application: its details, and later its brief. */
 export const APPLICATION_PATH = `${APPLICATIONS_PREFIX}:applicationId`;
@@ -24,6 +29,9 @@ export const applicationDetailsPath = (applicationId: string) =>
 
 /** The CV section (delivery 2b): the versions of the candidate's CVs. */
 export const CV_PATH = '/cv';
+
+/** The CV section with "Your CV details" open over it: the account page links here (D85). */
+export const CV_DETAILS_PATH = `${CV_PATH}/details`;
 
 /** One CV version: being made, could not be made, or made, with what it changes. */
 export const CV_VERSION_PATH = `${CV_PATH}/versions/:versionId`;

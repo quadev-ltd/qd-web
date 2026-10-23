@@ -70,16 +70,14 @@ test('sign-in errors: empty and invalid fields, wrong password, forgot password,
   await page.getByLabel('Email').fill(SAMPLE_USER.email);
   await page.getByLabel('Password', { exact: true }).fill(SAMPLE_USER.password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page).toHaveURL('/home');
+  // The sample account has the interview tools: it lands on its applications (D85)
+  await expect(page).toHaveURL('/applications');
   await expect(
     page.getByRole('heading', {
       level: 1,
-      name: `Welcome back, ${SAMPLE_USER.firstName}`,
+      name: `Welcome, ${SAMPLE_USER.firstName}`,
     }),
   ).toBeVisible();
-  await expect(
-    page.getByRole('region', { name: 'Your account' }),
-  ).toContainText(`${SAMPLE_USER.firstName} ${SAMPLE_USER.lastName}`);
 });
 
 test('sign up with an email that already has an account shows the error on the email field', async ({

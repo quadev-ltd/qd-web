@@ -59,8 +59,12 @@ describe('ApplicationScreen', () => {
     );
     expect(
       screen.getByRole('link', { name: 'applications.backLink' }),
-    ).toHaveAttribute('href', '/home');
+    ).toHaveAttribute('href', '/applications');
     expect(document.title).toBe('applications.documentTitle');
+    // An application is under Applications, which stays marked in the bar (D85).
+    expect(
+      screen.getByRole('link', { name: 'applications.title', current: 'page' }),
+    ).toBeInTheDocument();
   });
 
   it('shows its details, only the ones it has, and its posting as a link to open in another tab', () => {
@@ -145,7 +149,7 @@ describe('ApplicationScreen', () => {
       }),
     );
 
-    expect(await screen.findByText('at /home')).toBeInTheDocument();
+    expect(await screen.findByText('at /applications')).toBeInTheDocument();
     expect(gateway.removeApplication).toHaveBeenCalledExactlyOnceWith('a1');
     expect(store.getState().applications.applications).toEqual([]);
   });
@@ -208,7 +212,7 @@ describe('ApplicationScreen', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'applications.notFoundLink' }),
-    ).toHaveAttribute('href', '/home');
+    ).toHaveAttribute('href', '/applications');
   });
 
   it('waits while the applications are read', () => {

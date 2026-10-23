@@ -26,12 +26,12 @@ screen has an address, so a user can open any of them directly, whatever their s
 
 ### One page per session status
 
-| Session status           | Page                       |
-| ------------------------ | -------------------------- |
-| `signedOut`              | `/sign-in`, `/sign-up`     |
-| `needsEmailVerification` | `/verify-email`            |
-| `needsProfile`           | `/complete-profile`        |
-| `ready`                  | `/home`, `/account/delete` |
+| Session status           | Page                                                                   |
+| ------------------------ | ---------------------------------------------------------------------- |
+| `signedOut`              | `/sign-in`, `/sign-up`                                                 |
+| `needsEmailVerification` | `/verify-email`                                                        |
+| `needsProfile`           | `/complete-profile`                                                    |
+| `ready`                  | `/home`, `/account`, `/account/delete`, and the interview tools' pages |
 
 The guards (`src/app/guards.tsx`) show a page only to a session in its status. Anyone else is sent to
 the page of their own status, and a visitor who is not signed in to `/sign-in`. While the session is
@@ -86,6 +86,29 @@ password. No email exists there, so the gateway exposes two functions on `window
 `verifyEmail()` ("the user opened the link") and `removeProfile()` ("the profile was not written").
 The end-to-end tests and a person in the browser console use the same two. They are part of the
 preview gateway, which a production build cannot contain (ADR 0002).
+
+### The sections, and the account on its own page (D85, 23 Oct 2026)
+
+The signed-in pages are named after what is in them (D85, research doc 13 §22, doc 15 §19):
+
+- **The bar** is Applications · CVs · Profile for an account with `interviewAssistant` (CVs only
+  with `cvTool`), and Home · Profile without it. "Account" is no longer in the bar. A section stays
+  marked on the pages under it (an application, a CV version, a resource). The sections depend on
+  the flags, so the bar keeps their place empty until the flags are read, rather than show the wrong
+  ones for a moment.
+- **Where signing in lands** is still `/home` for the guards: `pathFor` does not know the flags.
+  `/home` sends an account with `interviewAssistant` to `/applications`, waiting for the flags
+  first, and shows the welcome and the three tools "Coming soon" to everyone else. `/applications`
+  sends an account without the flag back to `/home`. The logo on the signed-in pages leads to the
+  same place.
+- **The account** is behind the name: the menu shows the name and email, then "Account" and "Sign
+  out". `/account` ("Your account") has the cards that were at the bottom of Home: "Personal
+  details" (the account's name, email and date of birth) and "Sign-in and security". With the CV
+  tool, "Personal details" says the CV's details are separate and links to `/cv/details`: the CV
+  section with "Your CV details" open, which leaves that address when closed. The panel fills its
+  form once from data the CV section reads, so it opens there rather than over the account page.
+  An old link to `/home#account` leads to `/account`. "Change password", "Delete account" and its
+  Cancel lead back to `/account`.
 
 ## Consequences
 

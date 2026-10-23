@@ -12,7 +12,7 @@ import StatusIcon from '@/components/StatusIcon';
 import ButtonLink from '@/components/ui/ButtonLink';
 import Card from '@/components/ui/Card';
 import { useAuthGateway } from '@/core/auth/AuthGatewayProvider';
-import { HOME_PATH } from '@/core/auth/paths';
+import { ACCOUNT_PATH } from '@/core/auth/paths';
 import { SUPPORT_EMAIL } from '@/core/contact';
 import { useSessionUser } from '@/core/session/hooks';
 
@@ -60,7 +60,7 @@ export const DeleteAccountScreen: React.FC = () => {
                 </a>
               </li>
             </ul>
-            <ButtonLink to={HOME_PATH} variant="secondary">
+            <ButtonLink to={ACCOUNT_PATH} variant="secondary">
               {t('forgotPassword.backToHomeLink')}
             </ButtonLink>
           </>
