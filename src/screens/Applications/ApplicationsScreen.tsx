@@ -1,24 +1,21 @@
-// Applications (D58, D85, delivery 2a): where an account with the interview tools lands after
-// signing in. While it has no application, "Welcome", "Add your CV" and the three paths; then
-// "Your applications", with each one's brief and "Your profile" beside them. Practice is not
-// built yet; the CV tool has its own flag. The profile's and the applications' routes
-// (ProfileRoutes, ApplicationRoutes) give it the flag, the gateway, the profile and the list.
+// Applications (D58, D85, D91, delivery 2a): "Your applications" with "New application", one
+// application per row with where its brief is, in one column at the profile's width. With none
+// yet, a line that says what an application gives. "Prepare for a job" on the profile opens
+// "New application" here. The profile's and the applications' routes (ProfileRoutes,
+// ApplicationRoutes) give it the flag, the gateway and the list.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 
 import NewApplicationPanel from './NewApplicationPanel';
-import { StartCardContent } from './StartCard';
 
-import Icon, { type IconName } from '@/components/Icon';
+import Icon from '@/components/Icon';
 import SignedInShell from '@/components/layout/SignedInShell';
 import Spinner from '@/components/Spinner';
 import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
-import ButtonLink from '@/components/ui/ButtonLink';
 import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
-import { useFlag } from '@/core/flags/FlagsProvider';
 import {
   APPLICATIONS_MAX,
   briefStateOf,
@@ -29,66 +26,9 @@ import {
   useApplications,
   useApplicationsActions,
 } from '@/core/profile/ApplicationsProvider';
-import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
-import { applicationPath, CV_PATH, PROFILE_PATH } from '@/core/profile/paths';
-import { useProfile } from '@/core/session/hooks';
+import { applicationPath } from '@/core/profile/paths';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
-
-const TITLE = 'font-display text-[28px] leading-tight font-semibold';
-
-interface PathCardProps {
-  icon: IconName;
-  title: string;
-  description: string;
-  /** Opens the path; without it the path is not built yet and says "Coming soon". */
-  onOpen?: () => void;
-}
-
-/** One of the three paths of a new account: no order and no numbers (D58). */
-const PathCard: React.FC<PathCardProps> = ({
-  icon,
-  title,
-  description,
-  onOpen,
-}) => {
-  const { t } = useTranslation();
-  const body = (
-    <>
-      <span
-        aria-hidden="true"
-        className="flex size-11 flex-none items-center justify-center rounded-full bg-tint text-primary">
-        <Icon name={icon} size={20} />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
-        <span className="text-base leading-normal font-bold">{title}</span>
-        <span className="text-sm leading-normal text-muted">{description}</span>
-        {/* Under the words, so a narrow card keeps its width for them. */}
-        {!onOpen && (
-          <span className="mt-1.5 flex">
-            <Chip>{t('home.comingSoonChip')}</Chip>
-          </span>
-        )}
-      </span>
-    </>
-  );
-  return (
-    <Card as="article" elevation="raised" className="p-4">
-      {onOpen ? (
-        <button
-          type="button"
-          onClick={onOpen}
-          className="flex w-full cursor-pointer items-center gap-3 rounded-control text-text">
-          {body}
-          <span className="flex text-muted">
-            <Icon name="right" />
-          </span>
-        </button>
-      ) : (
-        <div className="flex items-center gap-3">{body}</div>
-      )}
-    </Card>
-  );
-};
+import { asksForNewApplication } from '@/screens/Profile/StartPaths';
 
 /** Where an application's brief is, in chips: none yet, ready (with its gaps), out of date. */
 const BriefChips: React.FC<{
@@ -138,174 +78,94 @@ const BriefChips: React.FC<{
   );
 };
 
-const ApplicationCard: React.FC<{
+/** One application in the list: the whole row opens it. */
+const ApplicationRow: React.FC<{
   application: JobApplication;
   profileRevision: number | null;
 }> = ({ application, profileRevision }) => {
   const { t } = useTranslation();
   return (
-    <Card as="article" elevation="raised" className="relative gap-3 p-4">
-      <div className="flex items-start gap-3">
-        <div className="flex min-w-0 flex-1 flex-col">
-          <h2 className="text-[17px] leading-normal font-bold wrap-anywhere">
-            {/* The whole card opens the application. */}
-            <Link
-              to={applicationPath(application.id)}
-              className="text-text no-underline after:absolute after:inset-0 after:rounded-card hover:text-text hover:underline">
-              {application.title || t('applications.untitled')}
-            </Link>
-          </h2>
-          {application.company && (
-            <p className="text-[15px] leading-normal text-muted wrap-anywhere">
-              {application.company}
-            </p>
-          )}
+    <Card as="article" elevation="raised" className="relative p-4">
+      <div className="flex items-center gap-3">
+        {/* The chips sit on the right while there is room, and under the names when not. */}
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex min-w-0 flex-[1_1_240px] flex-col">
+            <h2 className="text-[17px] leading-normal font-bold wrap-anywhere">
+              <Link
+                to={applicationPath(application.id)}
+                className="text-text no-underline after:absolute after:inset-0 after:rounded-card hover:text-text hover:underline">
+                {application.title || t('applications.untitled')}
+              </Link>
+            </h2>
+            {application.company && (
+              <p className="text-[15px] leading-normal text-muted wrap-anywhere">
+                {application.company}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <BriefChips
+              application={application}
+              profileRevision={profileRevision}
+            />
+          </div>
         </div>
-        <span className="flex pt-1 text-muted">
+        <span className="flex text-muted">
           <Icon name="right" />
         </span>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <BriefChips
-          application={application}
-          profileRevision={profileRevision}
-        />
-      </div>
-    </Card>
-  );
-};
-
-const ProfileCard: React.FC = () => {
-  const { t } = useTranslation();
-  const { status, resources } = useInterviewProfile();
-  return (
-    <Card
-      as="section"
-      elevation="raised"
-      aria-labelledby="home-profile"
-      className="gap-3 p-4">
-      <h2
-        id="home-profile"
-        className="font-display text-[18px] leading-tight font-semibold">
-        {t('home.profileCardTitle')}
-      </h2>
-      {status === 'loaded' && (
-        <p className="text-[15px] leading-normal text-muted">
-          {t('home.profileCardResources', { count: resources.length })}
-        </p>
-      )}
-      <ButtonLink to={PROFILE_PATH} variant="secondary" size="small">
-        {t('home.openProfileButton')}
-      </ButtonLink>
     </Card>
   );
 };
 
 export const ApplicationsScreen: React.FC = () => {
   const { t } = useTranslation();
-  const firstName = useProfile()?.firstName ?? '';
+  const location = useLocation();
+  const navigate = useNavigate();
   const { status, applications, profileRevision } = useApplications();
   const { reload } = useApplicationsActions();
-  const [adding, setAdding] = useState(false);
-  const full = applications.length >= APPLICATIONS_MAX;
-  const navigate = useNavigate();
-  // The CV tool has its own flag (delivery 2b): without it, its path is "Coming soon".
-  const cvTool = useFlag('cvTool');
-
-  const listTitle = (
-    <h1 className={`flex-1 ${TITLE}`}>{t('home.applicationsTitle')}</h1>
+  // Open at once when "Prepare for a job" led here.
+  const [adding, setAdding] = useState(() =>
+    asksForNewApplication(location.state),
   );
+  const full = applications.length >= APPLICATIONS_MAX;
+  const loaded = status === 'loaded';
 
   let body: React.ReactNode;
   if (status === 'error') {
     body = (
-      <>
-        {listTitle}
-        <Banner
-          tone="danger"
-          role="alert"
-          action={
-            <Button variant="quiet" size="small" onClick={reload}>
-              {t('applications.retryButton')}
-            </Button>
-          }>
-          {t('applications.loadErrorMessage')}
-        </Banner>
-      </>
-    );
-  } else if (status === 'loaded' && applications.length === 0) {
-    body = (
-      <>
-        <div className="flex flex-col gap-1">
-          <h1 className={TITLE}>
-            {t('applications.welcomeTitle', { firstName })}
-          </h1>
-          <p className="text-[16px] leading-normal text-muted">
-            {t('applications.welcomeDescription')}
-          </p>
-        </div>
-        <StartCardContent />
-        <section aria-labelledby="home-paths" className="flex flex-col gap-4">
-          <h2
-            id="home-paths"
-            className="font-display text-[22px] leading-natural font-semibold">
-            {t('home.pathsTitle')}
-          </h2>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] gap-5">
-            <PathCard
-              icon="case"
-              title={t('home.prepareTitle')}
-              description={t('home.prepareDescription')}
-              onOpen={() => setAdding(true)}
-            />
-            <PathCard
-              icon="mic"
-              title={t('home.practiseTitle')}
-              description={t('home.practiseDescription')}
-            />
-            <PathCard
-              icon="file"
-              title={t('home.improveCvTitle')}
-              description={t('home.improveCvDescription')}
-              onOpen={cvTool ? () => navigate(CV_PATH) : undefined}
-            />
-          </div>
-        </section>
-      </>
-    );
-  } else if (status === 'loaded') {
-    body = (
-      <>
-        <div className="flex flex-wrap items-center gap-4">
-          {listTitle}
-          <Button
-            onClick={() => setAdding(true)}
-            disabled={full}
-            className="gap-2">
-            <Icon name="plus" size={18} />
-            {t('home.newApplicationButton')}
+      <Banner
+        tone="danger"
+        role="alert"
+        action={
+          <Button variant="quiet" size="small" onClick={reload}>
+            {t('applications.retryButton')}
           </Button>
-        </div>
+        }>
+        {t('applications.loadErrorMessage')}
+      </Banner>
+    );
+  } else if (loaded && applications.length === 0) {
+    // The heading says it, under "Your applications".
+    body = null;
+  } else if (loaded) {
+    body = (
+      <>
         {full && (
           <Banner tone="warning">
             {t('applications.maxMessage', { max: APPLICATIONS_MAX })}
           </Banner>
         )}
-        <div className="flex flex-wrap items-start gap-5">
-          <ul className="grid min-w-0 flex-[999_1_560px] grid-cols-[repeat(auto-fill,minmax(min(280px,100%),1fr))] gap-5">
-            {applications.map(application => (
-              <li key={application.id} className="flex flex-col">
-                <ApplicationCard
-                  application={application}
-                  profileRevision={profileRevision}
-                />
-              </li>
-            ))}
-          </ul>
-          <div className="min-w-0 flex-[1_1_260px]">
-            <ProfileCard />
-          </div>
-        </div>
+        <ul className="flex flex-col gap-3">
+          {applications.map(application => (
+            <li key={application.id} className="flex flex-col">
+              <ApplicationRow
+                application={application}
+                profileRevision={profileRevision}
+              />
+            </li>
+          ))}
+        </ul>
       </>
     );
   } else {
@@ -320,8 +180,46 @@ export const ApplicationsScreen: React.FC = () => {
     <SignedInShell
       title={t('applications.listDocumentTitle')}
       mainClassName={PROFILE_MAIN}>
-      <div className="mx-auto flex max-w-[1120px] flex-col gap-6">{body}</div>
-      {adding && <NewApplicationPanel onClose={() => setAdding(false)} />}
+      {/* One column, at the left of the page as the profile is (D91). */}
+      <div className="mx-auto max-w-[1120px]">
+        <div className="flex max-w-[760px] flex-col gap-6">
+          {(loaded || status === 'error') && (
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-1">
+                <h1 className="font-display text-[28px] leading-tight font-semibold">
+                  {t('home.applicationsTitle')}
+                </h1>
+                {loaded && applications.length === 0 && (
+                  <p className="text-[16px] leading-normal text-muted">
+                    {t('applications.emptyDescription')}
+                  </p>
+                )}
+              </div>
+              {loaded && (
+                <Button
+                  onClick={() => setAdding(true)}
+                  disabled={full}
+                  className="gap-2">
+                  <Icon name="plus" size={18} />
+                  {t('home.newApplicationButton')}
+                </Button>
+              )}
+            </div>
+          )}
+          {body}
+        </div>
+      </div>
+      {adding && (
+        <NewApplicationPanel
+          onClose={() => {
+            setAdding(false);
+            // Asked for by the link that led here: once is enough, also after a reload.
+            if (asksForNewApplication(location.state)) {
+              navigate(location.pathname, { replace: true, state: null });
+            }
+          }}
+        />
+      )}
     </SignedInShell>
   );
 };

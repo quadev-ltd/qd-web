@@ -4,7 +4,7 @@ import { MainNav } from './MainNav';
 
 import { renderWithProviders } from '@/testUtil/renderWithProviders';
 
-/** With the interview tools: Applications · CVs (with the CV tool) · Profile (D85). */
+/** With the interview tools: Profile · Applications · CVs (with the CV tool) (D85, D91). */
 const renderTools = (route: string, { cvTool = true } = {}) =>
   renderWithProviders(
     <MainNav
@@ -37,13 +37,13 @@ const current = () =>
     .map(link => link.textContent);
 
 describe('MainNav', () => {
-  it('reads Applications · CVs · Profile with the interview and CV tools, and has no Account', () => {
+  it('reads Profile · Applications · CVs with the interview and CV tools, and has no Account', () => {
     renderTools('/applications');
 
     expect(labels()).toEqual([
+      'profile.title',
       'applications.title',
       'cv.title',
-      'profile.title',
     ]);
     expect(
       screen.getByRole('link', { name: 'applications.title' }),
@@ -61,10 +61,10 @@ describe('MainNav', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('reads Applications · Profile without the CV tool', () => {
+  it('reads Profile · Applications without the CV tool', () => {
     renderTools('/applications', { cvTool: false });
 
-    expect(labels()).toEqual(['applications.title', 'profile.title']);
+    expect(labels()).toEqual(['profile.title', 'applications.title']);
   });
 
   it('reads Home · Profile without the interview tools', () => {

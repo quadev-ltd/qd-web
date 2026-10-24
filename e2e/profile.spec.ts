@@ -318,30 +318,29 @@ test('open a failed resource, read why, and remove it in the dialog: it is gone 
   ).toBeVisible();
 });
 
-test('Applications starts with "Add your CV", and leads to it once it is in the profile', async ({
+test('Profile welcomes a new account, starts with the CV, and keeps the paths until the first application (D91)', async ({
   page,
 }) => {
-  // The sample account has the interview tools on: it lands on its applications (D85).
+  // The sample account has the interview tools on: it lands on its profile.
   await signIn(page);
-  await expect(page).toHaveURL('/applications');
-  await expect(
-    page.getByText('Your applications will show here. Start with your CV.'),
-  ).toBeVisible();
-  await expect(page.getByText('Start here')).toBeVisible();
-  await expect(
-    page.getByText(
-      'Everything else builds on it. We read it once and use it for every job you apply for.',
-    ),
-  ).toBeVisible();
-  // Of the three paths, practice is not built yet and says so; the CV tool is on.
-  await expect(page.getByText('Coming soon')).toHaveCount(1);
-  await expect(page.getByText('Available', { exact: true })).toHaveCount(0);
-
-  // "Add your CV" leads to the profile, with its panel open
-  await page.getByRole('link', { name: 'Add your CV' }).click();
   await expect(page).toHaveURL('/profile');
+  await expect(
+    page.getByRole('heading', { level: 1, name: /^Welcome, / }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Your profile is what every brief and CV is built from.'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Start with your CV' }),
+  ).toBeVisible();
+  const paths = page.getByRole('region', { name: 'What do you want to do?' });
+  // Of the three paths, practice is not built yet and says so; the CV tool is on.
+  await expect(paths.getByRole('article')).toHaveCount(3);
+  await expect(paths.getByText('Coming soon')).toHaveCount(1);
+
+  // "Add your CV": once it is in, the profile's own heading and the list, the paths below it
+  await page.getByRole('button', { name: 'Add your CV' }).click();
   const panel = page.getByRole('dialog', { name: 'Add your CV' });
-  await expect(panel).toBeVisible();
   await panel.getByRole('button', { name: /Upload a file/ }).click();
   const form = page.getByRole('dialog', { name: 'Upload your CV' });
   await form.locator('input[type=file]').setInputFiles(CV_FILE);
@@ -350,28 +349,29 @@ test('Applications starts with "Add your CV", and leads to it once it is in the 
   await expect(
     page.getByRole('listitem').filter({ hasText: 'maya-okafor-cv' }),
   ).toContainText('Ready');
-
-  // A reload of the profile does not open the panel again
-  await page.reload();
   await expect(
-    page.getByRole('heading', { name: 'Resources · 1 of 20' }),
+    page.getByRole('heading', { level: 1, name: 'Profile' }),
   ).toBeVisible();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(paths).toBeVisible();
 
-  // Back in Applications: the invitation became one line that leads to the CV's page
+  // "Prepare for a job" opens Applications with "New application" open; one added, the paths go
+  await paths.getByRole('button', { name: /Prepare for a job/ }).click();
+  await expect(page).toHaveURL('/applications');
+  const newApplication = page.getByRole('dialog', { name: 'New application' });
+  await newApplication.getByRole('button', { name: 'Add the job' }).click();
+  await newApplication
+    .getByLabel('Job description')
+    .fill('Platform Engineer\nHalvorsen\nYou will run the platform.');
+  await newApplication.getByRole('button', { name: 'Add the job' }).click();
+  await expect(page).toHaveURL(/\/applications\/.+/);
   await page
     .getByRole('navigation', { name: 'Main' })
-    .getByRole('link', { name: 'Applications' })
+    .getByRole('link', { name: 'Profile' })
     .click();
-  await expect(page).toHaveURL('/applications');
-  const done = page.getByRole('link', { name: /Your CV is in your profile/ });
-  await expect(done).toContainText('maya-okafor-cv');
-  await expect(page.getByText('Start here')).toHaveCount(0);
-  await done.click();
-  await expect(page).toHaveURL(/\/profile\/resources\/.+/);
   await expect(
-    page.getByRole('heading', { level: 1, name: 'maya-okafor-cv' }),
+    page.getByRole('heading', { level: 1, name: 'Profile' }),
   ).toBeVisible();
+  await expect(paths).toHaveCount(0);
 });
 
 test('an account without the interview tools has the home as before: no starting card, and Applications leads there', async ({

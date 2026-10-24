@@ -2,8 +2,8 @@
 // screens use these constants.
 
 /**
- * The signed-in home, where signing in leads. An account with the interview tools has the
- * applications instead (D85), and this address leads there; everyone else keeps the home.
+ * The signed-in home, where signing in leads. An account with the interview tools has its
+ * profile instead (D91), and this address leads there; everyone else keeps the home.
  */
 export const HOME_PATH = '/home';
 

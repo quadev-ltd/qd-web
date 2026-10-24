@@ -1,4 +1,7 @@
-/** The interview profile: its resources and what was found in them. */
+/**
+ * The interview profile: its resources. The first page after signing in for an account with the
+ * interview tools (D91).
+ */
 export const PROFILE_PATH = '/profile';
 
 /** One resource of the profile: where it is, what was read from it, and "Remove". */
@@ -7,10 +10,7 @@ export const RESOURCE_PATH = `${PROFILE_PATH}/resources/:resourceId`;
 export const resourcePath = (resourceId: string) =>
   `${PROFILE_PATH}/resources/${encodeURIComponent(resourceId)}`;
 
-/**
- * The job applications (delivery 2a): their list, the first page after signing in for an
- * account with the interview tools (D85).
- */
+/** The job applications (delivery 2a): their list. */
 export const APPLICATIONS_PATH = '/applications';
 
 export const APPLICATIONS_PREFIX = `${APPLICATIONS_PATH}/`;

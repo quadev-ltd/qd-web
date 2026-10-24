@@ -299,7 +299,7 @@ test('delete account with Google: no password, the confirmation on the public ho
   // The sample account has Google among its sign-in methods: it confirms with Google (the
   // preview has no Google window) and, being built in, is only signed out.
   await signIn(page);
-  await expect(page).toHaveURL('/applications');
+  await expect(page).toHaveURL('/profile');
   await page.goto('/account/delete');
   await expect(
     page.getByRole('heading', { level: 1, name: 'Are you sure?' }),
@@ -313,5 +313,5 @@ test('delete account with Google: no password, the confirmation on the public ho
   await expect(page).toHaveURL('/sign-in');
   // (the sample account can still sign in: the other tests need it)
   await signIn(page, SAMPLE_USER.email, SAMPLE_USER.password);
-  await expect(page).toHaveURL('/applications');
+  await expect(page).toHaveURL('/profile');
 });

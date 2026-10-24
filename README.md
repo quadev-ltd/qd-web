@@ -449,7 +449,7 @@ Rules (the same as in `qd-mobile` where they exist there):
   answer after a pause can take ten seconds (ADR 0007).
 - **Route guards** (`src/app/guards.tsx`) read the session status, like the app's Router. Each
   status has its page: `needsEmailVerification` → `/verify-email`, `needsProfile` →
-  `/complete-profile`, `ready` → `/home` (which leads to `/applications` for an account with
+  `/complete-profile`, `ready` → `/home` (which leads to `/profile` for an account with
   `interviewAssistant`), `/account`, `/account/delete` and the interview tools' pages. While the session is `initializing`
   they show the loading screen; a user who opens the page of another status (or `/sign-in`,
   `/sign-up`) is sent to the page of theirs; a visitor who is not signed in is sent to `/sign-in`; a
@@ -465,11 +465,11 @@ Rules (the same as in `qd-mobile` where they exist there):
   the app's (and the backend's): never add a flag here that the backend does not have. The user's
   overrides are read from the backend after sign-in (see [The interview profile](#the-interview-profile));
   then Remote Config, then the code default (all off). An account with `interviewAssistant` lands
-  on Applications, which starts with "Add your CV"; any other account lands on the home, whose
-  three tools are not built on the website yet and say "Coming soon".
-- **Navigation** (D85, ADR 0005): the bar is Applications · CVs · Profile with the interview tools
-  (CVs with `cvTool`), Home · Profile without them; the account is behind the name, on its own
-  page (`/account`).
+  on its profile, which welcomes a new account and starts with the CV; any other account lands on
+  the home, whose three tools are not built on the website yet and say "Coming soon".
+- **Navigation** (D85, D91, ADR 0005): the bar is Profile · Applications · CVs with the interview
+  tools (CVs with `cvTool`), Home · Profile without them; the account is behind the name, on its
+  own page (`/account`).
 - **Focus ring:** one rule for every interactive element (`global.css`). Its colour follows the
   surface: `data-surface="dark"` (brand and indigo backgrounds) uses the sky blue, light surfaces a
   darker blue, so the ring always has enough contrast.
@@ -499,10 +499,11 @@ Rules (the same as in `qd-mobile` where they exist there):
 ## Job applications
 
 The second part of the interview tools (delivery 2a): one application for each job the candidate
-applies for, built on the profile. An account with the `interviewAssistant` flag lands on
-Applications (`/applications`, D85): with none yet, "Welcome", "Add your CV" and three paths ("Prepare for a
-job" opens "New application"; practice and the CV tool say "Coming soon"); with some, "Your
-applications", each with where its brief is, and "Your profile". A new application is its job: pasted
+applies for, built on the profile. Applications (`/applications`) lists them one per row, each with
+where its brief is, under "Your applications" and "New application". Until the first one, the
+profile shows three paths under it (D58, D91): "Prepare for a job" opens Applications with "New
+application" open; practice says "Coming soon"; "Improve your CV" opens the CV section with
+`cvTool`. A new application is its job: pasted
 text, a file (PDF, Word or text) or the address of the posting, which the backend reads and names
 it from; its page (`/applications/:id`) follows the reading, then opens on its brief (prepared on request, up to a
 minute: what the job asks for, what the profile shows and the gaps, the likely questions with
@@ -518,25 +519,25 @@ its address, and a file's title from its name; a posting on a host under `.inval
 
 ## Pages
 
-| Path                     | Screen                                                                                                              |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `/`                      | Public home                                                                                                         |
-| `/privacy-policy`        | Privacy Policy                                                                                                      |
-| `/terms-and-conditions`  | Terms and Conditions                                                                                                |
-| `/delete-account`        | How to delete an account (public; the stores link to it)                                                            |
-| `/sign-in`               | Sign in (only with the account flag on)                                                                             |
-| `/sign-up`               | Sign up (only with the account flag on)                                                                             |
-| `/forgot-password`       | Reset password (only with the account flag on)                                                                      |
-| `/verify-email`          | Verify your email (flag on; signed in, email not verified yet)                                                      |
-| `/complete-profile`      | Complete your profile (flag on; signed in, no names in the profile yet)                                             |
-| `/home`                  | Signed-in home (only with the account flag on; needs a session); leads to `/applications` with `interviewAssistant` |
-| `/account`               | Your account: personal details, sign-in and security (flag on; needs a session)                                     |
-| `/account/delete`        | Delete the signed-in account (flag on; needs a session)                                                             |
-| `/profile`               | The interview profile (flag on; needs a session and `interviewAssistant`)                                           |
-| `/profile/resources/:id` | One resource of the profile (the same conditions)                                                                   |
-| `/applications`          | Applications, where an account with `interviewAssistant` lands; `/home` without it                                  |
-| `/applications/:id`      | One job application: its details and the job (flag `interviewAssistant`)                                            |
-| anything else            | Not found                                                                                                           |
+| Path                     | Screen                                                                                                           |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `/`                      | Public home                                                                                                      |
+| `/privacy-policy`        | Privacy Policy                                                                                                   |
+| `/terms-and-conditions`  | Terms and Conditions                                                                                             |
+| `/delete-account`        | How to delete an account (public; the stores link to it)                                                         |
+| `/sign-in`               | Sign in (only with the account flag on)                                                                          |
+| `/sign-up`               | Sign up (only with the account flag on)                                                                          |
+| `/forgot-password`       | Reset password (only with the account flag on)                                                                   |
+| `/verify-email`          | Verify your email (flag on; signed in, email not verified yet)                                                   |
+| `/complete-profile`      | Complete your profile (flag on; signed in, no names in the profile yet)                                          |
+| `/home`                  | Signed-in home (only with the account flag on; needs a session); leads to `/profile` with `interviewAssistant`   |
+| `/account`               | Your account: personal details, sign-in and security (flag on; needs a session)                                  |
+| `/account/delete`        | Delete the signed-in account (flag on; needs a session)                                                          |
+| `/profile`               | The interview profile, where an account with `interviewAssistant` lands (flag on; needs a session and that flag) |
+| `/profile/resources/:id` | One resource of the profile (the same conditions)                                                                |
+| `/applications`          | Applications, the list (flag `interviewAssistant`); `/home` without it                                           |
+| `/applications/:id`      | One job application: its details and the job (flag `interviewAssistant`)                                         |
+| anything else            | Not found                                                                                                        |
 
 # Quickstart
 

@@ -156,8 +156,19 @@ describe('routes', () => {
       });
 
       it('shows the profile when they are on', async () => {
+        // A user, so the profile is read: here the gateway is the unavailable one, and the
+        // page says it could not read it under its own heading.
         await renderRoute('/profile', {
-          ...signedIn,
+          session: {
+            ...signedIn.session,
+            user: {
+              uid: 'uid-1',
+              email: 'maya@example.com',
+              emailVerified: true,
+              displayName: null,
+              providerIds: ['password'],
+            },
+          },
           flags: { interviewAssistant: true },
         });
 
@@ -170,7 +181,7 @@ describe('routes', () => {
       });
     });
 
-    describe('where a signed-in user lands (D85)', () => {
+    describe('where a signed-in user lands (D85, D91)', () => {
       const signedIn = {
         session: {
           status: SessionStatus.Ready,
@@ -178,7 +189,7 @@ describe('routes', () => {
         },
       };
 
-      it('sends the home to the applications for an account with the interview tools', async () => {
+      it('sends the home to the profile for an account with the interview tools', async () => {
         const { router } = await renderRoute('/home', {
           ...signedIn,
           flags: { interviewAssistant: true },
@@ -186,11 +197,11 @@ describe('routes', () => {
 
         expect(
           await screen.findByRole('link', {
-            name: 'applications.title',
+            name: 'profile.title',
             current: 'page',
           }),
         ).toBeInTheDocument();
-        expect(router.state.location.pathname).toBe('/applications');
+        expect(router.state.location.pathname).toBe('/profile');
       });
 
       it('sends the applications to the home for an account without them', async () => {

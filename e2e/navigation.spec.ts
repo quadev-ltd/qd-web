@@ -1,29 +1,30 @@
-// The sections named after what is in them (D85, doc 15 §19): the bar, where signing in lands,
-// the account behind the name on its own page, and the logo back.
+// The sections named after what is in them (D85, doc 15 §19), Profile first (D91, doc 15 §20):
+// the bar, where signing in lands, the account behind the name on its own page, and the logo
+// back.
 import { expect, test } from '@playwright/test';
 
 import { SAMPLE_USER, signIn } from './support';
 
-test('sign in to Applications, open the account from the name, see the CV details from it, and come back with the logo', async ({
+test('sign in to Profile, open the account from the name, see the CV details from it, and come back with the logo', async ({
   page,
 }) => {
   await signIn(page);
-  await expect(page).toHaveURL('/applications');
-  await expect(page).toHaveTitle('Applications | QuaDev');
+  await expect(page).toHaveURL('/profile');
+  await expect(page).toHaveTitle('Profile | QuaDev');
   const bar = page.getByRole('navigation', { name: 'Main' });
   await expect(bar.getByRole('link')).toHaveText([
+    'Profile',
     'Applications',
     'CVs',
-    'Profile',
   ]);
-  await expect(bar.getByRole('link', { name: 'Applications' })).toHaveAttribute(
+  await expect(bar.getByRole('link', { name: 'Profile' })).toHaveAttribute(
     'aria-current',
     'page',
   );
 
   // The old address of the home leads here too
   await page.goto('/home');
-  await expect(page).toHaveURL('/applications');
+  await expect(page).toHaveURL('/profile');
 
   // The menu behind the name: the name and email, then Account and Sign out
   await page.getByRole('button', { name: /Account menu for/ }).click();
@@ -65,16 +66,16 @@ test('sign in to Applications, open the account from the name, see the CV detail
   await page.goBack();
   await expect(page).toHaveURL('/account');
 
-  // The logo leads back to Applications
+  // The logo leads back to the profile
   await page.getByRole('link', { name: 'QUADEV', exact: true }).click();
-  await expect(page).toHaveURL('/applications');
+  await expect(page).toHaveURL('/profile');
 });
 
 test('an application keeps Applications marked, and its back link says so', async ({
   page,
 }) => {
   await signIn(page);
-  await expect(page).toHaveURL('/applications');
+  await expect(page).toHaveURL('/profile');
   await page.goto('/applications/not-there');
 
   await expect(

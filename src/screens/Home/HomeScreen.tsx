@@ -1,5 +1,5 @@
 // The signed-in home of an account without the interview tools: the welcome and the three
-// tools, "Coming soon". An account with them has Applications instead (D85), and this address,
+// tools, "Coming soon". An account with them has its profile instead (D91), and this address,
 // where signing in leads, sends it there. The account has its own page (/account); an old
 // link to its section here (#account) leads to it.
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ import SignedInShell from '@/components/layout/SignedInShell';
 import Spinner from '@/components/Spinner';
 import { ACCOUNT_PATH } from '@/core/auth/paths';
 import { useFlag, useFlagsReady } from '@/core/flags/FlagsProvider';
-import { APPLICATIONS_PATH } from '@/core/profile/paths';
+import { PROFILE_PATH } from '@/core/profile/paths';
 import { useProfile } from '@/core/session/hooks';
 
 export const HomeScreen: React.FC = () => {
@@ -36,7 +36,7 @@ export const HomeScreen: React.FC = () => {
     );
   }
   if (interviewAssistant) {
-    return <Navigate to={APPLICATIONS_PATH} replace />;
+    return <Navigate to={PROFILE_PATH} replace />;
   }
 
   return (

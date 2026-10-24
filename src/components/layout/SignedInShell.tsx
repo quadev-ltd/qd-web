@@ -20,7 +20,7 @@ export interface SignedInShellProps {
 /**
  * The frame of the signed-in pages: the light page with the dark header, the main navigation
  * and the account menu. The app shows the same things in its drawer. The logo leads to where
- * the user lands: the applications with the interview tools (D85), the home without them.
+ * the user lands: the profile with the interview tools (D91), the home without them.
  */
 export const SignedInShell: React.FC<SignedInShellProps> = ({
   title,
@@ -45,7 +45,7 @@ export const SignedInShell: React.FC<SignedInShellProps> = ({
       tone="light"
       title={title}
       mainClassName={mainClassName}
-      brandPath={interviewTools ? APPLICATIONS_PATH : HOME_PATH}
+      brandPath={interviewTools ? PROFILE_PATH : HOME_PATH}
       headerNav={
         // The sections depend on the flags: until they are read, the bar keeps its place
         // empty rather than show the wrong ones.

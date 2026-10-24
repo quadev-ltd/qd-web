@@ -23,8 +23,9 @@ export interface MainNavProps {
 
 /**
  * The main navigation of the signed-in pages, next to the brand in the header: the sections
- * named after what is in them, Applications · CVs · Profile (D85), or Home · Profile for an
- * account without the interview tools. The account is behind the name (AccountMenu).
+ * named after what is in them (D85), Profile first (D91): Profile · Applications · CVs, or
+ * Home · Profile for an account without the interview tools. The account is behind the name
+ * (AccountMenu).
  */
 export const MainNav: React.FC<MainNavProps> = ({
   homePath,
@@ -42,6 +43,9 @@ export const MainNav: React.FC<MainNavProps> = ({
           {t('drawerMenu.home')}
         </NavLink>
       )}
+      <NavLink to={profilePath} className={linkClass}>
+        {t('profile.title')}
+      </NavLink>
       {applicationsPath && (
         <NavLink to={applicationsPath} className={linkClass}>
           {t('applications.title')}
@@ -52,9 +56,6 @@ export const MainNav: React.FC<MainNavProps> = ({
           {t('cv.title')}
         </NavLink>
       )}
-      <NavLink to={profilePath} className={linkClass}>
-        {t('profile.title')}
-      </NavLink>
     </nav>
   );
 };

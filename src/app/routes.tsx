@@ -123,13 +123,6 @@ const accountRoutes: RouteObject[] = [
         }),
         children: [
           {
-            path: PROFILE_PATH,
-            lazy: async () => ({
-              Component: (await import('@/screens/Profile/ProfileScreen'))
-                .ProfileScreen,
-            }),
-          },
-          {
             path: RESOURCE_PATH,
             lazy: async () => ({
               Component: (
@@ -138,7 +131,8 @@ const accountRoutes: RouteObject[] = [
             }),
           },
           // The job applications (delivery 2a): behind the same flag, with the applications.
-          // Their list is where an account with the flag lands (D85).
+          // The profile is with them: it is where an account with the flag lands, and shows a
+          // new account's start until its first application (D91).
           {
             lazy: async () => ({
               Component: (
@@ -146,6 +140,13 @@ const accountRoutes: RouteObject[] = [
               ).ApplicationRoutes,
             }),
             children: [
+              {
+                path: PROFILE_PATH,
+                lazy: async () => ({
+                  Component: (await import('@/screens/Profile/ProfileScreen'))
+                    .ProfileScreen,
+                }),
+              },
               {
                 path: APPLICATIONS_PATH,
                 lazy: async () => ({
