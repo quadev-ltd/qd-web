@@ -4,6 +4,7 @@ import { createMockProfileGateway } from './mockProfileGateway';
 import { renderWithProviders } from './renderWithProviders';
 
 import { type SessionUser } from '@/core/auth/types';
+import { type FlagValues } from '@/core/flags/registry';
 import { ApplicationsProvider } from '@/core/profile/ApplicationsProvider';
 import { InterviewProfileProvider } from '@/core/profile/InterviewProfileProvider';
 import { type ApplicationsState } from '@/core/state/slices/applicationsSlice';
@@ -27,6 +28,8 @@ interface Options {
   route?: string;
   /** Router state at that URL (what a <Link state> passes). */
   routeState?: unknown;
+  /** Flags on top of the interview tools' (`cvTool`). */
+  flags?: FlagValues;
 }
 
 /**
@@ -42,6 +45,7 @@ export const renderProfilePage = (
     applications,
     route = '/profile',
     routeState,
+    flags,
   }: Options = {},
 ) => ({
   gateway,
@@ -53,7 +57,7 @@ export const renderProfilePage = (
       route,
       routeState,
       profileGateway: gateway,
-      flags: { interviewAssistant: true },
+      flags: { interviewAssistant: true, ...flags },
       interviewProfile,
       applications,
       session: {

@@ -68,7 +68,7 @@ test('E4: a pasted job is read and named, shown on its page and the home, edited
   await expect(page).toHaveURL('/applications');
   await page.reload();
   await expect(
-    page.getByRole('heading', { name: 'What do you want to do?' }),
+    page.getByText(/^Paste a job you are applying for, or its link/),
   ).toBeVisible();
 });
 

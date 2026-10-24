@@ -1,10 +1,13 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes, useLocation } from 'react-router';
 
 import { ProfileScreen } from './ProfileScreen';
 
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
+import { type ApplicationsState } from '@/core/state/slices/applicationsSlice';
 import { type InterviewProfileState } from '@/core/state/slices/interviewProfileSlice';
+import { applicationFixture } from '@/testUtil/applicationFixtures';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
 import { resourceFixture } from '@/testUtil/profileFixtures';
 import { renderProfilePage } from '@/testUtil/renderProfilePage';
@@ -22,12 +25,27 @@ const loaded = (
   ...overrides,
 });
 
+/** The applications as read: none, or one. */
+const applicationsRead = (count: 0 | 1): Partial<ApplicationsState> => ({
+  uid: 'uid-1',
+  status: 'loaded',
+  applications: count ? [applicationFixture()] : [],
+});
+
+const Location = () => {
+  const { pathname, state } = useLocation();
+  return <p>{`at ${pathname} ${JSON.stringify(state)}`}</p>;
+};
+
 const addButton = () =>
   screen.queryByRole('button', { name: 'profile.addResourceButton' });
 
 describe('ProfileScreen', () => {
-  it('has the page heading, says what the profile is for and sits in the signed-in frame', async () => {
-    renderProfilePage(<ProfileScreen />);
+  it('has the page heading, says what the profile is for and sits in the signed-in frame', () => {
+    renderProfilePage(<ProfileScreen />, {
+      interviewProfile: loaded(),
+      applications: applicationsRead(1),
+    });
 
     expect(
       screen.getByRole('heading', { level: 1, name: 'profile.title' }),
@@ -38,7 +56,138 @@ describe('ProfileScreen', () => {
       'aria-current',
       'page',
     );
-    await screen.findByText('profile.emptyTitle');
+  });
+
+  describe("a new account's start (D58, D91)", () => {
+    const renderStart = ({
+      resources = [],
+      applications,
+      flags,
+    }: {
+      resources?: ReturnType<typeof resourceFixture>[];
+      applications?: Partial<ApplicationsState>;
+      flags?: { cvTool?: boolean };
+    }) =>
+      renderProfilePage(
+        <Routes>
+          <Route path="/profile" element={<ProfileScreen />} />
+          <Route path="*" element={<Location />} />
+        </Routes>,
+        { interviewProfile: loaded({ resources }), applications, flags },
+      );
+
+    const paths = () =>
+      screen.queryByRole('region', { name: 'home.pathsTitle' });
+
+    it('welcomes an account with neither resources nor applications, then the empty profile and the three paths', () => {
+      renderStart({ applications: applicationsRead(0) });
+
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'profile.welcomeTitle' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('profile.welcomeDescription'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 2, name: 'profile.emptyTitle' }),
+      ).toBeInTheDocument();
+      expect(
+        within(paths() as HTMLElement)
+          .getAllByRole('article')
+          .map(card => card.textContent),
+      ).toEqual([
+        'home.prepareTitlehome.prepareDescription',
+        'home.practiseTitlehome.practiseDescriptionhome.comingSoonChip',
+        'home.improveCvTitlehome.improveCvDescriptionhome.comingSoonChip',
+      ]);
+    });
+
+    it('keeps the paths under the list once there are resources, until the first application', () => {
+      renderStart({
+        resources: [resourceFixture({ title: 'Maya Okafor CV 2026' })],
+        applications: applicationsRead(0),
+      });
+
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'profile.title' }),
+      ).toBeInTheDocument();
+      const list = screen.getByRole('list');
+      expect(
+        list.compareDocumentPosition(paths() as HTMLElement) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it('has no paths once there is an application', () => {
+      renderStart({
+        resources: [resourceFixture()],
+        applications: applicationsRead(1),
+      });
+
+      expect(paths()).not.toBeInTheDocument();
+    });
+
+    it('gives an account with applications but no resources the profile’s own heading, its empty state and no paths', () => {
+      renderStart({ applications: applicationsRead(1) });
+
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'profile.title' }),
+      ).toBeInTheDocument();
+      expect(screen.getByText('profile.emptyTitle')).toBeInTheDocument();
+      expect(paths()).not.toBeInTheDocument();
+    });
+
+    it('waits for the applications before it welcomes, and uses the profile’s heading when they cannot be read', async () => {
+      const gateway = createMockProfileGateway();
+      let fail: (error: unknown) => void = () => {};
+      gateway.getApplications.mockReturnValue(
+        new Promise((_, reject) => {
+          fail = reject;
+        }),
+      );
+      renderProfilePage(<ProfileScreen />, {
+        gateway,
+        interviewProfile: loaded({ resources: [] }),
+      });
+
+      expect(
+        screen.getByRole('status', { name: 'spinner.accessibilityLabel' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+
+      fail(new ProfileError(ProfileErrorCode.Unknown));
+
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'profile.title' }),
+      ).toBeInTheDocument();
+      expect(screen.getByText('profile.emptyTitle')).toBeInTheDocument();
+      expect(paths()).not.toBeInTheDocument();
+    });
+
+    it('opens Applications with "New application" from "Prepare for a job"', async () => {
+      renderStart({ applications: applicationsRead(0) });
+
+      await userEvent.click(
+        screen.getByRole('button', { name: /home\.prepareTitle/ }),
+      );
+
+      expect(
+        screen.getByText('at /applications {"add":"application"}'),
+      ).toBeInTheDocument();
+    });
+
+    it('opens the CV section from "Improve your CV" with the CV tool', async () => {
+      renderStart({
+        applications: applicationsRead(0),
+        flags: { cvTool: true },
+      });
+
+      await userEvent.click(
+        screen.getByRole('button', { name: /home\.improveCvTitle/ }),
+      );
+
+      expect(screen.getByText('at /cv null')).toBeInTheDocument();
+    });
   });
 
   describe('while the profile is being read', () => {
@@ -208,6 +357,7 @@ describe('ProfileScreen', () => {
 
     it('shows the list and "Add a resource", and nothing else', () => {
       renderProfilePage(<ProfileScreen />, {
+        applications: applicationsRead(1),
         interviewProfile: loaded({
           resources: [
             resourceFixture({ id: 'a', title: 'Maya Okafor CV 2026' }),
@@ -310,6 +460,7 @@ describe('ProfileScreen', () => {
     it('keeps an empty profile from adding once today’s limit is reached', () => {
       renderProfilePage(<ProfileScreen />, {
         interviewProfile: loaded({ resources: [], extractionsToday: 20 }),
+        applications: applicationsRead(0),
       });
 
       expect(screen.getByText('profile.dailyLimitMessage')).toBeInTheDocument();

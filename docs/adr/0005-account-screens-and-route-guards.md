@@ -110,6 +110,24 @@ The signed-in pages are named after what is in them (D85, research doc 13 §22, 
   An old link to `/home#account` leads to `/account`. "Change password", "Delete account" and its
   Cancel lead back to `/account`.
 
+### Profile first (D91, 24 Oct 2026)
+
+D91 changes D85's order and landing page. The bar reads Profile · Applications · CVs, and `/home`
+and the logo lead an account with `interviewAssistant` to `/profile`. A new account's start (D58)
+moves to the profile:
+
+- with neither resources nor applications, the heading is "Welcome, Maya" with "Your profile is
+  what every brief and CV is built from.", over the empty profile;
+- until the first application, "What do you want to do?" with the three paths sits under the
+  profile. "Prepare for a job" opens Applications with "New application" open, through the link's
+  state as "Add your CV" does, so there is no new address.
+
+The profile therefore reads the applications too: its route sits with theirs. An empty profile
+waits for them before it chooses its heading. When they can't be read, it shows "Profile" and no
+paths; Applications says why. Applications is one column at the profile's width: one row per
+application, with nothing beside the list, and with none yet the line that says what an
+application gives.
+
 ## Consequences
 
 - The account flows can be walked end to end without a backend, in the preview and in the

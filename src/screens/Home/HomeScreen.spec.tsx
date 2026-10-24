@@ -87,10 +87,10 @@ describe('HomeScreen', () => {
     });
   });
 
-  it('sends an account with the interview tools to its applications (D85)', () => {
+  it('sends an account with the interview tools to its profile (D91)', () => {
     renderHome({ flags: { interviewAssistant: true } });
 
-    expect(screen.getByText('at /applications')).toBeInTheDocument();
+    expect(screen.getByText('at /profile')).toBeInTheDocument();
   });
 
   it('waits for the flags before it decides', () => {

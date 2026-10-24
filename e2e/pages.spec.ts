@@ -70,14 +70,18 @@ for (const { name, path, heading } of PUBLIC_PAGES) {
   });
 }
 
-test('Applications for a new account, the account menu open, and "Your account": accessible and no horizontal scroll', async ({
+test('Profile for a new account, the account menu open, and "Your account": accessible and no horizontal scroll', async ({
   page,
 }) => {
-  // The sample account has the interview and CV tools: it lands on Applications (D85)
+  // The sample account has the interview and CV tools: it lands on its profile, with the
+  // welcome and the paths (D91)
   await signIn(page);
-  await expect(page).toHaveURL('/applications');
+  await expect(page).toHaveURL('/profile');
   await expect(
     page.getByRole('heading', { level: 1, name: /Welcome, / }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'What do you want to do?' }),
   ).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
   await expectNoHorizontalScroll(page);
@@ -118,12 +122,12 @@ test('the home of an account without the interview tools: accessible and no hori
 test('applications: the list without and with them, a new one, an application, its edit panel and remove dialog: accessible and no horizontal scroll', async ({
   page,
 }) => {
-  // No application yet: "Add your CV" and the three paths
+  // No application yet: the heading, "New application" and the line that says what one gives
   await openApplications(page);
   await expectAccessibleAndNotTooWide(page);
 
   // "New application", with its messages
-  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  await page.getByRole('button', { name: 'New application' }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel.getByRole('button', { name: 'Add the job' }).click();
   await expect(
@@ -237,13 +241,16 @@ test('the brief, not prepared, ready with a requirement and a question open, out
 test('profile, empty and with resources in every state: accessible and no horizontal scroll', async ({
   page,
 }) => {
-  // The sample account has the interview tools on.
+  // The sample account has the interview tools on: a new account is welcomed (D91)
   await openProfile(page);
   await expect(
-    page.getByText('What you have done, read once and reused for every job.'),
+    page.getByText('Your profile is what every brief and CV is built from.'),
   ).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'Start with your CV' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'What do you want to do?' }),
   ).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
   await expectNoHorizontalScroll(page);
@@ -346,7 +353,7 @@ test('a posting read again, its outcome and "Replace your edited text?": accessi
   page,
 }) => {
   await openApplications(page);
-  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  await page.getByRole('button', { name: 'New application' }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel.getByText('Link', { exact: true }).click();
   await panel
@@ -407,7 +414,7 @@ test('CV versions: nothing in the profile, no version yet, the panel, the detail
     .getByRole('link', { name: 'Profile' })
     .click();
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Profile' }),
+    page.getByRole('heading', { name: 'Start with your CV' }),
   ).toBeVisible();
   await seedProfile(page);
   // A version made before D83, for its review below

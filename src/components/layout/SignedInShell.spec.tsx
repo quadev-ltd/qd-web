@@ -44,24 +44,24 @@ describe('SignedInShell', () => {
     );
   });
 
-  it('has Applications · CVs · Profile with the interview and CV tools, and the logo leads to the applications (D85)', () => {
+  it('has Profile · Applications · CVs with the interview and CV tools, and the logo leads to the profile (D91)', () => {
     renderShell({ flags: { interviewAssistant: true, cvTool: true } });
 
     expect(navLabels()).toEqual([
+      'profile.title',
       'applications.title',
       'cv.title',
-      'profile.title',
     ]);
     expect(screen.getByRole('link', { name: 'brand.name' })).toHaveAttribute(
       'href',
-      '/applications',
+      '/profile',
     );
   });
 
-  it('has Applications · Profile without the CV tool', () => {
+  it('has Profile · Applications without the CV tool', () => {
     renderShell({ flags: { interviewAssistant: true, cvTool: false } });
 
-    expect(navLabels()).toEqual(['applications.title', 'profile.title']);
+    expect(navLabels()).toEqual(['profile.title', 'applications.title']);
   });
 
   it('has Home · Profile without the interview tools, and the logo leads to the home', () => {

@@ -2,19 +2,21 @@
 // together in a browser. The same use case against the backend's code is in e2e-emulators/.
 import { expect, test } from '@playwright/test';
 
-import { openApplications, seedApplications } from './support';
+import { openApplications, seedApplications, signIn } from './support';
 
 // The in-memory reading takes the title and the company from the first two lines.
 const JOB =
   'Senior Backend Engineer\nNorthwind Logistics\nNorthwind Logistics moves two million parcels a day across Europe. We are looking for a Senior Backend Engineer to own the services behind parcel tracking.';
 
-test('an application: added from the home, its page, edited, removed', async ({
+test('an application: added from the profile’s "Prepare for a job", its page, edited, removed', async ({
   page,
 }) => {
-  await openApplications(page);
+  await signIn(page);
+  await expect(page).toHaveURL('/profile');
 
-  // "Prepare for a job" opens "New application"
+  // "Prepare for a job" opens Applications with "New application" open (D91)
   await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  await expect(page).toHaveURL('/applications');
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel.getByRole('button', { name: 'Add the job' }).click();
   await expect(
@@ -96,26 +98,49 @@ test('an application: added from the home, its page, edited, removed', async ({
   await dialog.getByRole('button', { name: 'Remove the application' }).click();
   await expect(page).toHaveURL('/applications');
   await expect(
-    page.getByRole('heading', { name: 'What do you want to do?' }),
+    page.getByText(
+      'Paste a job you are applying for, or its link, and get a brief: what it asks for, what your profile shows and what is missing.',
+    ),
   ).toBeVisible();
 });
 
-test('the home lists the applications with where their brief is', async ({
+test('Applications lists them one per row, with where their brief is', async ({
   page,
-}) => {
+}, testInfo) => {
   await openApplications(page);
   await seedApplications(page);
 
-  const cards = page.getByRole('listitem');
+  const cards = page.getByRole('main').getByRole('listitem');
   await expect(cards).toHaveCount(3);
   await expect(cards.nth(0)).toContainText('Senior Backend Engineer');
   await expect(cards.nth(0)).toContainText('Brief ready');
   await expect(cards.nth(0)).toContainText('2 gaps');
   await expect(cards.nth(1)).toContainText('Brief out of date');
   await expect(cards.nth(2)).toContainText('No brief yet');
-  await expect(
-    page.getByRole('region', { name: 'Your profile' }),
-  ).toContainText('6 resources');
+  // Nothing beside the list: the profile is in the bar (D91)
+  await expect(page.getByRole('region', { name: 'Your profile' })).toHaveCount(
+    0,
+  );
+
+  // One column at the profile's width; the chips beside the names on a wide screen, under
+  // them on a phone
+  const boxes = await Promise.all(
+    [0, 1, 2].map(index => cards.nth(index).boundingBox()),
+  );
+  expect(new Set(boxes.map(box => Math.round(box?.x ?? -1))).size).toBe(1);
+  for (const box of boxes) {
+    expect(box?.width).toBeLessThanOrEqual(760);
+  }
+  const title = await cards
+    .nth(0)
+    .getByRole('heading', { name: 'Senior Backend Engineer' })
+    .boundingBox();
+  const chip = await cards.nth(0).getByText('Brief ready').boundingBox();
+  if (testInfo.project.name === 'phone') {
+    expect(chip!.y).toBeGreaterThan(title!.y + title!.height);
+  } else {
+    expect(chip!.x).toBeGreaterThan(title!.x + title!.width);
+  }
 
   // A card opens its application
   await cards.nth(1).getByRole('link').click();
@@ -132,7 +157,7 @@ test('the brief: prepared, opened on a gap and a question, out of date when the 
   await page.reload();
 
   // A new application opens on its brief, not prepared yet
-  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  await page.getByRole('button', { name: 'New application' }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel
     .getByLabel('Job description')
@@ -215,7 +240,7 @@ test('a posting that cannot be read: "Paste the text instead", named in the same
   page,
 }) => {
   await openApplications(page);
-  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  await page.getByRole('button', { name: 'New application' }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel.getByText('Link', { exact: true }).click();
   await panel
@@ -254,7 +279,7 @@ test('a posting read again: the same posting, a changed one that dates the brief
   page,
 }) => {
   await openApplications(page);
-  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  await page.getByRole('button', { name: 'New application' }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel.getByText('Link', { exact: true }).click();
   await panel
@@ -324,7 +349,7 @@ test('a posting that could not be read is tried again, and read', async ({
   await page.evaluate(() =>
     window.qdPreviewProfile?.failNextJob('link-unreadable'),
   );
-  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  await page.getByRole('button', { name: 'New application' }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel.getByText('Link', { exact: true }).click();
   await panel
@@ -348,7 +373,7 @@ test('a job as a file: uploaded, read, named from the file, its source on Detail
   page,
 }) => {
   await openApplications(page);
-  await page.getByRole('button', { name: /Prepare for a job/ }).click();
+  await page.getByRole('button', { name: 'New application' }).click();
   const panel = page.getByRole('dialog', { name: 'New application' });
   await panel.getByText('File', { exact: true }).click();
   await panel.locator('input[type=file]').setInputFiles({

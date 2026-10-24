@@ -60,14 +60,11 @@ export const loseProfile = (page: Page) =>
 
 /** Signs in as the sample account (it has the interview tools on) and opens its profile. */
 export const openProfile = async (page: Page) => {
+  // The sample account lands on its profile (D91); with nothing in it yet, it is welcomed there.
   await signIn(page);
-  await page
-    .getByRole('navigation', { name: 'Main' })
-    .getByRole('link', { name: 'Profile' })
-    .click();
   await expect(page).toHaveURL('/profile');
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Profile' }),
+    page.getByRole('heading', { level: 1, name: /^(Profile|Welcome, .+)$/ }),
   ).toBeVisible();
 };
 
@@ -127,12 +124,20 @@ export const expectInsideViewport = async (page: Page, locator: Locator) => {
 
 // Job applications (delivery 2a), with the same preview gateway.
 
-/** Signs in as the sample account and waits for where it lands: its applications (D85). */
+/**
+ * Signs in as the sample account, which lands on its profile (D91), and opens Applications from
+ * the bar.
+ */
 export const openApplications = async (page: Page) => {
   await signIn(page);
+  await expect(page).toHaveURL('/profile');
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'Applications' })
+    .click();
   await expect(page).toHaveURL('/applications');
   await expect(
-    page.getByRole('heading', { name: 'What do you want to do?' }),
+    page.getByRole('heading', { level: 1, name: 'Your applications' }),
   ).toBeVisible();
 };
 

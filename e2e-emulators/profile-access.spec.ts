@@ -39,14 +39,15 @@ test('an account with the flag turned off for it sees the same', async ({
 test('an account with the flag on gets the profile', async ({ page }) => {
   const account = await createAccount({ interviewAssistant: true });
 
+  // It lands on its profile, which welcomes a new account (D91)
   await signIn(page, account);
   await openProfile(page);
 
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Profile' }),
+    page.getByRole('heading', { level: 1, name: 'Welcome, Maya' }),
   ).toBeVisible();
   await expect(
-    page.getByText('What you have done, read once and reused for every job.'),
+    page.getByText('Your profile is what every brief and CV is built from.'),
   ).toBeVisible();
   await expect(
     page.getByText('Not available for your account yet'),
@@ -55,6 +56,6 @@ test('an account with the flag on gets the profile', async ({ page }) => {
   // Opened by its address, with the session restored: the same answer.
   await page.reload();
   await expect(
-    page.getByText('What you have done, read once and reused for every job.'),
+    page.getByText('Your profile is what every brief and CV is built from.'),
   ).toBeVisible();
 });

@@ -64,7 +64,7 @@ test('the sign-in form can be filled and sent with the keyboard only', async ({
   await page.keyboard.type('Preview123!');
   await page.keyboard.press('Enter');
 
-  await expect(page).toHaveURL('/applications');
+  await expect(page).toHaveURL('/profile');
 });
 
 test('the account menu works with the keyboard', async ({ page }) => {

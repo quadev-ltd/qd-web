@@ -70,8 +70,8 @@ test('sign-in errors: empty and invalid fields, wrong password, forgot password,
   await page.getByLabel('Email').fill(SAMPLE_USER.email);
   await page.getByLabel('Password', { exact: true }).fill(SAMPLE_USER.password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  // The sample account has the interview tools: it lands on its applications (D85)
-  await expect(page).toHaveURL('/applications');
+  // The sample account has the interview tools: it lands on its profile (D91)
+  await expect(page).toHaveURL('/profile');
   await expect(
     page.getByRole('heading', {
       level: 1,

@@ -6,7 +6,6 @@ import { ApplicationsScreen } from './ApplicationsScreen';
 import { type ApplicationsState } from '@/core/state/slices/applicationsSlice';
 import { type InterviewProfileState } from '@/core/state/slices/interviewProfileSlice';
 import { applicationFixture } from '@/testUtil/applicationFixtures';
-import { resourceFixture } from '@/testUtil/profileFixtures';
 import { renderProfilePage } from '@/testUtil/renderProfilePage';
 
 vi.mock('@/core/logger', () => ({
@@ -57,59 +56,60 @@ describe('ApplicationsScreen', () => {
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
     expect(
-      await screen.findByRole('heading', { name: 'home.pathsTitle' }),
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'home.applicationsTitle',
+      }),
     ).toBeInTheDocument();
     expect(gateway.getApplications).toHaveBeenCalledExactlyOnceWith('uid-1');
   });
 
-  it('is Applications in the bar and in the tab, with no banner (D85)', () => {
+  it('is Applications in the bar and in the tab', () => {
     setUp({ applications: loaded() });
 
     expect(document.title).toBe('applications.listDocumentTitle');
     expect(
       screen.getByRole('link', { name: 'applications.title' }),
     ).toHaveAttribute('aria-current', 'page');
-    expect(
-      screen.queryByText('home.welcomeDescription'),
-    ).not.toBeInTheDocument();
   });
 
   describe('with no application yet', () => {
-    it('welcomes the new account, then "Add your CV" and the three paths', () => {
+    it('has its heading and "New application", with the line that says what one gives, and no welcome or paths (D91)', () => {
       setUp({ applications: loaded() });
 
       expect(
         screen.getByRole('heading', {
           level: 1,
-          name: 'applications.welcomeTitle',
+          name: 'home.applicationsTitle',
         }),
       ).toBeInTheDocument();
       expect(
-        screen.getByText('applications.welcomeDescription'),
-      ).toBeInTheDocument();
-      expect(screen.getByText('home.startTitle')).toBeInTheDocument();
-      const paths = screen.getByRole('region', { name: 'home.pathsTitle' });
+        screen.getByRole('button', { name: 'home.newApplicationButton' }),
+      ).toBeEnabled();
       expect(
-        within(paths)
-          .getAllByRole('article')
-          .map(card => card.textContent),
-      ).toEqual([
-        'home.prepareTitlehome.prepareDescription',
-        'home.practiseTitlehome.practiseDescriptionhome.comingSoonChip',
-        'home.improveCvTitlehome.improveCvDescriptionhome.comingSoonChip',
-      ]);
+        screen.getByText('applications.emptyDescription'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('home.pathsTitle')).not.toBeInTheDocument();
+      expect(screen.queryByText(/welcome/i)).not.toBeInTheDocument();
     });
 
-    it('opens "New application" from "Prepare for a job"', async () => {
-      setUp({ applications: loaded() });
+    it('opens "New application" at once when "Prepare for a job" led here, and only once', async () => {
+      renderProfilePage(<ApplicationsScreen />, {
+        route: '/applications',
+        routeState: { add: 'application' },
+        applications: loaded(),
+      });
 
+      const panel = screen.getByRole('dialog', {
+        name: 'applications.newTitle',
+      });
       await userEvent.click(
-        screen.getByRole('button', { name: /home\.prepareTitle/ }),
+        within(panel).getByRole('button', {
+          name: 'sidePanel.closeAccessibilityLabel',
+        }),
       );
 
-      expect(
-        screen.getByRole('dialog', { name: 'applications.newTitle' }),
-      ).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 
@@ -159,6 +159,10 @@ describe('ApplicationsScreen', () => {
         }),
       ).toHaveAttribute('href', '/applications/ready');
       expect(screen.queryByText('home.pathsTitle')).not.toBeInTheDocument();
+      // One column, with nothing beside it: the profile is in the bar (D91)
+      expect(
+        screen.queryByRole('link', { name: 'home.openProfileButton' }),
+      ).not.toBeInTheDocument();
     });
 
     it('says a job is being read or could not be read, and names one that has no name yet', () => {
@@ -201,28 +205,6 @@ describe('ApplicationsScreen', () => {
       });
 
       expect(items()[0]).toHaveTextContent('home.briefOutOfDateChip');
-    });
-
-    it('shows "Your profile" beside them, with how many resources it has', () => {
-      setUp({
-        applications: loaded({ applications }),
-        interviewProfile: {
-          uid: 'uid-1',
-          status: 'loaded',
-          resources: [
-            resourceFixture({ id: 'r1' }),
-            resourceFixture({ id: 'r2' }),
-          ],
-        },
-      });
-
-      const profile = screen.getByRole('region', {
-        name: 'home.profileCardTitle',
-      });
-      expect(profile).toHaveTextContent('home.profileCardResources');
-      expect(
-        within(profile).getByRole('link', { name: 'home.openProfileButton' }),
-      ).toHaveAttribute('href', '/profile');
     });
 
     it('opens "New application"', async () => {

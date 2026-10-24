@@ -20,8 +20,8 @@ export interface TestAccount {
   uid: string;
   email: string;
   password: string;
-  /** Where signing in leads: the applications with the interview tools (D85), else the home. */
-  landing: '/applications' | '/home';
+  /** Where signing in leads: the profile with the interview tools (D91), else the home. */
+  landing: '/profile' | '/home';
 }
 
 const send = async (
@@ -100,7 +100,7 @@ export const createAccount = async ({
     uid,
     email,
     password: PASSWORD,
-    landing: interviewAssistant ? '/applications' : '/home',
+    landing: interviewAssistant ? '/profile' : '/home',
   };
 };
 
