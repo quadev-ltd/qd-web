@@ -24,7 +24,9 @@ import {
 } from '@/core/auth/paths';
 import { env } from '@/core/env';
 import {
+  APPLICATION_CV_COMPARE_PATH,
   APPLICATION_CV_PATH,
+  APPLICATION_CV_VERSION_PATH,
   APPLICATION_DETAILS_PATH,
   APPLICATION_INTERVIEW_PATH,
   APPLICATION_INTERVIEWS_PATH,
@@ -228,6 +230,23 @@ const accountRoutes: RouteObject[] = [
               },
               {
                 path: CV_COMPARE_PATH,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/screens/Cv/compare/CvCompareScreen')
+                  ).CvCompareScreen,
+                }),
+              },
+              // The same pages opened from an application's CV tab (D96): under the
+              // application, so the way back leads there.
+              {
+                path: APPLICATION_CV_VERSION_PATH,
+                lazy: async () => ({
+                  Component: (await import('@/screens/Cv/CvVersionScreen'))
+                    .CvVersionScreen,
+                }),
+              },
+              {
+                path: APPLICATION_CV_COMPARE_PATH,
                 lazy: async () => ({
                   Component: (
                     await import('@/screens/Cv/compare/CvCompareScreen')

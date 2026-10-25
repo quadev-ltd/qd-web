@@ -8,6 +8,7 @@ import { versionDay, versionMeta } from './cvMeta';
 import { VersionRow } from './CvScreen';
 import DownloadButton from './download/DownloadButton';
 import NewCvVersionPanel from './NewCvVersionPanel';
+import { useCvPaths } from './useCvPaths';
 
 import Icon from '@/components/Icon';
 import Spinner from '@/components/Spinner';
@@ -23,12 +24,13 @@ import {
   useCvVersionsActions,
 } from '@/core/profile/CvVersionsProvider';
 import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
-import { cvVersionPath } from '@/core/profile/paths';
 
 export const ApplicationCvTab: React.FC<{ application: JobApplication }> = ({
   application,
 }) => {
   const { t } = useTranslation();
+  // The tab's versions open under the application (D96).
+  const paths = useCvPaths(application.id);
   const { status, versions } = useCvVersions();
   const { reload } = useCvVersionsActions();
   const { resources } = useInterviewProfile();
@@ -98,7 +100,7 @@ export const ApplicationCvTab: React.FC<{ application: JobApplication }> = ({
             )}
             <div className="flex flex-wrap items-start gap-2">
               <ButtonLink
-                to={cvVersionPath(sent.id)}
+                to={paths.version(sent.id)}
                 variant="secondary"
                 size="small">
                 {t('cv.openButton')}
@@ -132,6 +134,7 @@ export const ApplicationCvTab: React.FC<{ application: JobApplication }> = ({
               {others.map(version => (
                 <VersionRow
                   key={version.id}
+                  applicationId={application.id}
                   version={version}
                   title={t('cv.versionOf', { date: versionDay(version) })}
                   meta={versionMeta(t, version, resources)}

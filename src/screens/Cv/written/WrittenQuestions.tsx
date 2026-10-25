@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router';
 
 import { Badge } from '../review/CvDocument';
 import { type CvReview } from '../review/useCvReview';
+import { useCvPaths } from '../useCvPaths';
 
 import FormTextArea from '@/components/FormTextArea';
 import Icon from '@/components/Icon';
@@ -33,7 +34,6 @@ import {
   ProfileErrorCode,
 } from '@/core/profile/errors';
 import { dailyLimitResetTime } from '@/core/profile/limits';
-import { cvVersionPath } from '@/core/profile/paths';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
 import { useSessionUser } from '@/core/session/hooks';
 
@@ -145,6 +145,7 @@ export const WrittenQuestions: React.FC<{
 }> = ({ version, review }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const paths = useCvPaths();
   const gateway = useProfileGateway();
   const uid = useSessionUser()?.uid;
   const { refreshVersion, refreshToday } = useCvVersionsActions();
@@ -162,7 +163,7 @@ export const WrittenQuestions: React.FC<{
     try {
       const { versionId } = await gateway.rewriteCvVersion(version.id);
       await refreshVersion(versionId).catch(() => null);
-      navigate(cvVersionPath(versionId));
+      navigate(paths.version(versionId));
     } catch (error) {
       logProfileError('rewriteCvVersion', error, uid);
       switch (getProfileErrorCode(error)) {

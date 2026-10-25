@@ -68,3 +68,28 @@ export const APPLICATION_CV_PATH = `${APPLICATION_PATH}/cv`;
 
 export const applicationCvPath = (applicationId: string) =>
   `${applicationPath(applicationId)}/cv`;
+
+/**
+ * A CV version opened from its application's CV tab (D96): the same page as `/cv/versions/:id`,
+ * under the application, so the way back leads to that tab and the bar shows Applications.
+ */
+export const APPLICATION_CV_VERSION_PATH = `${APPLICATION_CV_PATH}/versions/:versionId`;
+
+export const applicationCvVersionPath = (
+  applicationId: string,
+  versionId: string,
+) =>
+  `${applicationCvPath(applicationId)}/versions/${encodeURIComponent(versionId)}`;
+
+/** Two versions compared, from an application's CV tab (D96). */
+export const APPLICATION_CV_COMPARE_PATH = `${APPLICATION_CV_PATH}/compare`;
+
+export const applicationCvComparePath = (
+  applicationId: string,
+  later: string,
+  earlier?: string,
+) =>
+  `${applicationCvPath(applicationId)}/compare?${new URLSearchParams({
+    later,
+    ...(earlier ? { earlier } : {}),
+  }).toString()}`;

@@ -6,8 +6,10 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { startTitle, versionDay, versionHeading } from './cvMeta';
+import CvWayBack from './CvWayBack';
 import RemoveCvVersionDialog from './RemoveCvVersionDialog';
 import CvReview from './review/CvReview';
+import { useCvPaths } from './useCvPaths';
 import { aboutPages } from './written/writtenMeta';
 import WrittenReview from './written/WrittenReview';
 
@@ -36,7 +38,6 @@ import {
 } from '@/core/profile/errors';
 import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
 import { dailyLimitResetTime } from '@/core/profile/limits';
-import { cvComparePath, CV_PATH, cvVersionPath } from '@/core/profile/paths';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
 import { useSessionUser } from '@/core/session/hooks';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
@@ -51,18 +52,6 @@ const FAILURES = {
   internal: 'cv.failedInternal',
 } as const satisfies Record<NonNullable<CvVersion['failure']>, string>;
 
-const BackLink: React.FC = () => {
-  const { t } = useTranslation();
-  return (
-    <Link
-      to={CV_PATH}
-      className="flex min-h-11 items-center gap-1 self-start text-[15px] leading-natural font-medium no-underline hover:underline">
-      <Icon name="left" size={18} />
-      {t('cv.title')}
-    </Link>
-  );
-};
-
 /**
  * "Try again" after a failure: a CV written for the same target, and the failed one removed. A
  * version made before D83 is written again too, at 2 pages: no new edit version is made.
@@ -70,6 +59,7 @@ const BackLink: React.FC = () => {
 const useTryAgain = (version: CvVersion | undefined) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const paths = useCvPaths();
   const gateway = useProfileGateway();
   const uid = useSessionUser()?.uid;
   const { refreshVersion, refreshToday } = useCvVersionsActions();
@@ -99,7 +89,7 @@ const useTryAgain = (version: CvVersion | undefined) => {
         refreshVersion(version.id).catch(() => null),
         refreshVersion(versionId).catch(() => null),
       ]);
-      navigate(cvVersionPath(versionId), { replace: true });
+      navigate(paths.version(versionId), { replace: true });
     } catch (error) {
       logProfileError('createCvVersion', error, uid);
       setErrorMessage(
@@ -119,6 +109,7 @@ export const CvVersionScreen: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { versionId = '' } = useParams();
+  const paths = useCvPaths();
   const { status, versions } = useCvVersions();
   const { reload } = useCvVersionsActions();
   const max = useCvDailyLimit();
@@ -144,7 +135,7 @@ export const CvVersionScreen: React.FC = () => {
       title={t('cv.versionDocumentTitle')}
       mainClassName={PROFILE_MAIN}>
       <div className="mx-auto flex max-w-[1120px] flex-col gap-6">
-        <BackLink />
+        <CvWayBack paths={paths} />
         {children}
       </div>
     </SignedInShell>
@@ -182,8 +173,12 @@ export const CvVersionScreen: React.FC = () => {
         <p className="text-[16px] leading-normal text-muted">
           {t('cv.notFoundDescription')}
         </p>
-        <ButtonLink to={CV_PATH} variant="secondary" size="small">
-          {t('cv.backToCvsButton')}
+        <ButtonLink to={paths.list} variant="secondary" size="small">
+          {t(
+            paths.applicationId
+              ? 'cv.backToApplicationCvButton'
+              : 'cv.backToCvsButton',
+          )}
         </ButtonLink>
       </Card>,
     );
@@ -315,8 +310,12 @@ export const CvVersionScreen: React.FC = () => {
             )}
             {t('cv.tryAgainButton')}
           </Button>
-          <ButtonLink to={CV_PATH} variant="secondary">
-            {t('cv.backToCvsButton')}
+          <ButtonLink to={paths.list} variant="secondary">
+            {t(
+              paths.applicationId
+                ? 'cv.backToApplicationCvButton'
+                : 'cv.backToCvsButton',
+            )}
           </ButtonLink>
         </div>
       </Card>
@@ -377,7 +376,7 @@ export const CvVersionScreen: React.FC = () => {
                   : t('cv.writtenAgainFrom', { date: day });
               })()}{' '}
               <Link
-                to={cvVersionPath(rewrittenFrom.id)}
+                to={paths.version(rewrittenFrom.id)}
                 className="font-medium whitespace-nowrap">
                 {t('cv.openVersionOf', { date: versionDay(rewrittenFrom) })}
               </Link>
@@ -386,7 +385,7 @@ export const CvVersionScreen: React.FC = () => {
         </div>
         {comparable && (
           <ButtonLink
-            to={cvComparePath(version.id)}
+            to={paths.compare(version.id)}
             variant="secondary"
             size="small">
             {t('cv.compareButton')}
@@ -409,7 +408,7 @@ export const CvVersionScreen: React.FC = () => {
           versionId={version.id}
           date={date}
           onCancel={() => setRemoving(false)}
-          onRemoved={() => navigate(CV_PATH, { replace: true })}
+          onRemoved={() => navigate(paths.list, { replace: true })}
         />
       )}
     </>,

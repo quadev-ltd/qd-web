@@ -529,26 +529,27 @@ its address, and a file's title from its name; a posting on a host under `.inval
 
 ## Pages
 
-| Path                                        | Screen                                                                                                           |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `/`                                         | Public home                                                                                                      |
-| `/privacy-policy`                           | Privacy Policy                                                                                                   |
-| `/terms-and-conditions`                     | Terms and Conditions                                                                                             |
-| `/delete-account`                           | How to delete an account (public; the stores link to it)                                                         |
-| `/sign-in`                                  | Sign in (only with the account flag on)                                                                          |
-| `/sign-up`                                  | Sign up (only with the account flag on)                                                                          |
-| `/forgot-password`                          | Reset password (only with the account flag on)                                                                   |
-| `/verify-email`                             | Verify your email (flag on; signed in, email not verified yet)                                                   |
-| `/complete-profile`                         | Complete your profile (flag on; signed in, no names in the profile yet)                                          |
-| `/home`                                     | Signed-in home (only with the account flag on; needs a session); leads to `/profile` with `interviewAssistant`   |
-| `/account`                                  | Your account: personal details, sign-in and security (flag on; needs a session)                                  |
-| `/account/delete`                           | Delete the signed-in account (flag on; needs a session)                                                          |
-| `/profile`                                  | The interview profile, where an account with `interviewAssistant` lands (flag on; needs a session and that flag) |
-| `/profile/resources/:id`                    | One resource of the profile (the same conditions)                                                                |
-| `/applications`                             | Applications, the list (flag `interviewAssistant`); `/home` without it                                           |
-| `/applications/:id`                         | One job application: its brief, interviews, details and CVs (flag `interviewAssistant`)                          |
-| `/applications/:id/interviews/:interviewId` | One interview of an application: when, what you know about it, "Edit" and "Remove" (D89; the same flag)          |
-| anything else                               | Not found                                                                                                        |
+| Path                                        | Screen                                                                                                                              |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                                         | Public home                                                                                                                         |
+| `/privacy-policy`                           | Privacy Policy                                                                                                                      |
+| `/terms-and-conditions`                     | Terms and Conditions                                                                                                                |
+| `/delete-account`                           | How to delete an account (public; the stores link to it)                                                                            |
+| `/sign-in`                                  | Sign in (only with the account flag on)                                                                                             |
+| `/sign-up`                                  | Sign up (only with the account flag on)                                                                                             |
+| `/forgot-password`                          | Reset password (only with the account flag on)                                                                                      |
+| `/verify-email`                             | Verify your email (flag on; signed in, email not verified yet)                                                                      |
+| `/complete-profile`                         | Complete your profile (flag on; signed in, no names in the profile yet)                                                             |
+| `/home`                                     | Signed-in home (only with the account flag on; needs a session); leads to `/profile` with `interviewAssistant`                      |
+| `/account`                                  | Your account: personal details, sign-in and security (flag on; needs a session)                                                     |
+| `/account/delete`                           | Delete the signed-in account (flag on; needs a session)                                                                             |
+| `/profile`                                  | The interview profile, where an account with `interviewAssistant` lands (flag on; needs a session and that flag)                    |
+| `/profile/resources/:id`                    | One resource of the profile (the same conditions)                                                                                   |
+| `/applications`                             | Applications, the list (flag `interviewAssistant`); `/home` without it                                                              |
+| `/applications/:id`                         | One job application: its brief, interviews, details and CVs (flag `interviewAssistant`)                                             |
+| `/applications/:id/interviews/:interviewId` | One interview of an application: when, what you know about it, "Edit" and "Remove" (D89; the same flag)                             |
+| `/applications/:id/cv/versions/:versionId`  | A CV version opened from its application's CV tab, with the way back there (D96; with `cvTool`); `/cv/versions/:versionId` from CVs |
+| anything else                               | Not found                                                                                                                           |
 
 # Quickstart
 

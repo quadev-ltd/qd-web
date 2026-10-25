@@ -322,3 +322,110 @@ describe('CvRoutes', () => {
     expect(screen.queryByText('the CV page')).not.toBeInTheDocument();
   });
 });
+
+describe('a version opened from its application’s CV tab (D96)', () => {
+  const fromApplication = (
+    version: CvVersion,
+    gateway = createMockProfileGateway(),
+  ) => {
+    gateway.getCvVersion.mockResolvedValue(version);
+    return renderCvPage(
+      <Routes>
+        <Route
+          path="/applications/:applicationId/cv/versions/:versionId"
+          element={<CvVersionScreen />}
+        />
+        <Route path="*" element={<Location />} />
+      </Routes>,
+      {
+        gateway,
+        route: `/applications/a1/cv/versions/${version.id}`,
+        interviewProfile: {
+          uid: 'uid-1',
+          status: 'loaded',
+          resources: [resourceFixture({ textAt: 1_500 })],
+        },
+        applications: {
+          uid: 'uid-1',
+          status: 'loaded',
+          applications: [applicationFixture()],
+        },
+        cvVersions: {
+          uid: 'uid-1',
+          status: 'loaded',
+          versions: [version],
+          madeToday: 0,
+        },
+      },
+    );
+  };
+
+  it('shows the way there, Applications › the application › CV, and marks Applications in the bar', () => {
+    fromApplication(cvVersionFixture());
+
+    const way = screen.getByRole('navigation', { name: 'breadcrumb.label' });
+    expect(
+      within(way)
+        .getAllByRole('link')
+        .map(link => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([
+      ['applications.title', '/applications'],
+      ['Senior Backend Engineer', '/applications/a1'],
+      ['applications.cvTab', '/applications/a1/cv'],
+    ]);
+    // On a phone: one link back to the application's CV tab.
+    expect(
+      screen.getByRole('link', { name: 'breadcrumb.pageOfApplication' }),
+    ).toHaveAttribute('href', '/applications/a1/cv');
+    expect(
+      screen.getByRole('link', { name: 'applications.title', current: 'page' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'cv.title', current: 'page' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('is removed and goes back to the application’s CV tab', async () => {
+    const gateway = createMockProfileGateway();
+    fromApplication(cvVersionFixture(), gateway);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'cv.removeVersionButton' }),
+    );
+    await userEvent.click(
+      within(
+        screen.getByRole('dialog', { name: 'cv.removeDialogTitle' }),
+      ).getByRole('button', { name: 'cv.removeConfirmButton' }),
+    );
+
+    expect(
+      await screen.findByText('at /applications/a1/cv'),
+    ).toBeInTheDocument();
+  });
+
+  it('says when it is not there, with the way back to the application’s CV tab', () => {
+    const gateway = createMockProfileGateway();
+    renderCvPage(
+      <Routes>
+        <Route
+          path="/applications/:applicationId/cv/versions/:versionId"
+          element={<CvVersionScreen />}
+        />
+      </Routes>,
+      {
+        gateway,
+        route: '/applications/a1/cv/versions/gone',
+        applications: {
+          uid: 'uid-1',
+          status: 'loaded',
+          applications: [applicationFixture()],
+        },
+        cvVersions: { uid: 'uid-1', status: 'loaded', versions: [] },
+      },
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'cv.backToApplicationCvButton' }),
+    ).toHaveAttribute('href', '/applications/a1/cv');
+  });
+});

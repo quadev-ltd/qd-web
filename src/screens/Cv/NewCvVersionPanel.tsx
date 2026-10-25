@@ -16,6 +16,7 @@ import {
 } from './conventions';
 import { detailsLines } from './details/CvDetailsCard';
 import CvDetailsPanel from './details/CvDetailsPanel';
+import { useCvPaths } from './useCvPaths';
 
 import FormTextInput from '@/components/FormTextInput';
 import Icon from '@/components/Icon';
@@ -45,7 +46,6 @@ import {
 } from '@/core/profile/errors';
 import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
 import { dailyLimitResetTime } from '@/core/profile/limits';
-import { cvVersionPath } from '@/core/profile/paths';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
 import { useSessionUser } from '@/core/session/hooks';
 import SubmitFooter from '@/screens/Applications/SubmitFooter';
@@ -74,6 +74,8 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
 }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  // From an application's CV tab, the new version opens under the application (D96).
+  const paths = useCvPaths();
   const gateway = useProfileGateway();
   const uid = useSessionUser()?.uid;
   const { resources } = useInterviewProfile();
@@ -158,7 +160,7 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
       });
       // Into the list before its page opens; the page follows it while it is written.
       await refreshVersion(versionId).catch(() => null);
-      navigate(cvVersionPath(versionId));
+      navigate(paths.version(versionId));
     } catch (error) {
       logProfileError('createCvVersion', error, uid);
       setErrorMessage(messageFor(error));
