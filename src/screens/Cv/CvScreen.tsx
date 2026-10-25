@@ -12,6 +12,7 @@ import { applicationOf, generalTitle, versionDay, versionMeta } from './cvMeta';
 import CvDetailsCard from './details/CvDetailsCard';
 import CvDetailsPanel from './details/CvDetailsPanel';
 import NewCvVersionPanel, { type CvVersionKind } from './NewCvVersionPanel';
+import { useCvPaths } from './useCvPaths';
 
 import Icon, { type IconName } from '@/components/Icon';
 import SignedInShell from '@/components/layout/SignedInShell';
@@ -37,7 +38,6 @@ import {
   applicationPath,
   CV_DETAILS_PATH,
   CV_PATH,
-  cvVersionPath,
   PROFILE_PATH,
 } from '@/core/profile/paths';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
@@ -117,33 +117,38 @@ export const VersionRow: React.FC<{
   version: CvVersion;
   title: string;
   meta: string;
-}> = ({ version, title, meta }) => (
-  <li className="border-border-faint not-first:border-t">
-    <Link
-      to={cvVersionPath(version.id)}
-      className="flex items-center gap-3 rounded-control py-3 text-text no-underline hover:text-text">
-      <span
-        aria-hidden="true"
-        className="flex size-10 flex-none items-center justify-center rounded-full bg-tint text-primary">
-        <Icon name="file" size={18} />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-base leading-normal font-medium wrap-anywhere">
-          {title}
+  /** In an application's CV tab: the version opens under the application (D96). */
+  applicationId?: string;
+}> = ({ version, title, meta, applicationId }) => {
+  const paths = useCvPaths(applicationId);
+  return (
+    <li className="border-border-faint not-first:border-t">
+      <Link
+        to={paths.version(version.id)}
+        className="flex items-center gap-3 rounded-control py-3 text-text no-underline hover:text-text">
+        <span
+          aria-hidden="true"
+          className="flex size-10 flex-none items-center justify-center rounded-full bg-tint text-primary">
+          <Icon name="file" size={18} />
         </span>
-        <span className="text-sm leading-normal text-muted wrap-anywhere">
-          {meta}
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-base leading-normal font-medium wrap-anywhere">
+            {title}
+          </span>
+          <span className="text-sm leading-normal text-muted wrap-anywhere">
+            {meta}
+          </span>
+          <span className="mt-1 flex flex-wrap gap-2">
+            <VersionChips version={version} />
+          </span>
         </span>
-        <span className="mt-1 flex flex-wrap gap-2">
-          <VersionChips version={version} />
+        <span className="flex text-muted">
+          <Icon name="right" />
         </span>
-      </span>
-      <span className="flex text-muted">
-        <Icon name="right" />
-      </span>
-    </Link>
-  </li>
-);
+      </Link>
+    </li>
+  );
+};
 
 const BigOption: React.FC<{
   icon: IconName;

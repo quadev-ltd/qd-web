@@ -470,7 +470,9 @@
     "replaceDialogText": "You changed the text of this job. Reading the posting again replaces your text with a new copy of the posting.",
     "replaceConfirmButton": "Replace my text",
     "interviewsTab": "Interviews",
-    "nextInterview": "Next interview {{when}}"
+    "nextInterview": "Next interview {{when}}",
+    "moreButton": "More for this application",
+    "menuLabel": "Application"
   },
   "interviews": {
     "documentTitle": "Interview | QuaDev",
@@ -933,7 +935,8 @@
     "writtenAgainFromAnswers_other": "Written again from the version of {{date}}, with {{count}} of your answers. That version is still in your list.",
     "openVersionOf": "Open the version of {{date}}",
     "closeLineLabel": "Close this line",
-    "limitNoneMessage": "Writing CVs isn’t available on your account at the moment."
+    "limitNoneMessage": "Writing CVs isn’t available on your account at the moment.",
+    "backToApplicationCvButton": "Back to this application’s CVs"
   },
   "textPreview": {
     "showAll": "Show all",
@@ -994,6 +997,10 @@
     "legalNavAccessibilityLabel": "Legal",
     "mainNavAccessibilityLabel": "Main",
     "accountMenuAccessibilityLabel": "Account menu for {{name}}"
+  },
+  "breadcrumb": {
+    "label": "Breadcrumb",
+    "pageOfApplication": "{{title}} · {{page}}"
   },
   "footer": {
     "copyright": "© {{year}} QuaDev. All rights reserved.",

@@ -110,3 +110,56 @@ describe('CvCompareScreen', () => {
     expect(screen.getByText('cv.compareNeedsTwo')).toBeInTheDocument();
   });
 });
+
+describe('compared from an application’s CV tab (D96)', () => {
+  const fromApplication = (
+    route: string,
+    gateway = createMockProfileGateway(),
+  ) =>
+    renderCvPage(
+      <Routes>
+        <Route
+          path="/applications/:applicationId/cv/compare"
+          element={<CvCompareScreen />}
+        />
+        <Route path="*" element={<Location />} />
+      </Routes>,
+      {
+        gateway,
+        route,
+        applications: {
+          uid: 'uid-1',
+          status: 'loaded',
+          applications: [applicationFixture()],
+        },
+        cvVersions: {
+          uid: 'uid-1',
+          status: 'loaded',
+          versions: [later, earlier, general],
+        },
+      },
+    );
+
+  it('shows the way back to the application’s CV tab', () => {
+    fromApplication('/applications/a1/cv/compare?later=v2');
+
+    const way = screen.getByRole('navigation', { name: 'breadcrumb.label' });
+    expect(
+      within(way).getByRole('link', { name: 'applications.cvTab' }),
+    ).toHaveAttribute('href', '/applications/a1/cv');
+  });
+
+  it('restores under the application', async () => {
+    const gateway = createMockProfileGateway();
+    gateway.copyCvVersion.mockResolvedValue({ versionId: 'v9' });
+    fromApplication('/applications/a1/cv/compare?later=v2', gateway);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'cv.restoreButton' }),
+    );
+
+    expect(
+      await screen.findByText('at /applications/a1/cv/versions/v9'),
+    ).toBeInTheDocument();
+  });
+});

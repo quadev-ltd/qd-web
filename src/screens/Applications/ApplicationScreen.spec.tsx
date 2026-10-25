@@ -241,3 +241,118 @@ describe('ApplicationScreen', () => {
     );
   });
 });
+
+describe('the application’s menu (D95)', () => {
+  const onTab = (
+    tab: 'brief' | 'interviews' | 'details',
+    gateway = createMockProfileGateway(),
+  ) =>
+    renderProfilePage(
+      <Routes>
+        <Route
+          path="/applications/:applicationId"
+          element={<ApplicationScreen tab={tab} />}
+        />
+        <Route path="*" element={<Location />} />
+      </Routes>,
+      {
+        gateway,
+        route: '/applications/a1',
+        interviewProfile: { uid: 'uid-1', status: 'loaded' },
+        applications: loaded(),
+      },
+    );
+
+  const more = () =>
+    screen.getByRole('button', { name: 'applications.moreButton' });
+
+  it.each(['brief', 'interviews', 'details'] as const)(
+    'is beside the title on the %s tab, closed',
+    tab => {
+      onTab(tab);
+
+      expect(more()).toHaveAttribute('aria-haspopup', 'menu');
+      expect(more()).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    },
+  );
+
+  it('opens with "Edit the application" and "Remove this application", the first one focused', async () => {
+    const user = userEvent.setup();
+    onTab('brief');
+
+    await user.click(more());
+
+    expect(more()).toHaveAttribute('aria-expanded', 'true');
+    const menu = screen.getByRole('menu', { name: 'applications.menuLabel' });
+    const items = within(menu).getAllByRole('menuitem');
+    expect(items.map(item => item.textContent)).toEqual([
+      'applications.editTitle',
+      'applications.removeLink',
+    ]);
+    expect(items[0]).toHaveFocus();
+  });
+
+  it('moves with the arrow keys, and closes on Escape with the focus back on the button', async () => {
+    const user = userEvent.setup();
+    onTab('brief');
+    more().focus();
+
+    await user.keyboard('{ArrowUp}');
+    const items = within(screen.getByRole('menu')).getAllByRole('menuitem');
+    expect(items[1]).toHaveFocus();
+    await user.keyboard('{ArrowDown}');
+    expect(items[0]).toHaveFocus();
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(more()).toHaveFocus();
+  });
+
+  it('opens the edit panel from "Edit the application"', async () => {
+    const user = userEvent.setup();
+    onTab('brief');
+
+    await user.click(more());
+    await user.click(
+      screen.getByRole('menuitem', { name: 'applications.editTitle' }),
+    );
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('dialog', { name: 'applications.editTitle' }),
+    ).toBeInTheDocument();
+  });
+
+  it('removes the application from "Remove this application", asked first, and goes to Applications', async () => {
+    const user = userEvent.setup();
+    const { gateway } = onTab('interviews');
+
+    await user.click(more());
+    await user.click(
+      screen.getByRole('menuitem', { name: 'applications.removeLink' }),
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: 'applications.removeDialogTitle',
+    });
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: 'applications.removeConfirmButton',
+      }),
+    );
+
+    expect(await screen.findByText('at /applications')).toBeInTheDocument();
+    expect(gateway.removeApplication).toHaveBeenCalledWith('a1');
+  });
+
+  it('keeps Details’ own Edit and Remove', () => {
+    onTab('details');
+
+    expect(
+      screen.getByRole('button', { name: 'applications.editButton' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'applications.removeLink' }),
+    ).toBeInTheDocument();
+  });
+});

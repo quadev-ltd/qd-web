@@ -23,7 +23,7 @@ const openInterviews = async (page: Page, title: string) => {
 
 test('the interviews of the designs: the next on the list of applications, coming up and past on the tab, one opened', async ({
   page,
-}) => {
+}, { project }) => {
   await openApplications(page);
   await seedApplications(page);
 
@@ -73,10 +73,21 @@ test('the interviews of the designs: the next on the list of applications, comin
   await expect(
     page.getByRole('region', { name: 'Get ready for it' }),
   ).toContainText('Coming soon');
-  await page
-    .getByRole('main')
-    .getByRole('link', { name: 'Senior Backend Engineer' })
-    .click();
+  // D96: the way back, the whole way on a computer, one link back on a phone
+  if (project.name === 'phone') {
+    await page
+      .getByRole('main')
+      .getByRole('link', { name: 'Senior Backend Engineer' })
+      .click();
+  } else {
+    const way = page.getByRole('navigation', { name: 'Breadcrumb' });
+    await expect(way.getByRole('link')).toHaveText([
+      'Applications',
+      'Senior Backend Engineer',
+      'Interviews',
+    ]);
+    await way.getByRole('link', { name: 'Interviews' }).click();
+  }
   await expect(
     page.getByRole('region', { name: 'Coming up · 2' }),
   ).toBeVisible();

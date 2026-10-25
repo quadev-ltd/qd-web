@@ -4,6 +4,7 @@
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, useParams } from 'react-router';
 
+import ApplicationMenu from './ApplicationMenu';
 import BriefTab from './BriefTab';
 import DetailsTab from './DetailsTab';
 import InterviewsTab from './interviews/InterviewsTab';
@@ -129,15 +130,19 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
 
   return frame(
     <>
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-[clamp(26px,4vw,32px)] leading-tight font-semibold wrap-anywhere">
-          {application.title || t('applications.untitled')}
-        </h1>
-        {subtitle && (
-          <p className="text-[17px] leading-normal text-muted wrap-anywhere">
-            {subtitle}
-          </p>
-        )}
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-1">
+          <h1 className="font-display text-[clamp(26px,4vw,32px)] leading-tight font-semibold wrap-anywhere">
+            {application.title || t('applications.untitled')}
+          </h1>
+          {subtitle && (
+            <p className="text-[17px] leading-normal text-muted wrap-anywhere">
+              {subtitle}
+            </p>
+          )}
+        </div>
+        {/* D95: the application's own actions, on every tab. */}
+        <ApplicationMenu application={application} />
       </div>
       <nav
         aria-label={t('applications.tabsLabel')}

@@ -1,4 +1,4 @@
-// One interview of an application (A8, D89): a link back to the application's interviews, its
+// One interview of an application (A8, D89): the way there (D96), its
 // name with the application under it, "Details" with when it is and what the candidate knows
 // about it, and "Edit". Until text practice exists (D92), "Get ready for it" says what will come.
 // With text practice (D94), its likely questions take that card's place. Then "Remove this
@@ -23,6 +23,7 @@ import {
 import RemoveInterviewDialog from './RemoveInterviewDialog';
 
 import Icon from '@/components/Icon';
+import Breadcrumb from '@/components/layout/Breadcrumb';
 import SignedInShell from '@/components/layout/SignedInShell';
 import Spinner from '@/components/Spinner';
 import Banner from '@/components/ui/Banner';
@@ -44,6 +45,7 @@ import {
 } from '@/core/profile/interviewTime';
 import {
   applicationInterviewsPath,
+  applicationPath,
   APPLICATIONS_PATH,
 } from '@/core/profile/paths';
 import { useInterviews } from '@/core/profile/useInterviews';
@@ -371,18 +373,30 @@ export const InterviewScreen: React.FC = () => {
       mainClassName={PROFILE_MAIN}>
       <div className="mx-auto max-w-[1120px]">
         <div className="flex max-w-[760px] flex-col gap-5">
-          <Link
-            to={
-              application
-                ? applicationInterviewsPath(application.id)
-                : APPLICATIONS_PATH
-            }
-            className="flex min-h-11 items-center gap-1 self-start text-[15px] leading-natural font-medium no-underline hover:underline">
-            <Icon name="left" size={18} />
-            {application
-              ? application.title || t('applications.untitled')
-              : t('applications.backLink')}
-          </Link>
+          {application ? (
+            // D96: two steps into Applications, the whole way there.
+            <Breadcrumb
+              steps={[
+                { label: t('applications.title'), to: APPLICATIONS_PATH },
+                {
+                  label: application.title || t('applications.untitled'),
+                  to: applicationPath(application.id),
+                },
+                {
+                  label: t('applications.interviewsTab'),
+                  to: applicationInterviewsPath(application.id),
+                },
+              ]}
+              backLabel={application.title || t('applications.untitled')}
+            />
+          ) : (
+            <Link
+              to={APPLICATIONS_PATH}
+              className="flex min-h-11 items-center gap-1 self-start text-[15px] leading-natural font-medium no-underline hover:underline">
+              <Icon name="left" size={18} />
+              {t('applications.backLink')}
+            </Link>
+          )}
           {body}
         </div>
       </div>

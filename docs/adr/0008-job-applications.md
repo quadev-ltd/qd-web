@@ -182,6 +182,27 @@ it the interview's page keeps "Get ready for it · Coming soon".
   which only offer jobs with their text, read it as before (their default message). The page says
   it where the button would be, with a link to Details, before asking, and after a refusal.
 
+## The application's menu and the way back (D95, D96, 25 Oct 2026)
+
+From the owner's use of the site (research doc 15 §23, canvas version 46, doc 13 §26).
+
+- **"More" (⋯) beside the title, on every tab,** with "Edit the application" and "Remove this
+  application", which open the existing panel and dialog; Details keeps its own. It follows the menu
+  button pattern, now shared with the account menu (`useMenuButton`), and hangs from the button's
+  left edge when the title wraps it to the left of a narrow screen.
+- **A CV version opened from an application's CV tab has an address under it:**
+  `/applications/:applicationId/cv/versions/:versionId`, and `/applications/:applicationId/cv/compare`.
+  They are the same pages as under `/cv`, routed inside CvRoutes for the `cvTool` check and the
+  versions. `useCvPaths` gives every link and navigation on those pages (back, remove, compare,
+  restore, "Write again", "Try again", the version written from the tab's "New version") the
+  addresses of where the page is, so the candidate stays under the application. Opened from CVs,
+  nothing changes. An address, not a memory of where the candidate came from: it survives a reload,
+  and the browser's Back agrees with the page's.
+- **A breadcrumb on pages two steps in** (`Breadcrumb`): a CV version or a comparison under an
+  application ("Applications › Senior Backend Engineer › CV") and an interview ("… › Interviews"),
+  each step a link, the separators hidden from screen readers. At 720 px and below, one link back to
+  the page before. Pages one step in keep their single back link.
+
 ## Consequences
 
 - When research doc 17 is merged on the backend, "New application" loses its title field, offers

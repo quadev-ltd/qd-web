@@ -166,6 +166,13 @@ test('applications: the list without and with them, a new one, an application, i
   await expect(
     page.getByRole('heading', { level: 1, name: 'Senior Backend Engineer' }),
   ).toBeVisible();
+  // The application's menu, open (D95)
+  await page.getByRole('button', { name: 'More for this application' }).click();
+  const menu = page.getByRole('menu', { name: 'Application' });
+  await expect(menu).toBeVisible();
+  await expectInsideViewport(page, menu);
+  await expectAccessibleAndNotTooWide(page);
+  await page.keyboard.press('Escape');
   await page.getByRole('link', { name: 'Details' }).click();
   await expect(page.getByRole('region', { name: 'The job' })).toBeVisible();
   await expectAccessibleAndNotTooWide(page);

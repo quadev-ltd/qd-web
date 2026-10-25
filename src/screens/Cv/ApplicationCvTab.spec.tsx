@@ -49,7 +49,7 @@ describe('ApplicationCvTab', () => {
     expect(sent).toHaveTextContent('cv.notShownIn');
     expect(
       within(sent).getByRole('link', { name: 'cv.openButton' }),
-    ).toHaveAttribute('href', '/cv/versions/v1');
+    ).toHaveAttribute('href', '/applications/a1/cv/versions/v1');
     expect(
       within(sent).getByRole('button', { name: 'cv.downloadPdfButton' }),
     ).toBeInTheDocument();

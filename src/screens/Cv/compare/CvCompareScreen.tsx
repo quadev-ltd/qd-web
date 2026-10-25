@@ -4,7 +4,7 @@
 // with its header from the CV's details as they are now, the same for both (doc 13 §20.6).
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 
 import { versionDay, versionHeading } from '../cvMeta';
 
@@ -24,9 +24,10 @@ import {
   useCvVersionsActions,
 } from '@/core/profile/CvVersionsProvider';
 import { logProfileError } from '@/core/profile/errors';
-import { CV_PATH, cvVersionPath } from '@/core/profile/paths';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
 import { useSessionUser } from '@/core/session/hooks';
+import CvWayBack from '@/screens/Cv/CvWayBack';
+import { useCvPaths } from '@/screens/Cv/useCvPaths';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 
 const KIND_CHIPS = {
@@ -78,6 +79,7 @@ export const CvCompareScreen: React.FC = () => {
   const gateway = useProfileGateway();
   const uid = useSessionUser()?.uid;
   const [params, setParams] = useSearchParams();
+  const paths = useCvPaths();
   const { status, versions, details } = useCvVersions();
   const { refreshVersion } = useCvVersionsActions();
   const { applications } = useApplications();
@@ -108,12 +110,10 @@ export const CvCompareScreen: React.FC = () => {
       title={t('cv.compareDocumentTitle')}
       mainClassName={PROFILE_MAIN}>
       <div className="mx-auto flex max-w-[1120px] flex-col gap-6">
-        <Link
-          to={later ? cvVersionPath(later.id) : CV_PATH}
-          className="flex min-h-11 items-center gap-1 self-start text-[15px] leading-natural font-medium no-underline hover:underline">
-          <Icon name="left" size={18} />
-          {t('cv.title')}
-        </Link>
+        <CvWayBack
+          paths={paths}
+          to={later ? paths.version(later.id) : undefined}
+        />
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-[28px] leading-tight font-semibold">
             {t('cv.compareTitle')}
@@ -167,7 +167,7 @@ export const CvCompareScreen: React.FC = () => {
     try {
       const { versionId } = await gateway.copyCvVersion(earlier.id);
       await refreshVersion(versionId).catch(() => null);
-      navigate(cvVersionPath(versionId));
+      navigate(paths.version(versionId));
     } catch (error) {
       logProfileError('copyCvVersion', error, uid);
       setRestoreFailed(true);

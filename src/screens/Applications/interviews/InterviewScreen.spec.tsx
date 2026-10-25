@@ -81,9 +81,21 @@ describe('InterviewScreen', () => {
     expect(
       screen.getByText('Senior Backend Engineer · Northwind Logistics'),
     ).toBeInTheDocument();
+    // D96: the whole way there, each step a link; on a phone, one link back to the interviews.
+    const way = screen.getByRole('navigation', { name: 'breadcrumb.label' });
     expect(
-      screen.getByRole('link', { name: 'Senior Backend Engineer' }),
-    ).toHaveAttribute('href', '/applications/a1/interviews');
+      within(way)
+        .getAllByRole('link')
+        .map(link => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([
+      ['applications.title', '/applications'],
+      ['Senior Backend Engineer', '/applications/a1'],
+      ['applications.interviewsTab', '/applications/a1/interviews'],
+    ]);
+    const back = screen
+      .getAllByRole('link', { name: 'Senior Backend Engineer' })
+      .find(link => !way.contains(link));
+    expect(back).toHaveAttribute('href', '/applications/a1/interviews');
     expect(document.title).toBe('interviews.documentTitle');
     // Under Applications, which stays marked in the bar.
     expect(
