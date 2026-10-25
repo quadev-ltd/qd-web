@@ -1,13 +1,15 @@
 // One interview of an application (A8, D89): a link back to the application's interviews, its
 // name with the application under it, "Details" with when it is and what the candidate knows
 // about it, and "Edit". Until text practice exists (D92), "Get ready for it" says what will come.
-// Then "Remove this interview".
+// With text practice (D94), its likely questions take that card's place. Then "Remove this
+// interview".
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import DateTile from './DateTile';
 import InterviewPanel from './InterviewPanel';
+import InterviewQuestionsCard from './InterviewQuestionsCard';
 import {
   dayOf,
   fullDayOf,
@@ -28,6 +30,7 @@ import Button from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/ButtonLink';
 import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
+import { useFlag } from '@/core/flags/FlagsProvider';
 import { type JobApplication } from '@/core/profile/applications';
 import {
   useApplications,
@@ -182,6 +185,30 @@ const DetailsCard: React.FC<{
   );
 };
 
+/** Without text practice (the `textPractice` flag off): what this page will offer. */
+const ComingSoonCard: React.FC = () => {
+  const { t } = useTranslation();
+  return (
+    <Card
+      as="section"
+      elevation="raised"
+      aria-labelledby="interview-ready"
+      className="gap-3 p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2
+          id="interview-ready"
+          className="min-w-0 flex-[1_1_160px] font-display text-[18px] leading-tight font-semibold">
+          {t('interviews.readyTitle')}
+        </h2>
+        <Chip tone="neutral">{t('home.comingSoonChip')}</Chip>
+      </div>
+      <p className="text-[15px] leading-normal text-muted">
+        {t('interviews.readyDescription')}
+      </p>
+    </Card>
+  );
+};
+
 const InterviewPage: React.FC<{
   application: JobApplication;
   interviewId: string;
@@ -193,6 +220,8 @@ const InterviewPage: React.FC<{
   const [timeZone] = useState(browserTimeZone);
   const [editing, setEditing] = useState(false);
   const [removing, setRemoving] = useState(false);
+  // D94: the likely questions, with text practice; until then, what will come.
+  const textPractice = useFlag('textPractice');
   const interview = interviews.find(({ id }) => id === interviewId);
   const tabPath = applicationInterviewsPath(application.id);
 
@@ -250,23 +279,14 @@ const InterviewPage: React.FC<{
         timeZone={timeZone}
         onEdit={() => setEditing(true)}
       />
-      <Card
-        as="section"
-        elevation="raised"
-        aria-labelledby="interview-ready"
-        className="gap-3 p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2
-            id="interview-ready"
-            className="min-w-0 flex-[1_1_160px] font-display text-[18px] leading-tight font-semibold">
-            {t('interviews.readyTitle')}
-          </h2>
-          <Chip tone="neutral">{t('home.comingSoonChip')}</Chip>
-        </div>
-        <p className="text-[15px] leading-normal text-muted">
-          {t('interviews.readyDescription')}
-        </p>
-      </Card>
+      {textPractice ? (
+        <InterviewQuestionsCard
+          application={application}
+          interview={interview}
+        />
+      ) : (
+        <ComingSoonCard />
+      )}
       <Button
         variant="quietDanger"
         size="small"

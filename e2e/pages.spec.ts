@@ -237,6 +237,42 @@ test('interviews (D89): none yet, coming up and past, the add panel, an intervie
   await expectAccessibleAndNotTooWide(page);
 });
 
+test('likely questions (D94): not written, being written, written and out of date: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openApplications(page);
+  await page.evaluate(() => window.qdPreview?.setFlag('textPractice', true));
+  await seedApplications(page);
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Senior Backend Engineer' })
+    .getByRole('link')
+    .click();
+  await page.getByRole('link', { name: 'Interviews' }).click();
+  await page.getByRole('link', { name: 'Technical interview' }).click();
+  const questions = page.getByRole('region', {
+    name: 'Likely questions for this interview',
+  });
+  await expect(questions).toContainText('lists left today');
+  await expectAccessibleAndNotTooWide(page);
+
+  await questions
+    .getByRole('button', { name: 'Write likely questions' })
+    .click();
+  await expect(questions.getByRole('status')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await expect(questions.getByRole('listitem')).toHaveCount(5);
+  await questions.getByRole('button', { name: 'Show all 8' }).click();
+  await expectAccessibleAndNotTooWide(page);
+
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const edit = page.getByRole('dialog', { name: 'Edit the interview' });
+  await edit.getByRole('button', { name: '90 min' }).click();
+  await edit.getByRole('button', { name: 'Save changes' }).click();
+  await expect(questions).toContainText('changed since these were written');
+  await expectAccessibleAndNotTooWide(page);
+});
+
 test('the brief, not prepared, ready with a requirement and a question open, out of date and failed: accessible and no horizontal scroll', async ({
   page,
 }) => {

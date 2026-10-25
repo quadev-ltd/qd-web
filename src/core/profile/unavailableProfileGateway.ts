@@ -36,6 +36,8 @@ export const unavailableProfileGateway: ProfileGateway = {
   createInterview: unavailable,
   updateInterview: unavailable,
   removeInterview: unavailable,
+  writeInterviewQuestions: unavailable,
+  getInterviewQuestionsToday: unavailable,
   getCvVersions: unavailable,
   getCvVersion: unavailable,
   createCvVersion: unavailable,

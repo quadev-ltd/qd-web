@@ -7,6 +7,8 @@ import {
   interviewsLoadFailed,
   interviewsLoadStarted,
   interviewsSlice,
+  questionsWritingEnded,
+  questionsWritingStarted,
 } from './interviewsSlice';
 import { authStateChanged } from './sessionSlice';
 
@@ -119,5 +121,17 @@ describe('interviewsSlice', () => {
   it('keeps nothing once the user signs out', () => {
     const state = reduce(loaded([interview('i1', 1)]), authStateChanged(null));
     expect(state).toEqual(initialInterviewsState);
+  });
+
+  it('marks an interview whose questions are being written, until the call ends', () => {
+    const writing = reduce(
+      initialInterviewsState,
+      questionsWritingStarted('i1'),
+    );
+    expect(writing.writingQuestions).toEqual({ i1: true });
+
+    expect(
+      reduce(writing, questionsWritingEnded('i1')).writingQuestions,
+    ).toEqual({});
   });
 });

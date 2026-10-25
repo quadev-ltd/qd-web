@@ -5,6 +5,7 @@
 import { ProfileError, ProfileErrorCode } from './errors';
 import {
   type ApplicationInterview,
+  type InterviewQuestions,
   INTERVIEW_DATE,
   INTERVIEW_DESCRIPTION_MAX_CHARS,
   INTERVIEW_LENGTH_MAX,
@@ -203,4 +204,71 @@ export const seedInterviews = (
     },
   ];
   return { first: first.map(stored), second: second.map(stored) };
+};
+
+/**
+ * The likely questions the fake writes for an interview (D94): eight, with the brief's kinds,
+ * each saying why it is likely from what the interview, the job or the profile give. New ids each
+ * time, as the backend's.
+ */
+export const previewQuestionsFor = (
+  interview: Pick<ApplicationInterview, 'description' | 'type'>,
+  job: { title: string; company?: string },
+  write: number,
+): InterviewQuestions['items'] => {
+  const where = job.company ? `${job.title} at ${job.company}` : job.title;
+  const from = interview.description
+    ? 'What you know about this interview says'
+    : 'The job says';
+  const items: [string, InterviewQuestions['items'][number]['kind'], string][] =
+    [
+      [
+        'Tell me about an incident you led from alert to fix.',
+        'behavioural',
+        `${from} they care about on-call.`,
+      ],
+      [
+        `How would you design the main service of the ${job.title} team?`,
+        'technical',
+        interview.type === 'system-design'
+          ? 'It is a system design interview.'
+          : 'The job asks you to design and run services in production.',
+      ],
+      [
+        'How would you keep a consumer correct when events arrive late or twice?',
+        'technical',
+        'The job names event streams, and your profile shows little of them.',
+      ],
+      [
+        `Why do you want to work on ${where}?`,
+        'motivation',
+        'Most interviews ask it early.',
+      ],
+      [
+        'What would you change first in your first 90 days?',
+        'role',
+        'The job is about owning a part of the platform.',
+      ],
+      [
+        'Tell me about a design you changed after someone reviewed it.',
+        'behavioural',
+        'Engineers will want to know how you take a review of your work.',
+      ],
+      [
+        'How do you decide what to measure for a service you run?',
+        'technical',
+        'The job asks for running services in production.',
+      ],
+      [
+        'Tell me about a time you mentored someone through a hard problem.',
+        'behavioural',
+        'The job asks you to mentor engineers on the team.',
+      ],
+    ];
+  return items.map(([text, kind, why], index) => ({
+    id: `q${index + 1}-${write}`,
+    text,
+    kind,
+    why,
+  }));
 };

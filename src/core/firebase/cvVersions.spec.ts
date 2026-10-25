@@ -238,7 +238,7 @@ describe('making and removing CV versions', () => {
     ['max-versions', ProfileErrorCode.MaxCvVersions],
     ['no-cv-text', ProfileErrorCode.NoCvText],
     ['not-a-cv', ProfileErrorCode.Invalid],
-    ['no-job-description', ProfileErrorCode.Invalid],
+    ['no-job-description', ProfileErrorCode.NoJobDescription],
     ['job-not-ready', ProfileErrorCode.Reading],
   ])('says why a version was refused (%s)', async (reason, code) => {
     callable.mockRejectedValue(

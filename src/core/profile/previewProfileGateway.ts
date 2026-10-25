@@ -67,6 +67,7 @@ import { browserTimeZone } from './interviewTime';
 import {
   checkedFields,
   instantIn,
+  previewQuestionsFor,
   seedInterviews,
   timesOf,
 } from './previewInterviews';
@@ -79,6 +80,7 @@ import {
 } from './previewProfileData';
 import {
   CV_VERSION_DAILY_LIMIT,
+  INTERVIEW_QUESTIONS_DAILY_LIMIT,
   effectiveLimits,
   serviceOverride,
   type StoredUsageLimits,
@@ -160,6 +162,8 @@ interface PreviewProfile {
   usageLimits?: StoredUsageLimits;
   /** The interviews of each application (D89), by application. */
   interviews?: Record<string, ApplicationInterview[]>;
+  /** How many lists of likely questions were written today (D94). */
+  interviewQuestionsToday?: number;
 }
 
 /** How the fake reads a page again: when it ends, and how. */
@@ -216,6 +220,10 @@ export interface PreviewProfileControls {
   failNextCv(reason: CvVersionFailure): void;
   /** How many CV versions were already made today. */
   setCvVersionsToday(count: number): void;
+  /** The next list of likely questions cannot be written: the model failed, or today's limit. */
+  failNextQuestions(reason: 'model' | 'quota'): void;
+  /** How many lists of likely questions were already written today. */
+  setInterviewQuestionsToday(count: number): void;
   /**
    * A version as they were made before D83: edits to the profile's CV (doc 18), made in the
    * background like any other. The pages no longer ask for one; their review stays. Resolves its id.
@@ -481,6 +489,13 @@ const rewriteFrom = (version: CvWrittenVersion, before: CvDocument) => {
   }
 };
 
+/** The lists of likely questions this account can have written today (D94). */
+const questionsDailyLimit = (profile: PreviewProfile) =>
+  effectiveLimits(
+    INTERVIEW_QUESTIONS_DAILY_LIMIT,
+    serviceOverride(profile.usageLimits, USAGE_SERVICES.interviewQuestions),
+  ).maxCallsPerDay;
+
 /** The CV versions this account can have made today: its override on top of the default. */
 const cvDailyLimit = (profile: PreviewProfile) =>
   effectiveLimits(
@@ -606,6 +621,7 @@ export const createPreviewProfileGateway = ({
   };
 
   let nextBriefFailure: 'model' | 'quota' | null = null;
+  let nextQuestionsFailure: 'model' | 'quota' | null = null;
   let nextJobFailure: ProfileResourceFailure | null = null;
   let nextRereadOutcome: ProfileResourceFailure | 'changed' | null = null;
 
@@ -1254,6 +1270,13 @@ export const createPreviewProfileGateway = ({
     },
     setCvVersionsToday: count => {
       currentProfile().cvVersionsToday = count;
+      save();
+    },
+    failNextQuestions: reason => {
+      nextQuestionsFailure = reason;
+    },
+    setInterviewQuestionsToday: count => {
+      currentProfile().interviewQuestionsToday = count;
       save();
     },
     // Set once the gateway exists, below: it asks the gateway for the version.
@@ -2370,6 +2393,51 @@ export const createPreviewProfileGateway = ({
       application.interviewTimes = timesOf(kept);
       save();
     },
+    writeInterviewQuestions: async (applicationId, interviewId) => {
+      const profile = currentProfile();
+      const application = applicationOf(profile, applicationId);
+      const interview = interviewsOf(profile, applicationId).find(
+        ({ id }) => id === interviewId,
+      );
+      if (!interview) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      if (isJobPending(application)) {
+        throw new ProfileError(ProfileErrorCode.Reading);
+      }
+      if (!application.jobDescription) {
+        throw new ProfileError(ProfileErrorCode.NoJobDescription);
+      }
+      const failure = nextQuestionsFailure;
+      nextQuestionsFailure = null;
+      const today = profile.interviewQuestionsToday ?? 0;
+      if (failure === 'quota' || today >= questionsDailyLimit(profile)) {
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+      }
+      await wait(PREVIEW_BRIEF_MS);
+      profile.interviewQuestionsToday = today + 1;
+      if (failure === 'model') {
+        save();
+        throw new ProfileError(ProfileErrorCode.Unknown);
+      }
+      const items = previewQuestionsFor(
+        interview,
+        application,
+        profile.interviewQuestionsToday,
+      );
+      // Neither the interview's revision nor its updatedAt changes.
+      interview.questions = {
+        items,
+        builtAt: now(),
+        interviewRevision: interview.revision,
+        applicationRevision: application.revision,
+        profileRevision: profile.revision ?? 0,
+      };
+      save();
+      return { questions: items.length };
+    },
+    getInterviewQuestionsToday: async uid =>
+      read(uid).interviewQuestionsToday ?? 0,
   };
   controls.createEditVersion = async (target = { kind: 'general' }) => {
     // The newest CV with its text, as the pages offered first.

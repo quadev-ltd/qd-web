@@ -26,6 +26,14 @@ export const INTERVIEW_TYPES = [
 ] as const;
 export type InterviewType = (typeof INTERVIEW_TYPES)[number];
 
+/** The kinds of a likely question: the brief's (`BRIEF_QUESTION_KINDS`). */
+export const INTERVIEW_QUESTION_KINDS = [
+  'behavioural',
+  'technical',
+  'role',
+  'motivation',
+] as const;
+
 /** `failed-precondition`: the application already holds INTERVIEWS_MAX interviews. */
 export const INTERVIEW_LIMIT_REASON = 'interview-limit';
 
@@ -53,6 +61,31 @@ const lengthMinutes = z
   .optional()
   .catch(undefined);
 
+/**
+ * The likely questions of an interview (D92, D94, research doc 21 §2.4): 6 to 10, written on request
+ * by `writeInterviewQuestions` from the job, the brief, the profile and the interview, each with
+ * the brief's kinds and a line on why it is likely. Replaced as a whole each time, with new ids.
+ */
+export const InterviewQuestionsSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        text: z.string().min(1),
+        kind: z.enum(INTERVIEW_QUESTION_KINDS).catch('role'),
+        why: z.string().catch(''),
+      }),
+    )
+    .catch([]),
+  /** Milliseconds; the Firebase layer turns the Timestamp into them. */
+  builtAt: timestamp,
+  /** The revisions it was written from: of the interview, its application and the profile. */
+  interviewRevision: z.number().catch(0),
+  applicationRevision: z.number().catch(0),
+  profileRevision: z.number().catch(0),
+});
+export type InterviewQuestions = z.infer<typeof InterviewQuestionsSchema>;
+
 /** `users/{uid}/applications/{applicationId}/interviews/{interviewId}`. */
 export const ApplicationInterviewSchema = z.object({
   id: z.string().min(1),
@@ -70,6 +103,8 @@ export const ApplicationInterviewSchema = z.object({
   description: z.string().catch(''),
   /** Goes up when the description, the type or the length change. Not shown. */
   revision: z.number().catch(0),
+  /** Its likely questions, once written (text practice, D94). */
+  questions: InterviewQuestionsSchema.optional().catch(undefined),
   createdAt: timestamp,
   updatedAt: timestamp,
 });
@@ -94,6 +129,8 @@ export type InterviewTime = z.infer<typeof InterviewTimeSchema>;
 // ---------- Callables of the `interview-profile` codebase ----------
 
 export const CREATE_APPLICATION_INTERVIEW = 'createApplicationInterview';
+/** Writes an interview's likely questions: one model call, 5 to 15 seconds (D94). */
+export const WRITE_INTERVIEW_QUESTIONS = 'writeInterviewQuestions';
 export const UPDATE_APPLICATION_INTERVIEW = 'updateApplicationInterview';
 export const REMOVE_APPLICATION_INTERVIEW = 'removeApplicationInterview';
 
@@ -135,7 +172,46 @@ export const UpdateInterviewResponseSchema = z.object({
   interviewId: documentId,
   revision: z.number().int().nonnegative(),
 });
+/** The list itself is on the interview; this is how many questions it has. */
+export const WriteInterviewQuestionsResponseSchema = z.object({
+  applicationId: documentId,
+  interviewId: documentId,
+  questions: z.number().int().nonnegative(),
+});
 export const RemoveInterviewResponseSchema = z.object({
   applicationId: documentId,
   interviewId: documentId,
 });
+
+// ---------- What the pages work out ----------
+
+/** Where an interview's likely questions are, as its page says it. */
+export type InterviewQuestionsState =
+  | { kind: 'none' }
+  | { kind: 'ready' }
+  | { kind: 'outOfDate'; because: 'interview' | 'job' | 'profile' };
+
+/**
+ * Whether the list is out of date, and what changed since it was written, as quadev-backend's
+ * `interviewQuestionsOutOfDate` says it: the interview first (what the candidate knows about it,
+ * its type or its length), then the job, then the profile.
+ */
+export const interviewQuestionsStateOf = (
+  { questions, revision }: Pick<ApplicationInterview, 'questions' | 'revision'>,
+  applicationRevision: number,
+  profileRevision: number | null,
+): InterviewQuestionsState => {
+  if (!questions) {
+    return { kind: 'none' };
+  }
+  if (questions.interviewRevision < revision) {
+    return { kind: 'outOfDate', because: 'interview' };
+  }
+  if (questions.applicationRevision < applicationRevision) {
+    return { kind: 'outOfDate', because: 'job' };
+  }
+  if (profileRevision !== null && questions.profileRevision < profileRevision) {
+    return { kind: 'outOfDate', because: 'profile' };
+  }
+  return { kind: 'ready' };
+};

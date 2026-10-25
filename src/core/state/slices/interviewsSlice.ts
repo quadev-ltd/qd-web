@@ -20,11 +20,17 @@ export interface InterviewsState {
   /** Whose interviews these are. Another user starts from nothing. */
   uid: string | null;
   byApplication: Record<string, ApplicationInterviews>;
+  /**
+   * The interviews whose likely questions are being written (D94): the call takes 5 to 15
+   * seconds, and the page says so again when the candidate comes back to it meanwhile.
+   */
+  writingQuestions: Record<string, true>;
 }
 
 export const initialInterviewsState: InterviewsState = {
   uid: null,
   byApplication: {},
+  writingQuestions: {},
 };
 
 const earliestFirst = (a: ApplicationInterview, b: ApplicationInterview) =>
@@ -111,6 +117,18 @@ export const interviewsSlice = createSlice({
         );
       }
     },
+    questionsWritingStarted: (
+      state,
+      { payload: interviewId }: PayloadAction<string>,
+    ) => {
+      state.writingQuestions[interviewId] = true;
+    },
+    questionsWritingEnded: (
+      state,
+      { payload: interviewId }: PayloadAction<string>,
+    ) => {
+      delete state.writingQuestions[interviewId];
+    },
   },
   extraReducers: builder => {
     // The user signed out, or another one signed in: nothing of theirs is kept.
@@ -132,6 +150,8 @@ export const {
   interviewsLoadFailed,
   interviewChanged,
   interviewRemoved,
+  questionsWritingStarted,
+  questionsWritingEnded,
 } = interviewsSlice.actions;
 
 export default interviewsSlice.reducer;

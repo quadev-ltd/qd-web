@@ -77,6 +77,7 @@ describe('FlagsProvider', () => {
       smartInspection: false,
       interviewAssistant: false,
       cvTool: false,
+      textPractice: false,
       aiDiagnostics: false,
     });
     expect(result.current.ready).toBe(true);

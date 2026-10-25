@@ -18,6 +18,8 @@ import {
   interviewsLoadFailed,
   interviewsLoadStarted,
   type InterviewsStatus,
+  questionsWritingEnded,
+  questionsWritingStarted,
 } from '@/core/state/slices/interviewsSlice';
 
 export const useInterviews = (applicationId: string) => {
@@ -91,13 +93,32 @@ export const useInterviews = (applicationId: string) => {
     [applicationId, dispatch, refreshApplication],
   );
 
+  /**
+   * Writes an interview's likely questions (D94), then reads the interview again. Rejects with
+   * the backend's refusal; the interview is marked as being written meanwhile.
+   */
+  const writeQuestions = useCallback(
+    async (interviewId: string) => {
+      dispatch(questionsWritingStarted(interviewId));
+      try {
+        await gateway.writeInterviewQuestions(applicationId, interviewId);
+        await refresh(interviewId);
+      } finally {
+        dispatch(questionsWritingEnded(interviewId));
+      }
+    },
+    [applicationId, dispatch, gateway, refresh],
+  );
+
   const status: InterviewsStatus = known?.status ?? 'loading';
   return {
     status,
     interviews: known?.interviews ?? [],
+    writingQuestions: state.writingQuestions,
     reload,
     refresh,
     removed,
+    writeQuestions,
   };
 };
 

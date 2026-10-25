@@ -201,6 +201,16 @@ export interface ProfileGateway {
     request: UpdateInterviewRequest,
   ): Promise<{ revision: number }>;
   removeInterview(applicationId: string, interviewId: string): Promise<void>;
+  /**
+   * Writes an interview's likely questions (text practice, D94), replacing the ones it had: one
+   * model call, 5 to 15 seconds. The list is then on the interview (`getInterview`).
+   */
+  writeInterviewQuestions(
+    applicationId: string,
+    interviewId: string,
+  ): Promise<{ questions: number }>;
+  /** How many lists of likely questions were written for this user today (UTC), for the limit. */
+  getInterviewQuestionsToday(uid: string): Promise<number>;
 
   // ---------- CV versions (delivery 2b) ----------
 

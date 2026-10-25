@@ -29,6 +29,11 @@ export const FLAGS = {
     description:
       'CV versions (doc 18): a CV improved in general or tailored to one job, reviewed change by change.',
   },
+  textPractice: {
+    default: false,
+    description:
+      'Text practice (doc 21, D94): the likely questions of each interview, practised in writing with key points and feedback.',
+  },
   aiDiagnostics: {
     default: false,
     description:

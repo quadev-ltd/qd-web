@@ -85,7 +85,8 @@ const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
   [CvRefusal.MaxVersions]: ProfileErrorCode.MaxCvVersions,
   [CvRefusal.NoCvText]: ProfileErrorCode.NoCvText,
   [CvRefusal.NotACv]: ProfileErrorCode.Invalid,
-  [CvRefusal.NoJobDescription]: ProfileErrorCode.Invalid,
+  // The CV pages only offer a job with its text; an interview's questions say so (D94).
+  [CvRefusal.NoJobDescription]: ProfileErrorCode.NoJobDescription,
   // The review pages only offer what the version allows.
   [CvRefusal.NotReady]: ProfileErrorCode.Invalid,
   [CvRefusal.NotEditable]: ProfileErrorCode.Invalid,

@@ -3,6 +3,7 @@ import { type ApplicationInterview } from './interviews';
 import {
   checkedFields,
   instantIn,
+  previewQuestionsFor,
   seedInterviews,
   timesOf,
 } from './previewInterviews';
@@ -140,5 +141,29 @@ describe('seedInterviews', () => {
       { date: '2026-11-03', startTime: '09:30', type: 'behavioural' },
     ]);
     expect(second[0].name).toBeUndefined();
+  });
+});
+
+describe('previewQuestionsFor', () => {
+  it('writes eight questions with the brief’s kinds and why each is likely, with new ids each time', () => {
+    const first = previewQuestionsFor(
+      { description: 'Two engineers.', type: 'system-design' },
+      { title: 'Senior Backend Engineer', company: 'Northwind Logistics' },
+      1,
+    );
+    const second = previewQuestionsFor(
+      { description: '' },
+      { title: 'Senior Backend Engineer' },
+      2,
+    );
+
+    expect(first).toHaveLength(8);
+    expect(new Set(first.map(({ kind }) => kind))).toEqual(
+      new Set(['behavioural', 'technical', 'role', 'motivation']),
+    );
+    expect(first[1].why).toBe('It is a system design interview.');
+    expect(first[0].why).toMatch(/^What you know about this interview/);
+    expect(second[0].why).toMatch(/^The job says/);
+    expect(first.map(({ id }) => id)).not.toEqual(second.map(({ id }) => id));
   });
 });

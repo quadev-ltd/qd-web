@@ -511,14 +511,19 @@ notes; out of date when the job or the profile changes). Its Interviews tab (D89
 interviews coming up, the next first, and the past ones, with "Add an interview" (a name, the
 date and start time in the browser's time zone, the length, the type and what the candidate knows
 about it); each opens its own page, with "Edit", "Remove" and "Get ready for it · Coming soon", and
-the list of applications shows each one's next interview. Details has the job, "Edit" and
+the list of applications shows each one's next interview. With the `textPractice` flag (D94),
+an interview's page has its likely questions instead of "Coming soon": written on request (5 to 15
+seconds, 10 lists a day), each with its kind and why it is likely, and out of date, with "Write
+again", when the interview, the job or the profile changes. Details has the job, "Edit" and
 "Remove". The decisions are in
 [ADR 0008](docs/adr/0008-job-applications.md).
 
 The in-memory gateway has `qdPreviewProfile.seedApplications()`: the three applications of the
 designs (a brief with two gaps, one the job changed since, none yet), the first with the
 interviews of the designs (two coming up, one past) and the second with one in 9 days; `failNextBrief('model')` or
-`('quota')`, `setBriefsToday(n)`, and `failNextJob(reason)` for the next job's reading. It reads a
+`('quota')`, `setBriefsToday(n)`, and `failNextJob(reason)` for the next job's reading;
+`failNextQuestions('model')` or `('quota')` and `setInterviewQuestionsToday(n)` for an interview's
+likely questions. It reads a
 job in 1.5 seconds, taking the title and the company from its first two lines, a posting's from
 its address, and a file's title from its name; a posting on a host under `.invalid` cannot be read.
 

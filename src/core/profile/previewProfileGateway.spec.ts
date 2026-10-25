@@ -2049,3 +2049,72 @@ describe('previewProfileGateway, the interviews of an application (D89)', () => 
     await expect(gateway.getInterviews(UID, first.id)).resolves.toHaveLength(3);
   });
 });
+
+describe('previewProfileGateway, the likely questions of an interview (D94)', () => {
+  const withInterview = async (
+    job = 'Senior Backend Engineer. Go and Kafka.',
+  ) => {
+    const context = await setUp();
+    const { applicationId } = await context.gateway.createApplication({
+      job: { source: 'text', text: job },
+      title: 'Senior Backend Engineer',
+    });
+    context.pass(PREVIEW_READ_MS);
+    await context.gateway.getApplications(UID);
+    const { interviewId } = await context.gateway.createInterview({
+      applicationId,
+      date: '2026-10-28',
+      startTime: '14:00',
+      timeZone: 'Europe/London',
+    });
+    return { ...context, applicationId, interviewId };
+  };
+
+  it('writes them onto the interview with what they were written from, without changing it otherwise, and counts the day', async () => {
+    const { gateway, applicationId, interviewId } = await withInterview();
+    const before = await gateway.getInterview(UID, applicationId, interviewId);
+
+    await expect(
+      gateway.writeInterviewQuestions(applicationId, interviewId),
+    ).resolves.toEqual({ questions: 8 });
+
+    const after = await gateway.getInterview(UID, applicationId, interviewId);
+    expect(after?.questions?.items).toHaveLength(8);
+    expect(after?.questions).toMatchObject({
+      interviewRevision: 1,
+      applicationRevision: 1,
+      profileRevision: 0,
+    });
+    expect(after?.revision).toBe(before?.revision);
+    expect(after?.updatedAt).toBe(before?.updatedAt);
+    await expect(gateway.getInterviewQuestionsToday(UID)).resolves.toBe(1);
+  });
+
+  it('refuses at the day’s limit, and fails as the backend can, changing nothing', async () => {
+    const { gateway, applicationId, interviewId } = await withInterview();
+
+    gateway.controls.failNextQuestions('model');
+    await expect(
+      codeOf(gateway.writeInterviewQuestions(applicationId, interviewId)),
+    ).resolves.toBe(ProfileErrorCode.Unknown);
+    expect(
+      (await gateway.getInterview(UID, applicationId, interviewId))?.questions,
+    ).toBeUndefined();
+
+    gateway.controls.setInterviewQuestionsToday(10);
+    await expect(
+      codeOf(gateway.writeInterviewQuestions(applicationId, interviewId)),
+    ).resolves.toBe(ProfileErrorCode.DailyLimit);
+  });
+
+  it('refuses for an interview or application that is gone', async () => {
+    const { gateway, applicationId } = await withInterview();
+
+    await expect(
+      codeOf(gateway.writeInterviewQuestions(applicationId, 'gone')),
+    ).resolves.toBe(ProfileErrorCode.NotFound);
+    await expect(
+      codeOf(gateway.writeInterviewQuestions('gone', 'gone')),
+    ).resolves.toBe(ProfileErrorCode.NotFound);
+  });
+});
