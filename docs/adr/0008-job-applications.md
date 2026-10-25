@@ -4,7 +4,7 @@
   applications foundation, the home that lists them, a new application with the pasted job, the
   page of an application (its details, the job, "Edit", "Remove"), its brief (slice 7), and the job
   as its text, a file or a link, read and named by the backend (slice 8, research doc 17), and its
-  interviews (slice 22, D89).
+  interviews (slice 22, D89) and their likely questions (slice 23, D94).
 - **Scope:** `src/core/profile/applications.ts`, `src/core/profile/ApplicationsProvider.tsx`, the
   `applications` slice of the store, `src/core/firebase/applications.ts`, `src/screens/Applications/`
   and `src/screens/Home/InterviewHome.tsx`
@@ -159,6 +159,28 @@ Since quadev-backend #54 (`36fbe7d`), an application holds its interviews, one p
   configurations set `timezoneId: 'Europe/London'` and `locale: 'en-GB'`, so a run says the same
   things on any computer. The preview's backend works out `startsAt` as the real one does, with the
   same rule for a change of the clocks.
+
+## The likely questions of an interview (D94, 25 Oct 2026)
+
+Text practice (research doc 21) starts with each interview's likely questions, written on request
+by `writeInterviewQuestions` and kept on the interview as `questions` (research doc 15 §22, canvas
+version 44, doc 13 §25). Behind a new flag, `textPractice`, mirrored from `@quadev/flags`; without
+it the interview's page keeps "Get ready for it · Coming soon".
+
+- **Read after the call, not listened to.** The call answers once the list is stored (5 to 15
+  seconds), so the page reads the interview again then, as the brief does; Firestore Lite has no
+  listener. Leaving the page meanwhile is fine: the call goes on, the store marks the interview as
+  being written (`writingQuestions`), and the answer lands in the store wherever the candidate is.
+- **Out of date is worked out on the page,** as for the brief, from the revisions the list was
+  written from: the interview first (what the candidate knows, its type or its length), then the
+  job, then the profile, as quadev-backend's `interviewQuestionsOutOfDate` orders them. The
+  profile's revision is read again when an interview opens, since the profile's pages share the
+  applications' provider (D91). The list stays, with "Write again".
+- **"N of M lists left today"** comes from `usage/{uid}/days/{date}` (service `interviewQuestions`)
+  and the account's `usageLimits`, as for CVs; the backend refuses over the limit anyway.
+- **A new error code, `profile/no-job-description`,** for the refusal of the same name. The CV pages,
+  which only offer jobs with their text, read it as before (their default message). The page says
+  it where the button would be, with a link to Details, before asking, and after a refusal.
 
 ## Consequences
 

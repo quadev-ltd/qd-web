@@ -51,6 +51,7 @@ describe('the flags from Remote Config', () => {
       smartInspection: false,
       interviewAssistant: false,
       cvTool: false,
+      textPractice: false,
       aiDiagnostics: false,
     });
   });
@@ -97,6 +98,7 @@ describe('the flags from Remote Config', () => {
       'cvTool',
       'interviewAssistant',
       'smartInspection',
+      'textPractice',
     ]);
   });
 

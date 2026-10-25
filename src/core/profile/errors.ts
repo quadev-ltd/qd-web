@@ -22,6 +22,8 @@ export const ProfileErrorCode = {
   NoCvText: 'profile/no-cv-text',
   /** The profile has no visible item, so no CV can be written from it. */
   NoItems: 'profile/no-items',
+  /** The application has no job description, so nothing can be written from it. */
+  NoJobDescription: 'profile/no-job-description',
   /** The resource or the item does not exist (any more). */
   NotFound: 'profile/not-found',
   /** It is being read (the first time, or its page again), so it cannot change or start again. */
@@ -69,6 +71,7 @@ const EXPECTED_CODES: ReadonlySet<string> = new Set([
   ProfileErrorCode.MaxCvVersions,
   ProfileErrorCode.NoCvText,
   ProfileErrorCode.NoItems,
+  ProfileErrorCode.NoJobDescription,
   ProfileErrorCode.NotFound,
   ProfileErrorCode.Reading,
   ProfileErrorCode.JobEdited,

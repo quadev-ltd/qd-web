@@ -11,9 +11,11 @@ import { getApplication } from './applications';
 import {
   createInterview,
   getInterview,
+  getInterviewQuestionsToday,
   getInterviews,
   removeInterview,
   updateInterview,
+  writeInterviewQuestions,
 } from './interviews';
 
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
@@ -279,5 +281,102 @@ describe('changing interviews', () => {
         new ProfileError(ProfileErrorCode.NotFound),
       );
     }
+  });
+});
+
+describe('likely questions (D94)', () => {
+  it('reads an interview’s questions with the date they were written in milliseconds', async () => {
+    vi.mocked(getDoc).mockResolvedValue(
+      document('i1', {
+        ...stored(100),
+        questions: {
+          items: [
+            {
+              id: 'q1',
+              text: 'Tell me about an incident you led.',
+              kind: 'behavioural',
+              why: 'They care about on-call.',
+            },
+            { id: 'q2', text: 'Why us?', kind: 'small-talk', why: 'Asked.' },
+          ],
+          skill: { id: 'interview-questions', version: '1.0.0' },
+          builtAt: at(500),
+          interviewRevision: 1,
+          applicationRevision: 2,
+          profileRevision: 3,
+        },
+      }) as never,
+    );
+
+    const interview = await getInterview('uid-1', 'a1', 'i1');
+
+    expect(interview?.questions).toEqual({
+      items: [
+        {
+          id: 'q1',
+          text: 'Tell me about an incident you led.',
+          kind: 'behavioural',
+          why: 'They care about on-call.',
+        },
+        // A kind it does not know is read as "about the role".
+        { id: 'q2', text: 'Why us?', kind: 'role', why: 'Asked.' },
+      ],
+      builtAt: 500,
+      interviewRevision: 1,
+      applicationRevision: 2,
+      profileRevision: 3,
+    });
+  });
+
+  it('writes them with writeInterviewQuestions, and resolves how many there are', async () => {
+    callable.mockResolvedValue({
+      data: { applicationId: 'a1', interviewId: 'i1', questions: 8 },
+    });
+
+    await expect(writeInterviewQuestions('a1', 'i1')).resolves.toEqual({
+      questions: 8,
+    });
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'writeInterviewQuestions',
+    );
+    expect(callable).toHaveBeenCalledWith({
+      applicationId: 'a1',
+      interviewId: 'i1',
+    });
+  });
+
+  it.each([
+    ['functions/resource-exhausted', 'quota', ProfileErrorCode.DailyLimit],
+    [
+      'functions/failed-precondition',
+      'no-job-description',
+      ProfileErrorCode.NoJobDescription,
+    ],
+    [
+      'functions/failed-precondition',
+      'job-not-ready',
+      ProfileErrorCode.Reading,
+    ],
+    ['functions/permission-denied', 'flag', ProfileErrorCode.FlagOff],
+    ['functions/deadline-exceeded', undefined, ProfileErrorCode.Network],
+  ])('turns %s (%s) into %s', async (code, reason, expected) => {
+    callable.mockRejectedValue(
+      Object.assign(new Error('refused'), { code, details: { reason } }),
+    );
+
+    await expect(writeInterviewQuestions('a1', 'i1')).rejects.toEqual(
+      new ProfileError(expected),
+    );
+  });
+
+  it('reads how many lists were written today, 0 when none', async () => {
+    vi.mocked(getDoc).mockResolvedValueOnce({
+      data: () => ({ services: { interviewQuestions: { calls: 4 } } }),
+    } as never);
+    await expect(getInterviewQuestionsToday('uid-1')).resolves.toBe(4);
+
+    vi.mocked(getDoc).mockResolvedValueOnce({ data: () => undefined } as never);
+    await expect(getInterviewQuestionsToday('uid-1')).resolves.toBe(0);
   });
 });

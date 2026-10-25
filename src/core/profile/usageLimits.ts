@@ -11,6 +11,7 @@ export const USAGE_SERVICES = {
   jobReading: 'jobReading',
   applicationBrief: 'applicationBrief',
   cvVersion: 'cvVersion',
+  interviewQuestions: 'interviewQuestions',
   aiDiagnostics: 'aiDiagnostics',
 } as const;
 export type UsageService = (typeof USAGE_SERVICES)[keyof typeof USAGE_SERVICES];
@@ -27,6 +28,12 @@ export interface DailyLimits {
 /** What a CV version may use per user and day, unless the user has an override. */
 export const CV_VERSION_DAILY_LIMIT: DailyLimits = {
   maxCallsPerDay: 5,
+  maxCostUsdPerDay: 0.5,
+};
+
+/** The likely questions of an interview (D94, doc 21 §4): lists written per user and day. */
+export const INTERVIEW_QUESTIONS_DAILY_LIMIT: DailyLimits = {
+  maxCallsPerDay: 10,
   maxCostUsdPerDay: 0.5,
 };
 

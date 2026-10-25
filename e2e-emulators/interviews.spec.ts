@@ -4,7 +4,7 @@
 // the time and the zone, and the application's `interviewTimes` on the list of applications.
 import { expect, type Page, test } from '@playwright/test';
 
-import { createAccount, signIn } from './support';
+import { createAccount, setUsageLimit, setUsageToday, signIn } from './support';
 
 /** An application with its title given, as "Paste the text instead" leaves it. */
 const addApplication = async (page: Page) => {
@@ -131,4 +131,116 @@ test('a past interview is kept under "Past", and is not the next one', async ({
   await page.goto('/applications');
   await expect(page.getByRole('listitem')).toHaveCount(1);
   await expect(page.getByText(/^Next interview/)).toBeHidden();
+});
+
+/** An interview added to a new application, its page open. */
+const openNewInterview = async (page: Page) => {
+  await addApplication(page);
+  await page.getByRole('link', { name: 'Interviews' }).click();
+  await page.getByRole('button', { name: 'Add an interview' }).click();
+  const add = page.getByRole('dialog', { name: 'Add an interview' });
+  await add.getByLabel('Name (optional)').fill('Technical interview');
+  await add.getByLabel('Date').fill(inDays(7));
+  await add.getByLabel('Start time').fill('14:00');
+  await add
+    .getByLabel('What you know about it (optional)')
+    .fill('Two engineers, then a design problem about parcel tracking.');
+  await add.getByRole('button', { name: 'Add the interview' }).click();
+  await expect(add).toBeHidden();
+  await page.getByRole('link', { name: 'Technical interview' }).click();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Technical interview' }),
+  ).toBeVisible();
+};
+
+test('likely questions (D94): written by writeInterviewQuestions, read back, counted for the day, out of date after an edit', async ({
+  page,
+}) => {
+  const account = await createAccount({
+    interviewAssistant: true,
+    textPractice: true,
+  });
+  await signIn(page, account);
+  await openNewInterview(page);
+  const questions = page.getByRole('region', {
+    name: 'Likely questions for this interview',
+  });
+  await expect(questions).toContainText('10 of 10 lists left today');
+
+  // The backend's offline fake writes one question, "fake-…"
+  await questions
+    .getByRole('button', { name: 'Write likely questions' })
+    .click();
+  await expect(questions.getByRole('listitem')).toHaveCount(1, {
+    timeout: 30_000,
+  });
+  await expect(questions.getByRole('listitem')).toContainText(/fake-/);
+
+  // Read back from the interview's document, with the day's count from usage
+  await page.reload();
+  await expect(questions.getByRole('listitem')).toHaveCount(1);
+  await expect(questions).toContainText(/Written on /);
+
+  // An edit of what the candidate knows raises the interview's revision: out of date, kept
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const edit = page.getByRole('dialog', { name: 'Edit the interview' });
+  await edit
+    .getByLabel('What you know about it (optional)')
+    .fill('Now a panel of three.');
+  await edit.getByRole('button', { name: 'Save changes' }).click();
+  await expect(edit).toBeHidden();
+  await expect(questions).toContainText(
+    'What you know about this interview changed since these were written.',
+  );
+  await expect(questions).toContainText('9 of 10 lists left today');
+  await expect(questions.getByRole('listitem')).toHaveCount(1);
+
+  // The account's own limit, from usageLimits, as the backend applies it
+  await setUsageLimit(account.uid, 'interviewQuestions', 1);
+  await page.reload();
+  await expect(questions).toContainText('0 of 1 lists left today');
+  await expect(
+    questions.getByRole('button', { name: 'Write again' }),
+  ).toBeDisabled();
+});
+
+test('likely questions: the backend refuses over the day’s limit, and the page says so', async ({
+  page,
+}) => {
+  const account = await createAccount({
+    interviewAssistant: true,
+    textPractice: true,
+  });
+  await signIn(page, account);
+  await openNewInterview(page);
+  const questions = page.getByRole('region', {
+    name: 'Likely questions for this interview',
+  });
+  await expect(questions).toContainText('10 of 10 lists left today');
+
+  // Used up since the page read the count: only the backend knows
+  await setUsageToday(account.uid, 'interviewQuestions', 10);
+  await questions
+    .getByRole('button', { name: 'Write likely questions' })
+    .click();
+
+  await expect(questions.getByRole('alert')).toContainText(
+    'You’ve written 10 lists of questions today, the daily limit.',
+  );
+  await expect(questions.getByRole('listitem')).toHaveCount(0);
+});
+
+test('likely questions: without textPractice, the interview keeps "Coming soon"', async ({
+  page,
+}) => {
+  const account = await createAccount({ interviewAssistant: true });
+  await signIn(page, account);
+  await openNewInterview(page);
+
+  await expect(
+    page.getByRole('region', { name: 'Get ready for it' }),
+  ).toContainText('Coming soon');
+  await expect(
+    page.getByRole('region', { name: 'Likely questions for this interview' }),
+  ).toBeHidden();
 });

@@ -210,3 +210,103 @@ test('an interview that is not there says so, with a way back', async ({
     page.getByRole('region', { name: 'Coming up · 2' }),
   ).toBeVisible();
 });
+
+/** The first interview of the designs, with text practice on for the account (D94). */
+const openTechnicalInterview = async (page: Page) => {
+  await openApplications(page);
+  await page.evaluate(() => window.qdPreview?.setFlag('textPractice', true));
+  await seedApplications(page);
+  await openInterviews(page, 'Senior Backend Engineer');
+  await page.getByRole('link', { name: 'Technical interview' }).click();
+  return page.getByRole('region', {
+    name: 'Likely questions for this interview',
+  });
+};
+
+test('likely questions (D94): written on request, shown with why each is likely, out of date when the interview changes, written again', async ({
+  page,
+}) => {
+  const questions = await openTechnicalInterview(page);
+  await expect(
+    page.getByRole('region', { name: 'Get ready for it' }),
+  ).toBeHidden();
+  await expect(questions).toContainText('10 of 10 lists left today');
+
+  // Written on request, with "Writing your questions" meanwhile
+  await questions
+    .getByRole('button', { name: 'Write likely questions' })
+    .click();
+  await expect(questions.getByRole('status')).toContainText(
+    'Writing your questions',
+  );
+  const items = questions.getByRole('listitem');
+  await expect(items).toHaveCount(5);
+  await expect(items.first()).toContainText('Behavioural');
+  await expect(items.first()).toContainText(
+    'Tell me about an incident you led from alert to fix.',
+  );
+  await expect(items.first()).toContainText('they care about on-call');
+  await questions.getByRole('button', { name: 'Show all 8' }).click();
+  await expect(items).toHaveCount(8);
+
+  // Read back after a reload
+  await page.reload();
+  await expect(questions).toContainText(/^.*Written on \d{1,2} \w{3} \d{4}/);
+  await expect(questions.getByRole('listitem')).toHaveCount(5);
+
+  // What the candidate knows changes: the list stays, out of date
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const edit = page.getByRole('dialog', { name: 'Edit the interview' });
+  await edit
+    .getByLabel('What you know about it (optional)')
+    .fill('Now a panel of three, with the head of platform.');
+  await edit.getByRole('button', { name: 'Save changes' }).click();
+  await expect(edit).toBeHidden();
+  await expect(questions).toContainText(
+    'What you know about this interview changed since these were written.',
+  );
+  await expect(questions).toContainText('9 of 10 lists left today');
+  await expect(questions.getByRole('listitem')).toHaveCount(5);
+
+  await questions.getByRole('button', { name: 'Write again' }).click();
+  await expect(questions).not.toContainText(
+    'changed since these were written',
+    {
+      timeout: 10_000,
+    },
+  );
+  await expect(questions.getByRole('listitem')).toHaveCount(5);
+});
+
+test('likely questions: a failed attempt changes nothing and can be tried again; none left today', async ({
+  page,
+}) => {
+  const questions = await openTechnicalInterview(page);
+
+  await page.evaluate(() =>
+    window.qdPreviewProfile?.failNextQuestions('model'),
+  );
+  await questions
+    .getByRole('button', { name: 'Write likely questions' })
+    .click();
+  await expect(questions.getByRole('alert')).toContainText(
+    'We couldn’t write the questions this time.',
+  );
+  await questions.getByRole('button', { name: 'Try again' }).click();
+  await expect(questions.getByRole('listitem')).toHaveCount(5);
+
+  // None left today: the button can't be used
+  await page.evaluate(() =>
+    window.qdPreviewProfile?.setInterviewQuestionsToday(10),
+  );
+  await page.goto('/applications');
+  await openInterviews(page, 'Senior Backend Engineer');
+  await page.getByRole('link', { name: 'System design' }).click();
+  const other = page.getByRole('region', {
+    name: 'Likely questions for this interview',
+  });
+  await expect(other).toContainText('0 of 10 lists left today');
+  await expect(
+    other.getByRole('button', { name: 'Write likely questions' }),
+  ).toBeDisabled();
+});
