@@ -183,6 +183,60 @@ test('applications: the list without and with them, a new one, an application, i
   await expectAccessibleAndNotTooWide(page);
 });
 
+test('interviews (D89): none yet, coming up and past, the add panel, an interview, its edit panel and remove dialog: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openApplications(page);
+  await seedApplications(page);
+
+  // None yet
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Platform Engineer' })
+    .getByRole('link')
+    .click();
+  await page.getByRole('link', { name: 'Interviews' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'No interviews yet' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // Coming up and past, and "Add an interview" with its messages
+  await page.goto('/applications');
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Senior Backend Engineer' })
+    .getByRole('link')
+    .click();
+  await page.getByRole('link', { name: 'Interviews' }).click();
+  await expect(page.getByRole('region', { name: 'Past · 1' })).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await page.getByRole('button', { name: 'Add an interview' }).click();
+  const add = page.getByRole('dialog', { name: 'Add an interview' });
+  await add.getByRole('button', { name: 'Add the interview' }).click();
+  await expect(add.getByText('Enter the date')).toBeVisible();
+  await expectInsideViewport(page, add);
+  await expectAccessibleAndNotTooWide(page);
+  await add.getByRole('button', { name: 'Close' }).click();
+
+  // An interview, its edit panel and its remove dialog
+  await page.getByRole('link', { name: 'Technical interview' }).click();
+  await expect(
+    page.getByRole('region', { name: 'Get ready for it' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const edit = page.getByRole('dialog', { name: 'Edit the interview' });
+  await expect(edit).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await edit.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Remove this interview' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Remove this interview?' });
+  await expect(dialog).toBeVisible();
+  await expectInsideViewport(page, dialog);
+  await expectAccessibleAndNotTooWide(page);
+});
+
 test('the brief, not prepared, ready with a requirement and a question open, out of date and failed: accessible and no horizontal scroll', async ({
   page,
 }) => {

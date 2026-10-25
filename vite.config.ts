@@ -97,6 +97,9 @@ export default defineConfig(({ command, mode }) => {
       environment: 'jsdom',
       setupFiles: ['./vitest.setup.ts'],
       include: ['src/**/*.spec.{ts,tsx}'],
+      // The interviews' times are shown in the browser's zone (D89): one zone, whatever the
+      // computer's, so a run says the same things everywhere. CI's is UTC.
+      env: { TZ: 'Europe/London' },
     },
   };
 });

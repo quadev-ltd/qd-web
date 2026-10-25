@@ -1,10 +1,12 @@
-// One job application: its name, its tabs (the brief, the details) and the tab that is open.
-// Sessions and CV versions have no backend yet, so they have no tab (ADR 0008).
+// One job application: its name, its tabs (the brief, its interviews, the details and, with the
+// CV tool, its CVs) and the tab that is open. Sessions have no backend yet, so they have no tab
+// (ADR 0008).
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, useParams } from 'react-router';
 
 import BriefTab from './BriefTab';
 import DetailsTab from './DetailsTab';
+import InterviewsTab from './interviews/InterviewsTab';
 
 import Icon from '@/components/Icon';
 import SignedInShell from '@/components/layout/SignedInShell';
@@ -22,6 +24,7 @@ import { CvVersionsProvider } from '@/core/profile/CvVersionsProvider';
 import {
   applicationCvPath,
   applicationDetailsPath,
+  applicationInterviewsPath,
   applicationPath,
   APPLICATIONS_PATH,
 } from '@/core/profile/paths';
@@ -44,7 +47,7 @@ const BackLink: React.FC = () => {
   );
 };
 
-export type ApplicationTab = 'brief' | 'details' | 'cv';
+export type ApplicationTab = 'brief' | 'interviews' | 'details' | 'cv';
 
 export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
   tab,
@@ -142,6 +145,12 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
         <NavLink end to={applicationPath(application.id)} className={tabClass}>
           {t('applications.briefTab')}
         </NavLink>
+        {/* D89: the interviews right after the brief. */}
+        <NavLink
+          to={applicationInterviewsPath(application.id)}
+          className={tabClass}>
+          {t('applications.interviewsTab')}
+        </NavLink>
         <NavLink
           to={applicationDetailsPath(application.id)}
           className={tabClass}>
@@ -153,7 +162,9 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
           </NavLink>
         )}
       </nav>
-      {tab === 'details' ? (
+      {tab === 'interviews' ? (
+        <InterviewsTab application={application} />
+      ) : tab === 'details' ? (
         <DetailsTab application={application} />
       ) : tab === 'cv' && cvTool ? (
         <CvVersionsProvider>
@@ -168,6 +179,10 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
 
 export const ApplicationBriefScreen: React.FC = () => (
   <ApplicationScreen tab="brief" />
+);
+
+export const ApplicationInterviewsScreen: React.FC = () => (
+  <ApplicationScreen tab="interviews" />
 );
 
 export const ApplicationDetailsScreen: React.FC = () => (

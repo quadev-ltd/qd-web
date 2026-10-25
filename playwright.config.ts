@@ -18,6 +18,10 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     trace: 'retain-on-failure',
+    // The interviews' times are shown in the browser's zone (D89): one zone, whatever the
+    // computer's, so a run says the same things everywhere.
+    timezoneId: 'Europe/London',
+    locale: 'en-GB',
   },
   projects: [
     {

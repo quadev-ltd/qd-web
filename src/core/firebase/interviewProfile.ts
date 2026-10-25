@@ -54,6 +54,7 @@ import {
   type UploadOptions,
   type UploadTarget,
 } from '@/core/profile/gateway';
+import { INTERVIEW_LIMIT_REASON } from '@/core/profile/interviews';
 
 // ---------- Errors ----------
 
@@ -74,6 +75,7 @@ const reasonOf = (error: unknown): unknown =>
 const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
   [CallableReason.MaxResources]: ProfileErrorCode.MaxResources,
   [CallableReason.MaxApplications]: ProfileErrorCode.MaxApplications,
+  [INTERVIEW_LIMIT_REASON]: ProfileErrorCode.MaxInterviews,
   [CallableReason.AlreadyReading]: ProfileErrorCode.Reading,
   [CallableReason.JobNotReady]: ProfileErrorCode.Reading,
   [CallableReason.JobEdited]: ProfileErrorCode.JobEdited,

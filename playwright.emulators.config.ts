@@ -35,6 +35,9 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     trace: 'retain-on-failure',
+    // As in playwright.config.ts: the interviews' times in one zone (D89).
+    timezoneId: 'Europe/London',
+    locale: 'en-GB',
   },
   // One size: the phone layout adds nothing to a test of the contract.
   projects: [

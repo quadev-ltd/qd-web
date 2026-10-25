@@ -235,6 +235,81 @@ describe('ApplicationsScreen', () => {
     });
   });
 
+  describe('the next interview (D89)', () => {
+    const NOW = Date.parse('2026-10-25T12:00:00Z');
+    const time = (
+      interviewId: string,
+      startsAt: string,
+      lengthMinutes?: number,
+    ) => ({
+      interviewId,
+      startsAt: Date.parse(startsAt),
+      date: startsAt.slice(0, 10),
+      startTime: startsAt.slice(11, 16),
+      timeZone: 'Europe/London',
+      lengthMinutes,
+    });
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('is under the company when one is coming up, and not otherwise', () => {
+      setUp({
+        applications: loaded({
+          applications: [
+            applicationFixture({
+              id: 'a1',
+              interviewTimes: [
+                time('past', '2026-10-08T10:00:00Z'),
+                time('next', '2026-10-28T14:00:00Z'),
+                time('later', '2026-11-05T10:00:00Z'),
+              ],
+            }),
+            applicationFixture({
+              id: 'a2',
+              title: 'Platform Engineer',
+              interviewTimes: [time('past', '2026-10-08T10:00:00Z')],
+            }),
+            applicationFixture({ id: 'a3', title: 'Engineering Manager' }),
+          ],
+        }),
+      });
+
+      const [first, second, third] = items();
+      expect(
+        within(first).getByText('applications.nextInterview'),
+      ).toBeInTheDocument();
+      expect(
+        within(second).queryByText('applications.nextInterview'),
+      ).not.toBeInTheDocument();
+      expect(
+        within(third).queryByText('applications.nextInterview'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('stays while one is going on, until it ends', () => {
+      setUp({
+        applications: loaded({
+          applications: [
+            applicationFixture({
+              interviewTimes: [time('now', '2026-10-25T11:00:00Z', 90)],
+            }),
+          ],
+        }),
+      });
+
+      expect(
+        within(items()[0]).getByText('applications.nextInterview'),
+      ).toBeInTheDocument();
+    });
+  });
+
   it('says the applications could not be loaded, and reads them again on "Try again"', async () => {
     const { gateway } = setUp({ applications: loaded({ status: 'error' }) });
 

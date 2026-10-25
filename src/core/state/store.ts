@@ -1,11 +1,12 @@
 // Mirrors qd-mobile src/core/state/store.ts (without the API slice, which the web does not have;
-// the `exit`, `interviewProfile`, `applications` and `cvVersions` slices are web only).
+// the `exit`, `interviewProfile`, `applications`, `interviews` and `cvVersions` slices are web only).
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
 
 import { applicationsSlice } from './slices/applicationsSlice';
 import { cvVersionsSlice } from './slices/cvVersionsSlice';
 import { exitSlice } from './slices/exitSlice';
 import { interviewProfileSlice } from './slices/interviewProfileSlice';
+import { interviewsSlice } from './slices/interviewsSlice';
 import { sessionSlice } from './slices/sessionSlice';
 
 // No persistence: the auth gateway keeps the session, and the profile is read again.
@@ -14,6 +15,7 @@ export const rootReducer = combineReducers({
   [exitSlice.reducerPath]: exitSlice.reducer,
   [interviewProfileSlice.reducerPath]: interviewProfileSlice.reducer,
   [applicationsSlice.reducerPath]: applicationsSlice.reducer,
+  [interviewsSlice.reducerPath]: interviewsSlice.reducer,
   [cvVersionsSlice.reducerPath]: cvVersionsSlice.reducer,
 });
 

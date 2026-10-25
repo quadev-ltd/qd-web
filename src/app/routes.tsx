@@ -26,6 +26,8 @@ import { env } from '@/core/env';
 import {
   APPLICATION_CV_PATH,
   APPLICATION_DETAILS_PATH,
+  APPLICATION_INTERVIEW_PATH,
+  APPLICATION_INTERVIEWS_PATH,
   APPLICATION_PATH,
   APPLICATIONS_PATH,
   CV_COMPARE_PATH,
@@ -161,6 +163,22 @@ const accountRoutes: RouteObject[] = [
                   Component: (
                     await import('@/screens/Applications/ApplicationScreen')
                   ).ApplicationBriefScreen,
+                }),
+              },
+              {
+                path: APPLICATION_INTERVIEWS_PATH,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/screens/Applications/ApplicationScreen')
+                  ).ApplicationInterviewsScreen,
+                }),
+              },
+              {
+                path: APPLICATION_INTERVIEW_PATH,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/screens/Applications/interviews/InterviewScreen')
+                  ).InterviewScreen,
                 }),
               },
               {
