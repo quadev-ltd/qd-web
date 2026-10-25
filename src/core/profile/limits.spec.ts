@@ -27,6 +27,12 @@ describe('profile limits', () => {
     expect(dailyLimitResetTime(now)).toMatch(/^\d{2}:\d{2}$/);
   });
 
+  it('says midnight UTC as the browser’s clock shows it: 01:00 in London in summer, 00:00 in winter', () => {
+    // The unit tests run in Europe/London (vite.config.ts).
+    expect(dailyLimitResetTime(new Date('2026-07-01T12:00:00Z'))).toBe('01:00');
+    expect(dailyLimitResetTime(new Date('2026-11-01T12:00:00Z'))).toBe('00:00');
+  });
+
   it('moves to the day after once midnight UTC has passed', () => {
     // One second before and one second after midnight UTC: the same time of day, a day apart.
     expect(dailyLimitResetTime(new Date('2026-10-13T23:59:59Z'))).toBe(
