@@ -45,16 +45,18 @@ const send = async (
 
 /**
  * A new account, ready to sign in.
- * `interviewAssistant`, `cvTool`: the overrides of those flags in `featureFlags/{uid}`; left
+ * `interviewAssistant`, `cvTool`, `textPractice`: the overrides of those flags in `featureFlags/{uid}`; left
  * out, the account has no override, which is what a new account has on the real backend. In
  * the emulators a flag comes only from that document (Remote Config is skipped there).
  */
 export const createAccount = async ({
   interviewAssistant,
   cvTool,
+  textPractice,
 }: {
   interviewAssistant?: boolean;
   cvTool?: boolean;
+  textPractice?: boolean;
 } = {}): Promise<TestAccount> => {
   const email = `e2e-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
   const created = await send(
@@ -84,7 +86,7 @@ export const createAccount = async ({
     OWNER,
   );
   const flags = Object.fromEntries(
-    Object.entries({ interviewAssistant, cvTool })
+    Object.entries({ interviewAssistant, cvTool, textPractice })
       .filter(([, value]) => value !== undefined)
       .map(([key, value]) => [key, { booleanValue: value }]),
   );

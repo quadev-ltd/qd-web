@@ -32,7 +32,7 @@ export const FLAGS = {
   textPractice: {
     default: false,
     description:
-      'Text practice (doc 21, D94): the likely questions of each interview, practised in writing with key points and feedback.',
+      'Text practice (doc 21): likely questions per interview, key points and feedback on typed answers.',
   },
   aiDiagnostics: {
     default: false,

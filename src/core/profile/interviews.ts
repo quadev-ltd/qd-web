@@ -193,8 +193,9 @@ export type InterviewQuestionsState =
 
 /**
  * Whether the list is out of date, and what changed since it was written, as quadev-backend's
- * `interviewQuestionsOutOfDate` says it: the interview first (what the candidate knows about it,
- * its type or its length), then the job, then the profile.
+ * `interviewQuestionsOutOfDate` says it, naming the interview first (what the candidate knows
+ * about it, its type or its length), then the job, then the profile. Revisions only go up: a
+ * revision on the page lower than the list's is one read before it, not a change, as for the brief.
  */
 export const interviewQuestionsStateOf = (
   { questions, revision }: Pick<ApplicationInterview, 'questions' | 'revision'>,
