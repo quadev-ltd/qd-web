@@ -27,6 +27,21 @@ export const APPLICATION_DETAILS_PATH = `${APPLICATION_PATH}/details`;
 export const applicationDetailsPath = (applicationId: string) =>
   `${applicationPath(applicationId)}/details`;
 
+/** The interviews of an application (D89): coming up and past, and "Add an interview". */
+export const APPLICATION_INTERVIEWS_PATH = `${APPLICATION_PATH}/interviews`;
+
+export const applicationInterviewsPath = (applicationId: string) =>
+  `${applicationPath(applicationId)}/interviews`;
+
+/** One interview of an application: when it is, what the candidate knows, "Edit" and "Remove". */
+export const APPLICATION_INTERVIEW_PATH = `${APPLICATION_INTERVIEWS_PATH}/:interviewId`;
+
+export const applicationInterviewPath = (
+  applicationId: string,
+  interviewId: string,
+) =>
+  `${applicationInterviewsPath(applicationId)}/${encodeURIComponent(interviewId)}`;
+
 /** The CV section (delivery 2b): the versions of the candidate's CVs. */
 export const CV_PATH = '/cv';
 

@@ -22,6 +22,11 @@ import {
   type CvVersionStatus,
   type ReviseCvLineRequest,
 } from './cvVersions';
+import {
+  type ApplicationInterview,
+  type CreateInterviewRequest,
+  type UpdateInterviewRequest,
+} from './interviews';
 import { type StoredUsageLimits } from './usageLimits';
 
 /** Where a file goes, as `createResource` answers for a file. */
@@ -170,6 +175,32 @@ export interface ProfileGateway {
   ): Promise<void>;
   /** How many briefs were prepared for this user today (UTC), for the daily limit. */
   getBriefsToday(uid: string): Promise<number>;
+
+  // ---------- The interviews of an application (D89) ----------
+
+  /** The interviews of one application, the earliest first. */
+  getInterviews(
+    uid: string,
+    applicationId: string,
+  ): Promise<ApplicationInterview[]>;
+  /** One interview; `null` when it does not exist (any more). */
+  getInterview(
+    uid: string,
+    applicationId: string,
+    interviewId: string,
+  ): Promise<ApplicationInterview | null>;
+  /**
+   * Adds an interview. The backend works out when it starts from the date, the time and the
+   * zone, and adds it to the application's `interviewTimes`.
+   */
+  createInterview(
+    request: CreateInterviewRequest,
+  ): Promise<{ interviewId: string }>;
+  /** Resolves the interview's revision after the change. */
+  updateInterview(
+    request: UpdateInterviewRequest,
+  ): Promise<{ revision: number }>;
+  removeInterview(applicationId: string, interviewId: string): Promise<void>;
 
   // ---------- CV versions (delivery 2b) ----------
 

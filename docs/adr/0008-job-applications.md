@@ -3,7 +3,8 @@
 - **Status:** accepted (15 October 2026), built slice by slice (research doc 15 §16). Done: the
   applications foundation, the home that lists them, a new application with the pasted job, the
   page of an application (its details, the job, "Edit", "Remove"), its brief (slice 7), and the job
-  as its text, a file or a link, read and named by the backend (slice 8, research doc 17).
+  as its text, a file or a link, read and named by the backend (slice 8, research doc 17), and its
+  interviews (slice 22, D89).
 - **Scope:** `src/core/profile/applications.ts`, `src/core/profile/ApplicationsProvider.tsx`, the
   `applications` slice of the store, `src/core/firebase/applications.ts`, `src/screens/Applications/`
   and `src/screens/Home/InterviewHome.tsx`
@@ -129,6 +130,35 @@ went).
 - **While the posting is read again its text cannot change** (`job-not-ready`), so "Edit the
   application" leaves it out, as during a first reading. For a posting it says "Your copy of the
   posting. Reading the posting again replaces it."
+
+## The interviews of an application (D89, 25 Oct 2026)
+
+Since quadev-backend #54 (`36fbe7d`), an application holds its interviews, one per round, under
+`users/{uid}/applications/{applicationId}/interviews`, written by `createApplicationInterview`,
+`updateApplicationInterview` and `removeApplicationInterview` (research doc 15 §21, canvas version
+43, row A8). The contract is mirrored in `src/core/profile/interviews.ts`.
+
+- **The profile gateway carries them too,** with one new code, `profile/max-interviews`, for the
+  `interview-limit` refusal (20 per application). `no-application` and `no-interview` are both "not
+  found": the page says the interview or its application is no longer here.
+- **Each application's interviews are read once, when its Interviews tab or one of them opens**, into
+  an `interviews` slice by application, earliest first; a change reads its interview again, and the
+  application, whose `interviewTimes` the list of applications shows. Removing an application
+  forgets its interviews; signing out forgets them all.
+- **The page never works out when an interview starts.** It sends the date and start time as typed,
+  with the browser's IANA zone, and shows the backend's `startsAt` in the browser's zone ("Times are
+  in London time (GMT)"). An interview entered in another zone says so on its page ("Added in New
+  York time: 10:00"). The edit panel shows the date and time in the browser's zone, and sends the
+  three together only when one changed, so an untouched interview keeps its zone.
+- **An interview has ended at its start plus its length, or an hour after its start without one.**
+  Until then it is under "Coming up", and the next interview on the list of applications; the pages
+  read the time again once a minute.
+- **Length and type are toggle chips** (`ToggleChips`): buttons with `aria-pressed`, where pressing
+  the chosen one clears it, since an optional choice can't be a group of radios left empty.
+- **Times in tests:** the unit tests run in `Europe/London` (`vite.config.ts`), and both Playwright
+  configurations set `timezoneId: 'Europe/London'` and `locale: 'en-GB'`, so a run says the same
+  things on any computer. The preview's backend works out `startsAt` as the real one does, with the
+  same rule for a change of the clocks.
 
 ## Consequences
 

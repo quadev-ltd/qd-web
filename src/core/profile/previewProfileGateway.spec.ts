@@ -1841,3 +1841,211 @@ describe('previewProfileGateway, written CVs (D83)', () => {
     await expect(gateway.getUsageLimits(UID)).resolves.toBeNull();
   });
 });
+
+describe('previewProfileGateway, the interviews of an application (D89)', () => {
+  const when = {
+    date: '2026-10-28',
+    startTime: '14:00',
+    timeZone: 'Europe/London',
+  };
+
+  const withApplication = async () => {
+    const context = await setUp();
+    const { applicationId } = await context.gateway.createApplication({
+      job: { source: 'text', text: 'Senior Backend Engineer. Go and Kafka.' },
+      title: 'Senior Backend Engineer',
+    });
+    return { ...context, applicationId };
+  };
+
+  it('adds one, works out when it starts, and keeps its time on the application without changing it otherwise', async () => {
+    const { gateway, applicationId, pass } = await withApplication();
+    const before = await gateway.getApplication(UID, applicationId);
+    pass(1000);
+
+    const { interviewId } = await gateway.createInterview({
+      applicationId,
+      name: ' Technical interview ',
+      ...when,
+      lengthMinutes: 60,
+      type: 'technical',
+    });
+
+    await expect(
+      gateway.getInterview(UID, applicationId, interviewId),
+    ).resolves.toMatchObject({
+      id: interviewId,
+      name: 'Technical interview',
+      startsAt: Date.parse('2026-10-28T14:00:00Z'),
+      lengthMinutes: 60,
+      type: 'technical',
+      description: '',
+      revision: 1,
+    });
+    const after = await gateway.getApplication(UID, applicationId);
+    expect(after?.interviewTimes).toEqual([
+      {
+        interviewId,
+        startsAt: Date.parse('2026-10-28T14:00:00Z'),
+        ...when,
+        name: 'Technical interview',
+        lengthMinutes: 60,
+      },
+    ]);
+    // Never a reason for the brief to go out of date, nor for the list's order to change.
+    expect(after?.revision).toBe(before?.revision);
+    expect(after?.updatedAt).toBe(before?.updatedAt);
+  });
+
+  it('lists an application’s interviews, the earliest first', async () => {
+    const { gateway, applicationId } = await withApplication();
+    await gateway.createInterview({
+      applicationId,
+      ...when,
+      date: '2026-11-05',
+    });
+    await gateway.createInterview({ applicationId, ...when });
+
+    const interviews = await gateway.getInterviews(UID, applicationId);
+
+    expect(interviews.map(({ date }) => date)).toEqual([
+      '2026-10-28',
+      '2026-11-05',
+    ]);
+  });
+
+  it('changes only what is sent, clears with null, and raises the revision only for what questions are written from', async () => {
+    const { gateway, applicationId } = await withApplication();
+    const { interviewId } = await gateway.createInterview({
+      applicationId,
+      name: 'Technical interview',
+      ...when,
+      type: 'technical',
+    });
+
+    await expect(
+      gateway.updateInterview({ applicationId, interviewId, name: null }),
+    ).resolves.toEqual({ revision: 1 });
+    await expect(
+      gateway.updateInterview({
+        applicationId,
+        interviewId,
+        type: null,
+        description: 'Two engineers.',
+      }),
+    ).resolves.toEqual({ revision: 2 });
+    await gateway.updateInterview({
+      applicationId,
+      interviewId,
+      date: '2026-10-29',
+      startTime: '09:30',
+      timeZone: 'America/New_York',
+    });
+
+    const interview = await gateway.getInterview(
+      UID,
+      applicationId,
+      interviewId,
+    );
+    expect(interview).toMatchObject({
+      date: '2026-10-29',
+      startTime: '09:30',
+      timeZone: 'America/New_York',
+      startsAt: Date.parse('2026-10-29T13:30:00Z'),
+      description: 'Two engineers.',
+    });
+    expect(interview?.name).toBeUndefined();
+    expect(interview?.type).toBeUndefined();
+    expect(
+      (await gateway.getApplication(UID, applicationId))?.interviewTimes,
+    ).toMatchObject([{ interviewId, startTime: '09:30' }]);
+  });
+
+  it('refuses a change without the date, time and zone together, or with nothing in it', async () => {
+    const { gateway, applicationId } = await withApplication();
+    const { interviewId } = await gateway.createInterview({
+      applicationId,
+      ...when,
+    });
+
+    await expect(
+      codeOf(
+        gateway.updateInterview({
+          applicationId,
+          interviewId,
+          date: '2026-10-29',
+        } as never),
+      ),
+    ).resolves.toBe(ProfileErrorCode.Invalid);
+    await expect(
+      codeOf(gateway.updateInterview({ applicationId, interviewId })),
+    ).resolves.toBe(ProfileErrorCode.Invalid);
+  });
+
+  it('holds 20 interviews at most', async () => {
+    const { gateway, applicationId } = await withApplication();
+    for (let index = 0; index < 20; index += 1) {
+      await gateway.createInterview({ applicationId, ...when });
+    }
+
+    await expect(
+      codeOf(gateway.createInterview({ applicationId, ...when })),
+    ).resolves.toBe(ProfileErrorCode.MaxInterviews);
+  });
+
+  it('says the application or the interview is gone', async () => {
+    const { gateway, applicationId } = await withApplication();
+
+    await expect(
+      codeOf(gateway.createInterview({ applicationId: 'gone', ...when })),
+    ).resolves.toBe(ProfileErrorCode.NotFound);
+    await expect(
+      codeOf(gateway.removeInterview(applicationId, 'gone')),
+    ).resolves.toBe(ProfileErrorCode.NotFound);
+  });
+
+  it('removes one, and its time from the application', async () => {
+    const { gateway, applicationId } = await withApplication();
+    const { interviewId } = await gateway.createInterview({
+      applicationId,
+      ...when,
+    });
+
+    await gateway.removeInterview(applicationId, interviewId);
+
+    await expect(gateway.getInterviews(UID, applicationId)).resolves.toEqual(
+      [],
+    );
+    expect(
+      (await gateway.getApplication(UID, applicationId))?.interviewTimes,
+    ).toEqual([]);
+  });
+
+  it('removes an application’s interviews with it', async () => {
+    const { gateway, applicationId } = await withApplication();
+    await gateway.createInterview({ applicationId, ...when });
+
+    await gateway.removeApplication(applicationId);
+
+    await expect(gateway.getInterviews(UID, applicationId)).resolves.toEqual(
+      [],
+    );
+  });
+
+  it('gives the seeded applications the interviews of the designs', async () => {
+    const { gateway } = await setUp();
+    gateway.controls.seed();
+
+    gateway.controls.seedApplications();
+
+    const [first, second, third] = await gateway.getApplications(UID);
+    expect(first.interviewTimes?.map(({ name }) => name)).toEqual([
+      'Recruiter call',
+      'Technical interview',
+      'System design',
+    ]);
+    expect(second.interviewTimes).toHaveLength(1);
+    expect(third.interviewTimes).toEqual([]);
+    await expect(gateway.getInterviews(UID, first.id)).resolves.toHaveLength(3);
+  });
+});

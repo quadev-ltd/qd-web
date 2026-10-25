@@ -10,6 +10,7 @@ import {
   PROFILE_UPLOAD_CONTENT_TYPES,
   type ProfileUploadContentType,
 } from './contract';
+import { InterviewTimeSchema } from './interviews';
 
 // ---------- Limits ----------
 
@@ -153,6 +154,12 @@ export const JobApplicationSchema = z.object({
   revision: z.number().catch(0),
   brief: ApplicationBriefSchema.optional().catch(undefined),
   job: ApplicationJobSchema.optional().catch(undefined),
+  /**
+   * The start of each of its interviews (D89), the oldest first, kept by the backend: the list
+   * of applications shows the next one from it. Changing an interview never changes `revision`
+   * or `updatedAt`.
+   */
+  interviewTimes: z.array(InterviewTimeSchema).optional().catch(undefined),
   createdAt: timestamp,
   updatedAt: timestamp,
 });

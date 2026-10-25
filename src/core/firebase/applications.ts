@@ -42,11 +42,20 @@ import { type UploadTarget } from '@/core/profile/gateway';
 const withDates = (id: string, data: DocumentData) => {
   const brief = data.brief as DocumentData | undefined;
   const job = data.job as DocumentData | undefined;
+  const times = data.interviewTimes as DocumentData[] | undefined;
   return {
     ...data,
     id,
     createdAt: millis(data.createdAt),
     updatedAt: millis(data.updatedAt),
+    ...(Array.isArray(times)
+      ? {
+          interviewTimes: times.map(time => ({
+            ...time,
+            startsAt: millis(time?.startsAt),
+          })),
+        }
+      : {}),
     ...(brief ? { brief: { ...brief, builtAt: millis(brief.builtAt) } } : {}),
     ...(job
       ? {

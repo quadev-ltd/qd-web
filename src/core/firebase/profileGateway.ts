@@ -37,6 +37,13 @@ import {
   updateItem,
   uploadFile,
 } from './interviewProfile';
+import {
+  createInterview,
+  getInterview,
+  getInterviews,
+  removeInterview,
+  updateInterview,
+} from './interviews';
 import { getUsageLimits } from './usageLimits';
 
 import { type ProfileGateway } from '@/core/profile/gateway';
@@ -71,6 +78,11 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   prepareBrief,
   readPostingAgain,
   getBriefsToday,
+  getInterviews,
+  getInterview,
+  createInterview,
+  updateInterview,
+  removeInterview,
   getCvVersions,
   getCvVersion,
   createCvVersion,

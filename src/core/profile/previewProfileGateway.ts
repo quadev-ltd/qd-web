@@ -62,6 +62,14 @@ import {
 } from './cvVersions';
 import { ProfileError, ProfileErrorCode } from './errors';
 import { type ProfileGateway } from './gateway';
+import { type ApplicationInterview, INTERVIEWS_MAX } from './interviews';
+import { browserTimeZone } from './interviewTime';
+import {
+  checkedFields,
+  instantIn,
+  seedInterviews,
+  timesOf,
+} from './previewInterviews';
 import {
   PREVIEW_CV_DETAILS,
   PREVIEW_FACTS,
@@ -150,6 +158,8 @@ interface PreviewProfile {
   cvRewrites?: Record<string, CvDocument>;
   /** The overrides of the daily limits (`usageLimits/{uid}`); none for the defaults. */
   usageLimits?: StoredUsageLimits;
+  /** The interviews of each application (D89), by application. */
+  interviews?: Record<string, ApplicationInterview[]>;
 }
 
 /** How the fake reads a page again: when it ends, and how. */
@@ -187,7 +197,8 @@ export interface PreviewProfileControls {
   setExtractionsToday(count: number): void;
   /**
    * Replaces the applications with the three of the designs: a brief with two gaps, a brief
-   * the job has changed since, and no brief yet.
+   * the job has changed since, and no brief yet. The first has the interviews of the designs
+   * (two coming up, one past) and the second one in 9 days (D89).
    */
   seedApplications(): void;
   /** The next brief cannot be prepared: the model failed, or today's limit was reached. */
@@ -826,6 +837,21 @@ export const createPreviewProfileGateway = ({
 
   const applicationsOf = (profile: PreviewProfile): JobApplication[] =>
     (profile.applications ??= []);
+  const interviewsOf = (
+    profile: PreviewProfile,
+    applicationId: string,
+  ): ApplicationInterview[] =>
+    ((profile.interviews ??= {})[applicationId] ??= []);
+  /** The application of an interview, refused as the backend does when it is gone. */
+  const applicationOf = (profile: PreviewProfile, applicationId: string) => {
+    const application = applicationsOf(profile).find(
+      ({ id }) => id === applicationId,
+    );
+    if (!application) {
+      throw new ProfileError(ProfileErrorCode.NotFound);
+    }
+    return application;
+  };
 
   const name = (value: string | undefined, required = false) => {
     const trimmed = value?.trim() ?? '';
@@ -1293,6 +1319,19 @@ export const createPreviewProfileGateway = ({
           updatedAt: at,
         };
       });
+      const [first, second] = profile.applications;
+      const seeded = seedInterviews(now(), browserTimeZone(), () =>
+        newId('interview'),
+      );
+      profile.interviews = {
+        [first.id]: seeded.first,
+        [second.id]: seeded.second,
+      };
+      for (const application of profile.applications) {
+        application.interviewTimes = timesOf(
+          profile.interviews[application.id] ?? [],
+        );
+      }
       save();
     },
   };
@@ -2214,6 +2253,121 @@ export const createPreviewProfileGateway = ({
       profile.applications = applicationsOf(profile).filter(
         ({ id }) => id !== applicationId,
       );
+      // Its interviews go with it, as removeJobApplication does.
+      delete profile.interviews?.[applicationId];
+      save();
+    },
+
+    getInterviews: async (uid, applicationId) =>
+      structuredClone(interviewsOf(read(uid), applicationId)).sort(
+        (a, b) => a.startsAt - b.startsAt,
+      ),
+    getInterview: async (uid, applicationId, interviewId) => {
+      const found = interviewsOf(read(uid), applicationId).find(
+        ({ id }) => id === interviewId,
+      );
+      return found ? structuredClone(found) : null;
+    },
+    createInterview: async ({ applicationId, ...request }) => {
+      const profile = currentProfile();
+      const application = applicationOf(profile, applicationId);
+      const { name, description } = checkedFields(request);
+      const interviews = interviewsOf(profile, applicationId);
+      if (interviews.length >= INTERVIEWS_MAX) {
+        throw new ProfileError(ProfileErrorCode.MaxInterviews);
+      }
+      const at = now();
+      const interview: ApplicationInterview = {
+        id: newId('interview'),
+        ...(name ? { name } : {}),
+        date: request.date,
+        startTime: request.startTime,
+        timeZone: request.timeZone,
+        startsAt: instantIn(request.date, request.startTime, request.timeZone),
+        ...(request.lengthMinutes
+          ? { lengthMinutes: request.lengthMinutes }
+          : {}),
+        ...(request.type ? { type: request.type } : {}),
+        description: description ?? '',
+        revision: 1,
+        createdAt: at,
+        updatedAt: at,
+      };
+      interviews.push(interview);
+      // Not the application's revision or updatedAt: a brief never goes out of date for this.
+      application.interviewTimes = timesOf(interviews);
+      save();
+      return { interviewId: interview.id };
+    },
+    updateInterview: async ({ applicationId, interviewId, ...changes }) => {
+      const profile = currentProfile();
+      const application = applicationOf(profile, applicationId);
+      const interview = interviewsOf(profile, applicationId).find(
+        ({ id }) => id === interviewId,
+      );
+      if (!interview) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      const when = [changes.date, changes.startTime, changes.timeZone];
+      const some = when.filter(value => value !== undefined).length;
+      if (Object.keys(changes).length === 0 || (some > 0 && some < 3)) {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      const { name, description } = checkedFields(changes);
+      if (changes.name !== undefined) {
+        interview.name = name || undefined;
+      }
+      if (changes.date && changes.startTime && changes.timeZone) {
+        interview.date = changes.date;
+        interview.startTime = changes.startTime;
+        interview.timeZone = changes.timeZone;
+        interview.startsAt = instantIn(
+          changes.date,
+          changes.startTime,
+          changes.timeZone,
+        );
+      }
+      const before = JSON.stringify([
+        interview.description,
+        interview.type,
+        interview.lengthMinutes,
+      ]);
+      if (changes.lengthMinutes !== undefined) {
+        interview.lengthMinutes = changes.lengthMinutes ?? undefined;
+      }
+      if (changes.type !== undefined) {
+        interview.type = changes.type ?? undefined;
+      }
+      if (description !== undefined) {
+        interview.description = description;
+      }
+      if (
+        before !==
+        JSON.stringify([
+          interview.description,
+          interview.type,
+          interview.lengthMinutes,
+        ])
+      ) {
+        interview.revision += 1;
+      }
+      interview.updatedAt = now();
+      application.interviewTimes = timesOf(
+        interviewsOf(profile, applicationId),
+      );
+      save();
+      return { revision: interview.revision };
+    },
+    removeInterview: async (applicationId, interviewId) => {
+      const profile = currentProfile();
+      const application = applicationOf(profile, applicationId);
+      const interviews = interviewsOf(profile, applicationId);
+      if (!interviews.some(({ id }) => id === interviewId)) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      const kept = interviews.filter(({ id }) => id !== interviewId);
+      (profile.interviews ??= {})[applicationId] = kept;
+      application.interviewTimes = timesOf(kept);
       save();
     },
   };

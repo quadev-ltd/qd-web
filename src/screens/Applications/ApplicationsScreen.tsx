@@ -26,7 +26,12 @@ import {
   useApplications,
   useApplicationsActions,
 } from '@/core/profile/ApplicationsProvider';
+import { browserTimeZone, nextInterviewOf } from '@/core/profile/interviewTime';
 import { applicationPath } from '@/core/profile/paths';
+import {
+  nextInterviewWhen,
+  useNow,
+} from '@/screens/Applications/interviews/interviewText';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 import { asksForNewApplication } from '@/screens/Profile/StartPaths';
 
@@ -78,12 +83,15 @@ const BriefChips: React.FC<{
   );
 };
 
-/** One application in the list: the whole row opens it. */
+/** One application in the list: the whole row opens it. Its next interview is under the company. */
 const ApplicationRow: React.FC<{
   application: JobApplication;
   profileRevision: number | null;
-}> = ({ application, profileRevision }) => {
+  now: number;
+  timeZone: string;
+}> = ({ application, profileRevision, now, timeZone }) => {
   const { t } = useTranslation();
+  const next = nextInterviewOf(application.interviewTimes, now);
   return (
     <Card as="article" elevation="raised" className="relative p-4">
       <div className="flex items-center gap-3">
@@ -100,6 +108,14 @@ const ApplicationRow: React.FC<{
             {application.company && (
               <p className="text-[15px] leading-normal text-muted wrap-anywhere">
                 {application.company}
+              </p>
+            )}
+            {next && (
+              <p className="mt-1 flex items-center gap-1.5 text-sm leading-normal font-medium text-primary-dark">
+                <Icon name="calendar" size={16} />
+                {t('applications.nextInterview', {
+                  when: nextInterviewWhen(t, next, now, timeZone),
+                })}
               </p>
             )}
           </div>
@@ -124,6 +140,8 @@ export const ApplicationsScreen: React.FC = () => {
   const navigate = useNavigate();
   const { status, applications, profileRevision } = useApplications();
   const { reload } = useApplicationsActions();
+  const now = useNow();
+  const [timeZone] = useState(browserTimeZone);
   // Open at once when "Prepare for a job" led here.
   const [adding, setAdding] = useState(() =>
     asksForNewApplication(location.state),
@@ -162,6 +180,8 @@ export const ApplicationsScreen: React.FC = () => {
               <ApplicationRow
                 application={application}
                 profileRevision={profileRevision}
+                now={now}
+                timeZone={timeZone}
               />
             </li>
           ))}
