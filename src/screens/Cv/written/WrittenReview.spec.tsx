@@ -430,8 +430,17 @@ describe('WrittenReview', () => {
       await userEvent.click(
         screen.getByRole('button', { name: 'cv.writeAgainWithAnswers' }),
       );
+      // "Write this CV again" (D97): nothing was asked of it, so the box starts empty.
+      const panel = screen.getByRole('dialog', { name: 'cv.rewriteTitle' });
+      expect(within(panel).getByLabelText('cv.askedField')).toHaveValue('');
+      await userEvent.click(
+        within(panel).getByRole('button', { name: 'cv.writeAgainButton' }),
+      );
 
-      expect(gateway.rewriteCvVersion).toHaveBeenCalledExactlyOnceWith('w1');
+      expect(gateway.rewriteCvVersion).toHaveBeenCalledExactlyOnceWith(
+        'w1',
+        undefined,
+      );
       expect(gateway.getCvVersion).toHaveBeenCalledWith('uid-1', 'version-3');
     });
 
@@ -445,10 +454,196 @@ describe('WrittenReview', () => {
       await userEvent.click(
         screen.getByRole('button', { name: 'cv.writeAgainButton' }),
       );
+      const panel = screen.getByRole('dialog', { name: 'cv.rewriteTitle' });
+      await userEvent.click(
+        within(panel).getByRole('button', { name: 'cv.writeAgainButton' }),
+      );
 
-      expect(await screen.findByRole('alert')).toHaveTextContent(
+      expect(await within(panel).findByRole('alert')).toHaveTextContent(
         'cv.limitMessage',
       );
     });
+  });
+});
+
+describe('what the candidate asked of it (D97)', () => {
+  const ASKED =
+    'Put first: on-call.\nLeave out: Kestrel.\nAlso: ran the hiring loop in 2025.';
+  const askedVersion = (more: Partial<CvWrittenVersion> = {}) => {
+    const document = writtenDocumentFixture();
+    document.experience[0]!.bullets.push({
+      id: 'l9',
+      text: 'Ran the hiring loop for two backend engineers in 2025.',
+      sources: [{ kind: 'statement', id: 'N3' }],
+      state: 'written',
+      proposed: 'Ran the hiring loop for two backend engineers in 2025.',
+    });
+    return ready({
+      document,
+      asked: ASKED,
+      askedOutcomes: [
+        { outcome: 'done', text: 'Put your on-call work first.' },
+        {
+          outcome: 'changed',
+          text: 'Kept Kestrel to one line: without it, a gap.',
+        },
+        { outcome: 'not-done', text: 'Didn’t raise your title.' },
+      ],
+      statements: [
+        { id: 'N1', kind: 'note', text: 'Put first: on-call.' },
+        { id: 'N2', kind: 'note', text: 'Leave out: Kestrel.' },
+        { id: 'N3', kind: 'note', text: 'Also: ran the hiring loop in 2025.' },
+      ],
+      ...more,
+    });
+  };
+
+  const notesCard = () => screen.getByRole('region', { name: 'cv.notesTitle' });
+
+  it('opens "What we did and why" with what was asked, in the candidate’s words, and what was done with each request', () => {
+    setUp(askedVersion());
+
+    const card = notesCard();
+    expect(card).toHaveTextContent('cv.notesCountAsked');
+    expect(within(card).getByText('cv.askedTitle')).toBeInTheDocument();
+    expect(
+      within(card).getByText(
+        (_, element) =>
+          element?.tagName === 'BLOCKQUOTE' && element.textContent === ASKED,
+      ),
+    ).toBeInTheDocument();
+    expect(within(card).getByText('cv.askedUsedEveryTime')).toBeInTheDocument();
+    const outcomes = within(card).getByRole('list', {
+      name: 'cv.askedOutcomesLabel',
+    });
+    expect(
+      within(outcomes)
+        .getAllByRole('listitem')
+        .map(item => item.textContent),
+    ).toEqual([
+      'cv.askedOutcome_done: Put your on-call work first.',
+      'cv.askedOutcome_changed: Kept Kestrel to one line: without it, a gap.',
+      'cv.askedOutcome_not-done: Didn’t raise your title.',
+    ]);
+  });
+
+  it('"Change it and write again" opens "Write this CV again" with what was asked, and sends what the box shows', async () => {
+    const user = userEvent.setup();
+    const gateway = setUp(askedVersion());
+
+    await user.click(
+      within(notesCard()).getByRole('button', {
+        name: 'cv.askedChangeButton',
+      }),
+    );
+    const panel = screen.getByRole('dialog', { name: 'cv.rewriteTitle' });
+    const box = within(panel).getByLabelText('cv.askedField');
+    expect(box).toHaveValue(ASKED);
+    expect(within(panel).getByText('cv.askedCarriedRewrite')).toBeVisible();
+    await user.clear(box);
+    await user.type(box, 'Put first: payments.');
+    await user.click(
+      within(panel).getByRole('button', { name: 'cv.writeAgainButton' }),
+    );
+
+    expect(gateway.rewriteCvVersion).toHaveBeenCalledExactlyOnceWith(
+      'w1',
+      'Put first: payments.',
+    );
+  });
+
+  it('writes it again without anything asked once the box is cleared', async () => {
+    const user = userEvent.setup();
+    const gateway = setUp(askedVersion());
+
+    // The questions' "Write again" opens the same panel.
+    await user.click(
+      within(aside()).getByRole('button', { name: 'cv.writeAgainButton' }),
+    );
+    const panel = screen.getByRole('dialog', { name: 'cv.rewriteTitle' });
+    await user.click(
+      within(panel).getByRole('button', { name: 'cv.askedClearButton' }),
+    );
+    await user.click(
+      within(panel).getByRole('button', { name: 'cv.writeAgainButton' }),
+    );
+
+    expect(gateway.rewriteCvVersion).toHaveBeenCalledExactlyOnceWith(
+      'w1',
+      undefined,
+    );
+  });
+
+  it('a line from what was asked says so, and is added to the profile as a note', async () => {
+    const user = userEvent.setup();
+    const gateway = setUp(askedVersion());
+
+    await user.click(
+      within(cv()).getByRole('button', { name: /Ran the hiring loop/ }),
+    );
+    const line = within(aside()).getByRole('region', { name: 'cv.thisLine' });
+    expect(line).toHaveTextContent('cv.askedSourceTitle');
+    expect(line).toHaveTextContent('Also: ran the hiring loop in 2025.');
+    expect(line).toHaveTextContent('cv.onlyInThisCv');
+    expect(line).toHaveTextContent('cv.addNoteReading');
+    await user.click(
+      within(line).getByRole('button', { name: 'cv.addNoteButton' }),
+    );
+
+    expect(gateway.addCvNoteToProfile).toHaveBeenCalledExactlyOnceWith(
+      'w1',
+      'N3',
+      'cv.noteTitle',
+    );
+    expect(await within(line).findByText('cv.noteAddedText')).toBeVisible();
+    expect(
+      within(line).getByRole('link', { name: 'cv.openNoteLink' }),
+    ).toHaveAttribute('href', '/profile/resources/resource-9');
+  });
+
+  it('says a note already added is in the profile', async () => {
+    const user = userEvent.setup();
+    setUp(
+      askedVersion({
+        statements: [
+          {
+            id: 'N3',
+            kind: 'note',
+            text: 'Also: ran the hiring loop in 2025.',
+            resourceId: 'r7',
+          },
+        ],
+      }),
+    );
+
+    await user.click(
+      within(cv()).getByRole('button', { name: /Ran the hiring loop/ }),
+    );
+    const line = within(aside()).getByRole('region', { name: 'cv.thisLine' });
+    expect(within(line).getByText('cv.noteAddedText')).toBeVisible();
+    expect(
+      within(line).queryByRole('button', { name: 'cv.addNoteButton' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [ProfileErrorCode.AlreadyAdded, 'cv.noteAddedText'],
+    [ProfileErrorCode.MaxResources, 'profile.fullMessage'],
+    [ProfileErrorCode.DailyLimit, 'profile.dailyLimitMessage'],
+    [ProfileErrorCode.Network, 'cv.addNoteFailedMessage'],
+  ])('when adding is refused with %s, says %s', async (code, message) => {
+    const user = userEvent.setup();
+    const gateway = setUp(askedVersion());
+    gateway.addCvNoteToProfile.mockRejectedValue(new ProfileError(code));
+
+    await user.click(
+      within(cv()).getByRole('button', { name: /Ran the hiring loop/ }),
+    );
+    const line = within(aside()).getByRole('region', { name: 'cv.thisLine' });
+    await user.click(
+      within(line).getByRole('button', { name: 'cv.addNoteButton' }),
+    );
+
+    expect(await within(line).findByText(message)).toBeVisible();
   });
 });

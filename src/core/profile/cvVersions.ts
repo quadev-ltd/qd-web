@@ -186,14 +186,31 @@ export type CvQuestion = z.infer<typeof CvQuestionSchema>;
  * question of the version it was written again from, or a line or heading in their own words.
  */
 export const CvStatementSchema = z.object({
-  /** `A1`, `A2`, ... */
+  /** `A1`, `A2`, ... for answers, `N1`, `N2`, ... for the lines of what was asked (D97). */
   id: z.string(),
-  kind: z.enum(['answer', 'edit']).catch('answer'),
+  /** `note`: one line of what the candidate asked of this CV (D97), cited "From what you asked to add". */
+  kind: z.enum(['answer', 'edit', 'note']).catch('answer'),
   /** Answers only: the question. */
   question: z.string().optional().catch(undefined),
   text: z.string(),
+  /** Notes only: the profile's note it was added as ("Add it to my profile as a note"). */
+  resourceId: z.string().optional().catch(undefined),
 });
 export type CvStatement = z.infer<typeof CvStatementSchema>;
+
+/** Longest "Anything to put first, leave out or add?" (D97), and its lines that become statements. */
+export const CV_ASKED_MAX_CHARS = 1_000;
+export const CV_ASKED_MAX_LINES = 12;
+
+export const CV_ASKED_OUTCOMES = ['done', 'changed', 'not-done'] as const;
+export type CvAskedOutcomeKind = (typeof CV_ASKED_OUTCOMES)[number];
+
+/** What the writer did with one request of what was asked: one sentence to the candidate. */
+export const CvAskedOutcomeSchema = z.object({
+  outcome: z.enum(CV_ASKED_OUTCOMES).catch('done'),
+  text: z.string(),
+});
+export type CvAskedOutcome = z.infer<typeof CvAskedOutcomeSchema>;
 
 /** A fact nobody gave, asked by the writer. Answering it changes nothing until the CV is written again. */
 export const CvWrittenQuestionSchema = z.object({
@@ -244,6 +261,10 @@ export const CvWrittenVersionSchema = z.object({
   document: CvDocumentSchema.optional().catch(undefined),
   /** "What we did and why", the most important first. */
   notes: z.array(z.string()).catch([]),
+  /** What the candidate asked of this CV (D97), as written; absent when nothing was. */
+  asked: z.string().optional().catch(undefined),
+  /** What was done with each request, in the order asked; kept apart from `notes`. */
+  askedOutcomes: z.array(CvAskedOutcomeSchema).optional().catch(undefined),
   questions: z.array(CvWrittenQuestionSchema).catch([]),
   /** The candidate's statements its lines may cite, copied from the version written again. */
   statements: z.array(CvStatementSchema).catch([]),
@@ -287,6 +308,8 @@ export const isWrittenVersion = (
 export const CREATE_CV_VERSION = 'createCvVersion';
 export const REMOVE_CV_VERSION = 'removeCvVersion';
 export const DECIDE_CV_CHANGE = 'decideCvChange';
+/** Adds one line of what was asked of a written CV to the profile as a note (D97). */
+export const ADD_CV_NOTE_TO_PROFILE = 'addCvNoteToProfile';
 export const ANSWER_CV_QUESTION = 'answerCvQuestion';
 export const MARK_CV_VERSION_SENT = 'markCvVersionSent';
 export const COPY_CV_VERSION = 'copyCvVersion';
@@ -316,6 +339,8 @@ export type CreateCvVersionRequest =
       target: CvVersionTargetRequest;
       pages?: CvPageCount;
       convention?: CvVersionConvention;
+      /** What the candidate asks of it (D97); empty or absent: nothing. */
+      asked?: string;
     }
   | {
       mode?: 'edit';
@@ -358,6 +383,13 @@ export const RewriteCvVersionResponseSchema = z.object({
   versionId: documentId,
   status: z.literal('creating'),
 });
+/** "Add it to my profile as a note" (D97): the note resource made from one line of what was asked. */
+export const AddCvNoteToProfileResponseSchema = z.object({
+  versionId: documentId,
+  statementId: z.string(),
+  resourceId: documentId,
+});
+
 /** "Restore": the copy, which keeps every decision and becomes the newest version. */
 export const CopyCvVersionResponseSchema = z.object({
   versionId: documentId,
@@ -384,6 +416,8 @@ export const CvRefusal = {
   NoItems: 'no-items',
   /** Lines are revised, and CVs written again, in written versions only. */
   NotWritten: 'not-written',
+  /** That line of what was asked is in the profile already, as `details.resourceId` (D97). */
+  AlreadyAdded: 'already-added',
   /** No new edit version (D83): the pages ask for written ones only. */
   EditRetired: 'edit-retired',
 } as const;

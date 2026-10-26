@@ -217,6 +217,32 @@ reads the job's `country` (ISO code) into the application, and `createCvVersion`
 - **The preview reads a country** from a job's text (a few places only), and its three seeded jobs
   are in the UK, the US and Norway.
 
+## What the candidate asks of a CV (D97, 26 Oct 2026)
+
+The owner asked to be able to tell the writer what to change. Drawn on canvas versions 50 and 51
+(doc 13 §27), built as slice 25 (research doc 15 §24) against the backend's contract (`asked`,
+`askedOutcomes`, the `note` statements, `addCvNoteToProfile`).
+
+- **"Anything to put first, leave out or add?"**, optional, up to 1,000 characters, in "New CV
+  version" after "Written as" (`AskedField`). Three starters add "Put first: ", "Leave out: " or
+  "Also: " on a line of their own and give the box the focus; a focused box given new text puts the
+  caret at its end, so nothing moves it later (an earlier version did, and moved it back over what
+  was typed meanwhile).
+- **Carried over** from the latest version for the same target, whatever it had (`carriedAsked`):
+  a job's to that job, a general CV's to the next general one. An empty box stays empty, so text the
+  candidate cleared on purpose doesn't come back. A line says where it comes from, with "Clear". What
+  the candidate types or clears stays with each target while the panel is open.
+- **"What we did and why"** opens with "What you asked for" in the candidate's words and, beside it,
+  one line per request from `askedOutcomes`, marked done, done differently or not done (the mark is
+  also read out). Nothing is built from the writer's free-text notes.
+- **"Write this CV again"** (`RewritePanel`) replaces the direct call: "Change it and write again"
+  and the questions' "Write again" open it with what was asked filled in. It sends what the box
+  shows; emptied, the CV is written without it. "Try again" after a failure asks the same again.
+- **A line citing what was asked** says "From what you asked to add", shows the candidate's words,
+  then "Only in this CV" and "Add it to my profile as a note" (`addCvNoteToProfile`, titled
+  "Added from your CV of {date}"), which uses one of the day's readings. Once added, or refused as
+  `already-added`, it says "Added to your profile", with a link to the note when its id is known.
+
 ## What follows
 
 Doc 19 slice 5 is complete on the website. What is left is in doc 19 §6: "Edit my CV" (a resource

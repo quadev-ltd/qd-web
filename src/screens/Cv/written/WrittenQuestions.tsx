@@ -1,15 +1,13 @@
 // The writer's questions (doc 13 §20.1, doc 19 §3.3): facts nobody gave, each answered in the
 // candidate's words ("Save the answer") or skipped. An answer changes nothing by itself: "Write
-// again with my answers" makes a new version from the profile and the answers, keeping the lines
-// edited and leaving out the ones removed. With no answer it writes again from the profile as it
-// is now. The version written again from stays.
+// again with my answers" opens "Write this CV again" (D97), which makes a new version from the
+// profile, the answers and what was asked, keeping the lines edited and leaving out the ones
+// removed. The version written again from stays.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
 
 import { Badge } from '../review/CvDocument';
 import { type CvReview } from '../review/useCvReview';
-import { useCvPaths } from '../useCvPaths';
 
 import FormTextArea from '@/components/FormTextArea';
 import Icon from '@/components/Icon';
@@ -20,22 +18,10 @@ import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
 import {
   CV_LINE_MAX_CHARS,
-  CV_VERSIONS_MAX,
   type CvWrittenQuestion,
   type CvWrittenVersion,
 } from '@/core/profile/cvVersions';
-import {
-  useCvDailyLimit,
-  useCvVersionsActions,
-} from '@/core/profile/CvVersionsProvider';
-import {
-  getProfileErrorCode,
-  logProfileError,
-  ProfileErrorCode,
-} from '@/core/profile/errors';
-import { dailyLimitResetTime } from '@/core/profile/limits';
-import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
-import { useSessionUser } from '@/core/session/hooks';
+import { useCvDailyLimit } from '@/core/profile/CvVersionsProvider';
 
 const Question: React.FC<{
   question: CvWrittenQuestion;
@@ -142,46 +128,15 @@ const Question: React.FC<{
 export const WrittenQuestions: React.FC<{
   version: CvWrittenVersion;
   review: CvReview;
-}> = ({ version, review }) => {
+  /** "Write again": opens "Write this CV again" (D97). */
+  onWriteAgain: () => void;
+}> = ({ version, review, onWriteAgain }) => {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const paths = useCvPaths();
-  const gateway = useProfileGateway();
-  const uid = useSessionUser()?.uid;
-  const { refreshVersion, refreshToday } = useCvVersionsActions();
   const max = useCvDailyLimit();
-  const [writing, setWriting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string>();
   const { questions } = version;
   const answered = questions.filter(
     ({ status, answer }) => status === 'answered' && answer,
   ).length;
-
-  const writeAgain = async () => {
-    setWriting(true);
-    setErrorMessage(undefined);
-    try {
-      const { versionId } = await gateway.rewriteCvVersion(version.id);
-      await refreshVersion(versionId).catch(() => null);
-      navigate(paths.version(versionId));
-    } catch (error) {
-      logProfileError('rewriteCvVersion', error, uid);
-      switch (getProfileErrorCode(error)) {
-        case ProfileErrorCode.DailyLimit:
-          setErrorMessage(
-            t('cv.limitMessage', { max, time: dailyLimitResetTime() }),
-          );
-          break;
-        case ProfileErrorCode.MaxCvVersions:
-          setErrorMessage(t('cv.maxMessage', { max: CV_VERSIONS_MAX }));
-          break;
-        default:
-          setErrorMessage(t('cv.rewriteFailedMessage'));
-      }
-      refreshToday();
-      setWriting(false);
-    }
-  };
 
   return (
     <Card
@@ -218,29 +173,14 @@ export const WrittenQuestions: React.FC<{
             {t('cv.writeAgainButton')}
           </h2>
         )}
-        {errorMessage && (
-          <Banner tone="danger" role="alert">
-            {errorMessage}
-          </Banner>
-        )}
         <Button
           variant={answered > 0 ? 'primary' : 'secondary'}
-          disabled={writing}
-          aria-busy={writing}
-          onClick={() => {
-            writeAgain();
-          }}
+          onClick={onWriteAgain}
           className="gap-2 self-start">
-          {writing ? (
-            <Spinner size="small" decorative />
-          ) : (
-            <Icon name="refresh" size={18} />
-          )}
-          {writing
-            ? t('cv.writingAgainButton')
-            : answered > 0
-              ? t('cv.writeAgainWithAnswers', { count: answered })
-              : t('cv.writeAgainButton')}
+          <Icon name="refresh" size={18} />
+          {answered > 0
+            ? t('cv.writeAgainWithAnswers', { count: answered })
+            : t('cv.writeAgainButton')}
         </Button>
         <p className="text-sm leading-normal text-muted">
           {t(

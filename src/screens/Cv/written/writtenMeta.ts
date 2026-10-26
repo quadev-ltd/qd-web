@@ -40,6 +40,8 @@ export interface SourceContext {
   statements: CvStatement[];
   /** The day of the version it was written again from: "your answer of 15 Oct". */
   writtenAgainDay?: string;
+  /** The version itself, for what a line of it can do ("Add it to my profile as a note", D97). */
+  version?: { id: string; day: string };
 }
 
 /**
@@ -63,7 +65,9 @@ export const sourceLine = (
           ? writtenAgainDay
             ? t('cv.sourceAnswerOf', { date: writtenAgainDay })
             : t('cv.sourceAnswer')
-          : t('cv.sourceYourWords'),
+          : statement?.kind === 'note'
+            ? t('cv.sourceAsked')
+            : t('cv.sourceYourWords'),
       );
       continue;
     }

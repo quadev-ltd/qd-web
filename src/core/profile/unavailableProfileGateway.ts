@@ -49,6 +49,7 @@ export const unavailableProfileGateway: ProfileGateway = {
   copyCvVersion: unavailable,
   reviseCvLine: unavailable,
   rewriteCvVersion: unavailable,
+  addCvNoteToProfile: unavailable,
   getUsageLimits: unavailable,
   getCvDetails: unavailable,
   updateCvDetails: unavailable,

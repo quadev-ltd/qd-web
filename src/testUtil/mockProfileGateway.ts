@@ -50,6 +50,9 @@ export const createMockProfileGateway = (): Mocked<ProfileGateway> => ({
   copyCvVersion: vi.fn(() => Promise.resolve({ versionId: 'version-2' })),
   reviseCvLine: vi.fn(() => Promise.resolve()),
   rewriteCvVersion: vi.fn(() => Promise.resolve({ versionId: 'version-3' })),
+  addCvNoteToProfile: vi.fn(() =>
+    Promise.resolve({ resourceId: 'resource-9' }),
+  ),
   getUsageLimits: vi.fn(() => Promise.resolve(null)),
   getCvDetails: vi.fn(() => Promise.resolve(null)),
   updateCvDetails: vi.fn(() => Promise.resolve({ changed: [] })),

@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CONVENTION_TAG_KEYS } from '../conventions';
+import { versionDay } from '../cvMeta';
 import CvDetailsPanel from '../details/CvDetailsPanel';
 import DownloadButton from '../download/DownloadButton';
 import { TermsCard } from '../review/ReviewCards';
@@ -15,6 +16,7 @@ import { useCvReview } from '../review/useCvReview';
 import useItems from '../review/useItems';
 
 import LinePanel, { type Opened } from './LinePanel';
+import RewritePanel from './RewritePanel';
 import WrittenCv from './WrittenCv';
 import { aboutPages, isLongerThanAsked } from './writtenMeta';
 import WrittenQuestions from './WrittenQuestions';
@@ -30,7 +32,10 @@ import {
   type CvDocument,
   type CvLine,
 } from '@/core/profile/cvDocument';
-import { type CvWrittenVersion } from '@/core/profile/cvVersions';
+import {
+  type CvAskedOutcome,
+  type CvWrittenVersion,
+} from '@/core/profile/cvVersions';
 import { useCvVersions } from '@/core/profile/CvVersionsProvider';
 import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
 
@@ -68,6 +73,73 @@ const findOpened = (
   return undefined;
 };
 
+const OUTCOME_MARKS = {
+  done: { icon: 'check', className: 'text-success' },
+  changed: { icon: 'alert', className: 'text-warning' },
+  'not-done': { icon: 'x', className: 'text-danger' },
+} as const;
+
+/**
+ * "What you asked for" (D97): the candidate's words, used every time this CV is written, with
+ * "Change it and write again"; beside it, what was done with each request.
+ */
+const AskedBlock: React.FC<{
+  asked: string;
+  outcomes: CvAskedOutcome[];
+  onWriteAgain: () => void;
+}> = ({ asked, outcomes, onWriteAgain }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-wrap gap-x-8 gap-y-4">
+      <div className="flex min-w-0 flex-[1_1_340px] flex-col gap-1.5">
+        <p className="flex items-baseline gap-2">
+          <span className="min-w-0 flex-1 text-sm leading-normal font-bold">
+            {t('cv.askedTitle')}
+          </span>
+          <span className="text-[13px] leading-normal text-muted">
+            {t('cv.askedYourWords')}
+          </span>
+        </p>
+        <blockquote className="rounded-xl bg-tint px-3.5 py-3 text-[15px] leading-normal whitespace-pre-wrap shadow-[inset_3px_0_0_var(--color-primary)] wrap-anywhere">
+          {asked}
+        </blockquote>
+        <p className="text-[13px] leading-normal text-muted">
+          {t('cv.askedUsedEveryTime')}
+        </p>
+        <Button
+          variant="quiet"
+          size="small"
+          onClick={onWriteAgain}
+          className="-ml-1.5 gap-2 self-start text-[15px]">
+          <Icon name="edit" size={18} />
+          {t('cv.askedChangeButton')}
+        </Button>
+      </div>
+      {outcomes.length > 0 && (
+        <ul
+          aria-label={t('cv.askedOutcomesLabel')}
+          className="flex min-w-0 flex-[1_1_380px] flex-col gap-2.5">
+          {outcomes.map(({ outcome, text }, index) => (
+            // The outcomes have no ids; their order is the order asked.
+            <li key={index} className="flex items-start gap-2.5">
+              <span
+                className={`flex pt-0.5 ${OUTCOME_MARKS[outcome].className}`}>
+                <Icon name={OUTCOME_MARKS[outcome].icon} size={18} />
+              </span>
+              <span className="min-w-0 flex-1 text-[15px] leading-normal">
+                <span className="sr-only">
+                  {t(`cv.askedOutcome_${outcome}`)}:{' '}
+                </span>
+                {text}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
 export interface WrittenReviewProps {
   version: CvWrittenVersion & { document: CvDocument };
   /** What the downloaded file is called, without its extension. */
@@ -90,15 +162,19 @@ export const WrittenReview: React.FC<WrittenReviewProps> = ({
   const [allNotes, setAllNotes] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [openedId, setOpenedId] = useState<string>();
+  // "Write this CV again" (D97), from "Change it and write again" or the questions.
+  const [rewriting, setRewriting] = useState(false);
   const wide = useMediaQuery('(min-width: 768px)');
 
-  const { document, notes } = version;
+  const { document, notes, asked } = version;
+  const outcomes = version.askedOutcomes ?? [];
   const opened = findOpened(document, openedId);
   const context = {
     items,
     resources,
     statements: version.statements,
     writtenAgainDay,
+    version: { id: version.id, day: versionDay(version) },
   };
   const panel = opened && (
     <LinePanel
@@ -117,7 +193,7 @@ export const WrittenReview: React.FC<WrittenReviewProps> = ({
 
   return (
     <div className="flex flex-col gap-5">
-      {!opened && (notes.length > 0 || dropped > 0) && (
+      {!opened && (notes.length > 0 || dropped > 0 || asked) && (
         <Card
           as="section"
           elevation="raised"
@@ -129,12 +205,24 @@ export const WrittenReview: React.FC<WrittenReviewProps> = ({
               className="font-display text-[18px] leading-tight font-semibold">
               {t('cv.notesTitle')}
             </h2>
-            {notes.length > 0 && (
+            {notes.length + outcomes.length > 0 && (
               <p className="text-sm leading-normal text-muted">
-                {t('cv.notesCount', { count: notes.length })}
+                {outcomes.length > 0
+                  ? t('cv.notesCountAsked', {
+                      count: notes.length + outcomes.length,
+                      asked: outcomes.length,
+                    })
+                  : t('cv.notesCount', { count: notes.length })}
               </p>
             )}
           </div>
+          {asked && (
+            <AskedBlock
+              asked={asked}
+              outcomes={outcomes}
+              onWriteAgain={() => setRewriting(true)}
+            />
+          )}
           {notes.length > 0 && (
             <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(260px,100%),1fr))] gap-3">
               {(allNotes ? notes : notes.slice(0, NOTES_SHOWN)).map(
@@ -256,7 +344,11 @@ export const WrittenReview: React.FC<WrittenReviewProps> = ({
           {version.target.kind === 'job' && (
             <SentCard sent={sent} review={review} />
           )}
-          <WrittenQuestions version={version} review={review} />
+          <WrittenQuestions
+            version={version}
+            review={review}
+            onWriteAgain={() => setRewriting(true)}
+          />
           <TermsCard terms={version.unsupportedJobTerms} />
         </aside>
       </div>
@@ -268,6 +360,9 @@ export const WrittenReview: React.FC<WrittenReviewProps> = ({
         </SidePanel>
       )}
       {detailsOpen && <CvDetailsPanel onClose={() => setDetailsOpen(false)} />}
+      {rewriting && (
+        <RewritePanel version={version} onClose={() => setRewriting(false)} />
+      )}
     </div>
   );
 };

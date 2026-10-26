@@ -2,6 +2,7 @@ import { doc, getDoc, getDocs, Timestamp } from 'firebase/firestore/lite';
 import { httpsCallable } from 'firebase/functions';
 
 import {
+  addCvNoteToProfile,
   answerCvQuestion,
   copyCvVersion,
   createCvVersion,
@@ -357,4 +358,64 @@ describe('a written CV revised (D83)', () => {
     );
     expect(callable).toHaveBeenCalledWith({ versionId: 'w1' });
   });
+
+  it('writes one again with what is asked of it (D97)', async () => {
+    callable.mockResolvedValue({
+      data: { versionId: 'w2', status: 'creating' },
+    });
+
+    await rewriteCvVersion('w1', 'Put first: on-call.');
+
+    expect(callable).toHaveBeenCalledWith({
+      versionId: 'w1',
+      asked: 'Put first: on-call.',
+    });
+  });
+
+  it('adds a line of what was asked to the profile with addCvNoteToProfile (D97)', async () => {
+    callable.mockResolvedValue({
+      data: { versionId: 'w1', statementId: 'N2', resourceId: 'r9' },
+    });
+
+    await expect(
+      addCvNoteToProfile('w1', 'N2', 'Added from your CV of 15 Oct 2026'),
+    ).resolves.toEqual({ resourceId: 'r9' });
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'addCvNoteToProfile',
+    );
+    expect(callable).toHaveBeenCalledWith({
+      versionId: 'w1',
+      statementId: 'N2',
+      title: 'Added from your CV of 15 Oct 2026',
+    });
+  });
+
+  it.each([
+    [
+      'functions/failed-precondition',
+      'already-added',
+      ProfileErrorCode.AlreadyAdded,
+    ],
+    [
+      'functions/failed-precondition',
+      'max-resources',
+      ProfileErrorCode.MaxResources,
+    ],
+    ['functions/resource-exhausted', 'quota', ProfileErrorCode.DailyLimit],
+  ])(
+    'turns %s (%s) of addCvNoteToProfile into %s',
+    async (code, reason, expected) => {
+      callable.mockRejectedValue(
+        Object.assign(new Error('refused'), {
+          code,
+          details: { reason, resourceId: 'r7' },
+        }),
+      );
+
+      await expect(addCvNoteToProfile('w1', 'N2', 'Title')).rejects.toEqual(
+        new ProfileError(expected),
+      );
+    },
+  );
 });
