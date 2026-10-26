@@ -429,7 +429,7 @@ test('with nothing in the profile, "Add to your profile first" leads to it', asy
 
 test('a version made before D83 is still reviewed to the end, compared with a written one, and restored', async ({
   page,
-}) => {
+}, { project }) => {
   await openProfile(page);
   await seedProfile(page);
   // Made before the CV pages read the versions, so the list has it
@@ -468,6 +468,18 @@ test('a version made before D83 is still reviewed to the end, compared with a wr
   await expect(
     page.getByRole('region', { name: /\d+ differences/ }),
   ).toContainText('PROFILE');
+  // D96: the way back ends with the version it was opened from
+  const fromVersion = page.url();
+  if (project.name === 'phone') {
+    await expect(
+      page.getByRole('link', { name: /^Version of / }),
+    ).toBeVisible();
+  } else {
+    await expect(
+      page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link'),
+    ).toHaveText(['CVs', /^Version of /]);
+  }
+  expect(fromVersion).toContain('/cv/compare');
 
   // The earlier one restored: a copy, the newest, with its decisions
   await page.getByRole('button', { name: /Restore the version of/ }).click();
