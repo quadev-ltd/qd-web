@@ -112,7 +112,14 @@ export const CvCompareScreen: React.FC = () => {
       <div className="mx-auto flex max-w-[1120px] flex-col gap-6">
         <CvWayBack
           paths={paths}
-          to={later ? paths.version(later.id) : undefined}
+          from={
+            later
+              ? {
+                  label: t('cv.versionOf', { date: versionDay(later) }),
+                  to: paths.version(later.id),
+                }
+              : undefined
+          }
         />
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-[28px] leading-tight font-semibold">

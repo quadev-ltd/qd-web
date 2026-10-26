@@ -111,6 +111,37 @@ describe('CvCompareScreen', () => {
   });
 });
 
+describe('the way back from a comparison (D96)', () => {
+  it('opened from CVs: CVs › the version it was opened from; on a phone, back to that version', () => {
+    setUp('/cv/compare?later=v2');
+
+    const way = screen.getByRole('navigation', { name: 'breadcrumb.label' });
+    expect(
+      within(way)
+        .getAllByRole('link')
+        .map(link => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([
+      ['cv.title', '/cv'],
+      ['cv.versionOf', '/cv/versions/v2'],
+    ]);
+    const back = screen
+      .getAllByRole('link', { name: 'cv.versionOf' })
+      .find(link => !way.contains(link));
+    expect(back).toHaveAttribute('href', '/cv/versions/v2');
+  });
+
+  it('without the version, "‹ CVs"', () => {
+    setUp('/cv/compare?later=gone');
+
+    expect(
+      screen.queryByRole('navigation', { name: 'breadcrumb.label' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('main')).getByRole('link', { name: 'cv.title' }),
+    ).toHaveAttribute('href', '/cv');
+  });
+});
+
 describe('compared from an application’s CV tab (D96)', () => {
   const fromApplication = (
     route: string,
@@ -140,13 +171,25 @@ describe('compared from an application’s CV tab (D96)', () => {
       },
     );
 
-  it('shows the way back to the application’s CV tab', () => {
+  it('shows the way there, ending with the version it was opened from', () => {
     fromApplication('/applications/a1/cv/compare?later=v2');
 
     const way = screen.getByRole('navigation', { name: 'breadcrumb.label' });
     expect(
-      within(way).getByRole('link', { name: 'applications.cvTab' }),
-    ).toHaveAttribute('href', '/applications/a1/cv');
+      within(way)
+        .getAllByRole('link')
+        .map(link => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([
+      ['applications.title', '/applications'],
+      ['Senior Backend Engineer', '/applications/a1'],
+      ['applications.cvTab', '/applications/a1/cv'],
+      ['cv.versionOf', '/applications/a1/cv/versions/v2'],
+    ]);
+    // On a phone: one link back, to that version.
+    const back = screen
+      .getAllByRole('link', { name: 'cv.versionOf' })
+      .find(link => !way.contains(link));
+    expect(back).toHaveAttribute('href', '/applications/a1/cv/versions/v2');
   });
 
   it('restores under the application', async () => {
