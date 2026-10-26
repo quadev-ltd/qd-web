@@ -80,7 +80,12 @@ const useTryAgain = (version: CvVersion | undefined) => {
         // A written version tried again keeps its length and convention; an old edit version
         // is written in the one its job suggests.
         ...(isWrittenVersion(version)
-          ? { pages: version.pages, convention: version.convention }
+          ? {
+              pages: version.pages,
+              convention: version.convention,
+              // What was asked of it is asked again (D97).
+              ...(version.asked ? { asked: version.asked } : {}),
+            }
           : { pages: 2 as const }),
       });
       // The failed one keeps nothing: it goes, so the list has the new one only.

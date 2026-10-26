@@ -95,6 +95,8 @@ const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
   [CvRefusal.NoItems]: ProfileErrorCode.NoItems,
   [CvRefusal.NotWritten]: ProfileErrorCode.Invalid,
   [CvRefusal.EditRetired]: ProfileErrorCode.Invalid,
+  // "Add it to my profile as a note" (D97): the page says it is there already.
+  [CvRefusal.AlreadyAdded]: ProfileErrorCode.AlreadyAdded,
 };
 
 /**

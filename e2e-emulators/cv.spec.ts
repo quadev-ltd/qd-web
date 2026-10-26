@@ -248,6 +248,11 @@ test('a written CV revised (reviseCvLine), a question answered, then written aga
   await page
     .getByRole('button', { name: 'Write again with my answers (1)' })
     .click();
+  // D97: "Write this CV again" opens first, with nothing asked of this CV
+  await page
+    .getByRole('dialog', { name: 'Write this CV again' })
+    .getByRole('button', { name: 'Write again' })
+    .click();
   await expect(
     page.getByText(
       /^Written again from the version of .+, with 1 of your answers/,
@@ -316,6 +321,11 @@ test('the convention chosen (D86): kept by the backend, the UK’s right to work
 
   // rewriteCvVersion keeps the version's convention
   await page.getByRole('button', { name: /^Write again/ }).click();
+  // D97: "Write this CV again" opens first, with nothing asked of this CV
+  await page
+    .getByRole('dialog', { name: 'Write this CV again' })
+    .getByRole('button', { name: 'Write again' })
+    .click();
   await expect(
     page.getByText(/^Written again from the version of/),
   ).toBeVisible();
@@ -355,4 +365,98 @@ test('a per-user daily limit (usageLimits/{uid}): the backend lets a sixth CV th
   await expect(page.getByRole('article', { name: 'Your CV' })).toContainText(
     'fake-profile:',
   );
+});
+
+test('what is asked of a CV (D97): sent and kept, what was done with each request, a line added to the profile, written again, carried over', async ({
+  page,
+}) => {
+  const account = await createAccount({
+    interviewAssistant: true,
+    cvTool: true,
+  });
+  await signIn(page, account);
+  await openProfile(page);
+  await addCv(page);
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'CVs', exact: true })
+    .click();
+
+  // createCvVersion with `asked`
+  await page.getByRole('button', { name: 'Write a general CV' }).click();
+  const panel = page.getByRole('dialog', { name: 'Write a general CV' });
+  await panel
+    .getByLabel('Anything to put first, leave out or add? (optional)')
+    .fill(
+      'Put first: my on-call work\nLeave out: Kestrel\nAlso: ran the hiring loop in 2025',
+    );
+  await panel.getByRole('button', { name: 'Write my CV' }).click();
+  await expect(page).toHaveURL(/\/cv\/versions\/.+/);
+  const cv = page.getByRole('article', { name: 'Your CV' });
+  // The fake's summary ends with a line citing N1
+  await expect(cv).toContainText('fake-asked: Put first: my on-call work');
+
+  // What was asked, read back, and one outcome per line in turn
+  const notes = page.getByRole('region', { name: 'What we did and why' });
+  await expect(notes).toContainText('What you asked for');
+  await expect(notes.locator('blockquote')).toHaveText(
+    'Put first: my on-call work\nLeave out: Kestrel\nAlso: ran the hiring loop in 2025',
+  );
+  const outcomes = notes.getByRole('list', {
+    name: 'What we did with what you asked',
+  });
+  await expect(outcomes.getByRole('listitem')).toHaveText([
+    'Done: fake-outcome: done for N1.',
+    'Done differently: fake-outcome: changed for N2.',
+    'Not done: fake-outcome: not-done for N3.',
+  ]);
+
+  // The line from what was asked, added to the profile as a note (addCvNoteToProfile)
+  await cv.getByRole('button', { name: /fake-asked:/ }).click();
+  const line = page.getByRole('region', { name: 'This line' });
+  await expect(line).toContainText('What you asked to add');
+  await line
+    .getByRole('button', { name: 'Add it to my profile as a note' })
+    .click();
+  await expect(line).toContainText('Added to your profile');
+  // Read back after a reload: the statement keeps its resourceId
+  await page.reload();
+  await cv.getByRole('button', { name: /fake-asked:/ }).click();
+  await expect(page.getByRole('region', { name: 'This line' })).toContainText(
+    'Added to your profile',
+  );
+  await page
+    .getByRole('region', { name: 'This line' })
+    .getByRole('link', { name: 'Open the note' })
+    .click();
+  await expect(
+    page.getByRole('heading', { level: 1, name: /^Added from your CV of / }),
+  ).toBeVisible();
+  await page.goBack();
+
+  // rewriteCvVersion with what the box shows
+  await page
+    .getByRole('region', { name: 'What we did and why' })
+    .getByRole('button', { name: 'Change it and write again' })
+    .click();
+  const again = page.getByRole('dialog', { name: 'Write this CV again' });
+  await again
+    .getByLabel('Anything to put first, leave out or add? (optional)')
+    .fill('Put first: my payments work');
+  const first = page.url();
+  await again.getByRole('button', { name: 'Write again' }).click();
+  await expect(page).not.toHaveURL(first);
+  await expect(cv).toContainText('fake-asked: Put first: my payments work');
+  await expect(
+    page.getByRole('list', { name: 'What we did with what you asked' }),
+  ).toHaveText('Done: fake-outcome: done for N1.');
+
+  // The next general CV starts with what was asked of the latest
+  await page.getByRole('link', { name: 'CVs', exact: true }).first().click();
+  await page.getByRole('button', { name: 'New version' }).click();
+  const next = page.getByRole('dialog', { name: 'New CV version' });
+  await next.getByText('No job in particular').click();
+  await expect(
+    next.getByLabel('Anything to put first, leave out or add? (optional)'),
+  ).toHaveValue('Put first: my payments work');
 });

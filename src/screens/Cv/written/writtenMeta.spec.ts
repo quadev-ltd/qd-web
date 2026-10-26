@@ -22,6 +22,7 @@ const context = {
   statements: [
     { id: 'A1', kind: 'answer' as const, question: 'How many?', text: 'Nine.' },
     { id: 'A2', kind: 'edit' as const, text: 'Led the team.' },
+    { id: 'N1', kind: 'note' as const, text: 'Also: ran the hiring loop.' },
   ],
   writtenAgainDay: '15 Oct 2026',
 };
@@ -44,6 +45,16 @@ describe('sourceLine', () => {
     ).toBe(
       'cv.sourceFrom {"sources":"Maya Okafor CV 2026 · Performance review 2025"}',
     );
+  });
+
+  it('says a line from what the candidate asked of the CV (D97)', () => {
+    expect(
+      sourceLine(
+        t,
+        { state: 'written', sources: [{ kind: 'statement', id: 'N1' }] },
+        context,
+      ),
+    ).toBe('cv.sourceFrom {"sources":"cv.sourceAsked"}');
   });
 
   it('says an answer with the day of the version it was written again from, and the candidate’s words', () => {

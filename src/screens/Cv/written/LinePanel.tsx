@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { type CvReview } from '../review/useCvReview';
 
+import NoteToProfile from './NoteToProfile';
 import { type SourceContext } from './writtenMeta';
 
 import FormTextArea from '@/components/FormTextArea';
@@ -52,6 +53,36 @@ const ENTRY_FIELDS: {
   { field: 'end', label: 'cv.roleTo' },
 ];
 
+/** The lines of what was asked that the line cites (D97), each one to add to the profile. */
+const NotesToProfile: React.FC<{
+  sources: CvLineSource[];
+  context: SourceContext;
+  version: { id: string; day: string };
+}> = ({ sources, context, version }) => {
+  const notes = sources.flatMap(source => {
+    if (source.kind !== 'statement') {
+      return [];
+    }
+    const statement = context.statements.find(({ id }) => id === source.id);
+    return statement?.kind === 'note' ? [statement] : [];
+  });
+  if (notes.length === 0) {
+    return null;
+  }
+  return (
+    <div className="flex flex-col gap-3 border-t border-border-faint pt-3">
+      {notes.map(statement => (
+        <NoteToProfile
+          key={statement.id}
+          versionId={version.id}
+          versionDay={version.day}
+          statement={statement}
+        />
+      ))}
+    </div>
+  );
+};
+
 /** "Where it says this": each source with the words it says. */
 const Sources: React.FC<{
   sources: CvLineSource[];
@@ -73,17 +104,27 @@ const Sources: React.FC<{
         if (source.kind === 'statement') {
           const statement = statements.find(({ id }) => id === source.id);
           const answer = statement?.kind === 'answer';
+          const note = statement?.kind === 'note';
           return (
             <li key={key} className="flex flex-col gap-1.5">
               <p className="flex items-center gap-2 text-sm font-bold">
                 <span className="flex text-primary">
                   <Icon name={answer ? 'help' : 'edit'} size={16} />
                 </span>
-                {answer
-                  ? writtenAgainDay
-                    ? t('cv.yourAnswerOf', { date: writtenAgainDay })
-                    : t('cv.yourAnswerTitle')
-                  : t('cv.yourWordsTitle')}
+                <span className="min-w-0 flex-1">
+                  {answer
+                    ? writtenAgainDay
+                      ? t('cv.yourAnswerOf', { date: writtenAgainDay })
+                      : t('cv.yourAnswerTitle')
+                    : note
+                      ? t('cv.askedSourceTitle')
+                      : t('cv.yourWordsTitle')}
+                </span>
+                {note && (
+                  <span className="text-[13px] font-normal text-muted">
+                    {t('cv.askedYourWords')}
+                  </span>
+                )}
               </p>
               {answer && statement.question && (
                 <p className="text-sm leading-normal text-muted">
@@ -91,7 +132,13 @@ const Sources: React.FC<{
                 </p>
               )}
               {statement && (
-                <blockquote className="rounded-[12px] bg-background px-3.5 py-3 text-[15px] leading-normal">
+                <blockquote
+                  className={`rounded-[12px] px-3.5 py-3 text-[15px] leading-normal ${
+                    note
+                      ? // The candidate's words, tinted as "Your words" are elsewhere.
+                        'bg-tint shadow-[inset_3px_0_0_var(--color-primary)]'
+                      : 'bg-background'
+                  }`}>
                   {statement.text}
                 </blockquote>
               )}
@@ -391,6 +438,14 @@ export const LinePanel: React.FC<LinePanelProps> = ({
           </>
         )}
       </div>
+      {!edited && !removed && context.version && (
+        // D97: what was asked that the line cites, kept only in this CV until added.
+        <NotesToProfile
+          sources={target.sources}
+          context={context}
+          version={context.version}
+        />
+      )}
     </div>
   );
 };

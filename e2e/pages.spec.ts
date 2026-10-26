@@ -581,6 +581,12 @@ test('CV versions: nothing in the profile, no version yet, the panel, the detail
 
   // Written again: from the version before, with what was removed left out
   await page.getByRole('button', { name: 'Write again' }).click();
+  await expectAccessibleAndNotTooWide(page);
+  // D97: "Write this CV again" opens first, with what was asked (nothing here).
+  await page
+    .getByRole('dialog', { name: 'Write this CV again' })
+    .getByRole('button', { name: 'Write again' })
+    .click();
   await expect(
     page.getByText(/^Written again from the version of/),
   ).toBeVisible();
@@ -617,6 +623,45 @@ test('CV versions: nothing in the profile, no version yet, the panel, the detail
     await showCv.click();
   }
   await expect(page.getByRole('article', { name: 'Your CV' })).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+});
+
+test('what is asked of a CV (D97): the box, what was done with it, a line from it and "Write this CV again": accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await seedProfile(page);
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'CVs', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Write a general CV' }).click();
+  const panel = page.getByRole('dialog', { name: 'Write a general CV' });
+  await panel
+    .getByLabel('Anything to put first, leave out or add? (optional)')
+    .fill(
+      'Put first: my on-call work\nLeave out: Kestrel\nAlso: ran the hiring loop in 2025\nMake it sound like I was the tech lead.',
+    );
+  await expectAccessibleAndNotTooWide(page);
+  await panel.getByRole('button', { name: 'Write my CV' }).click();
+  await expect(page.getByRole('article', { name: 'Your CV' })).toBeVisible();
+  await expect(
+    page.getByRole('list', { name: 'What we did with what you asked' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await page
+    .getByRole('article', { name: 'Your CV' })
+    .getByRole('button', { name: /ran the hiring loop/ })
+    .click();
+  await expect(
+    page.getByRole('button', { name: 'Add it to my profile as a note' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await page.goto(page.url());
+  await page.getByRole('button', { name: 'Change it and write again' }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'Write this CV again' }),
+  ).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
 });
 

@@ -64,6 +64,7 @@ import { ProfileError, ProfileErrorCode } from './errors';
 import { type ProfileGateway } from './gateway';
 import { type ApplicationInterview, INTERVIEWS_MAX } from './interviews';
 import { browserTimeZone } from './interviewTime';
+import { askedOf, followAsked, noteStatementsOf } from './previewCvAsked';
 import {
   checkedFields,
   instantIn,
@@ -1115,6 +1116,12 @@ export const createPreviewProfileGateway = ({
           ? cvWriteAnswerFor(profile.items, job?.jobDescription)
           : cvAnswerFor(version.cv, profile.items[0], job?.jobDescription),
       );
+      if (isWrittenVersion(version) && version.document && version.asked) {
+        version.askedOutcomes = followAsked(
+          version.document,
+          version.statements,
+        );
+      }
       const before = profile.cvRewrites?.[versionId];
       if (isWrittenVersion(version) && version.document && before) {
         rewriteFrom(version, before);
@@ -1908,6 +1915,8 @@ export const createPreviewProfileGateway = ({
       if ((profile.cvVersionsToday ?? 0) >= cvDailyLimit(profile)) {
         throw new ProfileError(ProfileErrorCode.DailyLimit);
       }
+      const asked =
+        request.mode === 'write' ? askedOf(request.asked) : undefined;
       const at = now();
       const common = {
         id: newId('version'),
@@ -1931,7 +1940,9 @@ export const createPreviewProfileGateway = ({
                 request.convention ?? defaultCvConvention(target, application),
               pages: request.pages ?? 2,
               notes: [],
-              statements: [],
+              ...(asked ? { asked } : {}),
+              // D97: each line of what was asked, a statement the CV may cite.
+              statements: noteStatementsOf(asked),
             }
           : {
               ...common,
@@ -2179,9 +2190,10 @@ export const createPreviewProfileGateway = ({
       version.updatedAt = now();
       save();
     },
-    rewriteCvVersion: async versionId => {
+    rewriteCvVersion: async (versionId, requested) => {
       const profile = currentProfile();
       const version = readyVersion(versionId);
+      const asked = askedOf(requested);
       if (!isWrittenVersion(version) || !version.document) {
         throw new ProfileError(ProfileErrorCode.Invalid);
       }
@@ -2191,12 +2203,16 @@ export const createPreviewProfileGateway = ({
       if ((profile.cvVersionsToday ?? 0) >= cvDailyLimit(profile)) {
         throw new ProfileError(ProfileErrorCode.DailyLimit);
       }
-      // The candidate's answers and edits become statements the new one cites.
-      const statements: CvStatement[] = [];
+      // What was asked (D97), then the candidate's answers and edits, become statements the new
+      // one cites; a line of what was asked that was added to the profile keeps its note.
+      const notes = isWrittenVersion(version)
+        ? noteStatementsOf(asked, version.statements)
+        : [];
+      const statements: CvStatement[] = [...notes];
       for (const question of version.questions) {
         if (question.status === 'answered' && question.answer) {
           statements.push({
-            id: `A${statements.length + 1}`,
+            id: `A${statements.length - notes.length + 1}`,
             kind: 'answer',
             question: question.text,
             text: question.answer,
@@ -2206,7 +2222,7 @@ export const createPreviewProfileGateway = ({
       for (const { line } of cvDocumentLines(version.document)) {
         if (line.state === 'edited') {
           statements.push({
-            id: `A${statements.length + 1}`,
+            id: `A${statements.length - notes.length + 1}`,
             kind: 'edit',
             text: line.text,
           });
@@ -2221,6 +2237,7 @@ export const createPreviewProfileGateway = ({
         pages: version.pages,
         status: 'creating',
         notes: [],
+        ...(asked ? { asked } : {}),
         questions: [],
         unsupportedJobTerms: [],
         statements,
@@ -2244,6 +2261,34 @@ export const createPreviewProfileGateway = ({
       nextCvFailure = null;
       save();
       return { versionId: written.id };
+    },
+    addCvNoteToProfile: async (versionId, statementId, title) => {
+      const version = readyVersion(versionId);
+      if (!isWrittenVersion(version)) {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      const statement = version.statements.find(
+        ({ id, kind }) => id === statementId && kind === 'note',
+      );
+      if (!statement) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      if (
+        statement.resourceId &&
+        currentProfile().resources.some(({ id }) => id === statement.resourceId)
+      ) {
+        throw new ProfileError(ProfileErrorCode.AlreadyAdded);
+      }
+      // A note, word for word, read as any note is: the day's readings and the 20 resources.
+      const { resourceId } = await gateway.createResource({
+        source: 'text',
+        type: 'note',
+        title,
+        text: statement.text,
+      });
+      statement.resourceId = resourceId;
+      save();
+      return { resourceId };
     },
     markCvVersionSent: async (versionId, sent) => {
       const profile = currentProfile();

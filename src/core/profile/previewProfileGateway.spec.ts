@@ -2118,3 +2118,120 @@ describe('previewProfileGateway, the likely questions of an interview (D94)', ()
     ).resolves.toBe(ProfileErrorCode.NotFound);
   });
 });
+
+describe('previewProfileGateway, what is asked of a CV (D97)', () => {
+  const written = async (asked?: string) => {
+    const context = await setUp();
+    context.gateway.controls.seed();
+    const { versionId } = await context.gateway.createCvVersion({
+      mode: 'write',
+      target: { kind: 'general' },
+      ...(asked === undefined ? {} : { asked }),
+    });
+    context.pass(PREVIEW_CV_MS);
+    const versions = await context.gateway.getCvVersions(UID);
+    const version = versions.find(({ id }) => id === versionId);
+    if (!version || !isWrittenVersion(version)) {
+      throw new Error('not written');
+    }
+    return { ...context, version };
+  };
+
+  it('keeps what was asked, a note statement per line, and says what was done with each request', async () => {
+    const { version } = await written(
+      '  Put first: on-call work.\n\nLeave out: Kestrel.\nAlso: ran the hiring loop in 2025.\nMake it sound like I was the tech lead.  ',
+    );
+
+    expect(version.asked).toBe(
+      'Put first: on-call work.\n\nLeave out: Kestrel.\nAlso: ran the hiring loop in 2025.\nMake it sound like I was the tech lead.',
+    );
+    expect(
+      version.statements
+        .filter(({ kind }) => kind === 'note')
+        .map(({ id, text }) => [id, text]),
+    ).toEqual([
+      ['N1', 'Put first: on-call work.'],
+      ['N2', 'Leave out: Kestrel.'],
+      ['N3', 'Also: ran the hiring loop in 2025.'],
+      ['N4', 'Make it sound like I was the tech lead.'],
+    ]);
+    expect(version.askedOutcomes?.map(({ outcome }) => outcome)).toEqual([
+      'done',
+      'changed',
+      'done',
+      'not-done',
+    ]);
+    // The fact given is a line that cites it.
+    const lines = JSON.stringify(version.document);
+    expect(lines).toContain('"id":"N3"');
+  });
+
+  it('asks nothing when nothing is asked', async () => {
+    const { version } = await written('   ');
+
+    expect(version.asked).toBeUndefined();
+    expect(version.askedOutcomes).toBeUndefined();
+    expect(version.statements).toEqual([]);
+  });
+
+  it('refuses more than 1,000 characters', async () => {
+    const { gateway } = await setUp();
+    gateway.controls.seed();
+
+    await expect(
+      codeOf(
+        gateway.createCvVersion({
+          mode: 'write',
+          target: { kind: 'general' },
+          asked: 'x'.repeat(1_001),
+        }),
+      ),
+    ).resolves.toBe(ProfileErrorCode.Invalid);
+  });
+
+  it('adds a line to the profile as a note, once, and keeps it there when the CV is written again', async () => {
+    const { gateway, version, pass } = await written(
+      'Also: ran the hiring loop in 2025.',
+    );
+
+    const { resourceId } = await gateway.addCvNoteToProfile(
+      version.id,
+      'N1',
+      'Added from your CV of 15 Oct 2026',
+    );
+
+    await expect(gateway.getResource(UID, resourceId)).resolves.toMatchObject({
+      type: 'note',
+      title: 'Added from your CV of 15 Oct 2026',
+    });
+    await expect(
+      codeOf(gateway.addCvNoteToProfile(version.id, 'N1', 'Again')),
+    ).resolves.toBe(ProfileErrorCode.AlreadyAdded);
+
+    const { versionId } = await gateway.rewriteCvVersion(
+      version.id,
+      'Also: ran the hiring loop in 2025.\nPut first: payments.',
+    );
+    pass(PREVIEW_CV_MS);
+    const again = await gateway.getCvVersion(UID, versionId);
+    expect(again && isWrittenVersion(again) && again.statements).toEqual([
+      {
+        id: 'N1',
+        kind: 'note',
+        text: 'Also: ran the hiring loop in 2025.',
+        resourceId,
+      },
+      { id: 'N2', kind: 'note', text: 'Put first: payments.' },
+    ]);
+  });
+
+  it('writes it again without anything asked when the box is empty', async () => {
+    const { gateway, version, pass } = await written('Put first: on-call.');
+
+    const { versionId } = await gateway.rewriteCvVersion(version.id);
+    pass(PREVIEW_CV_MS);
+
+    const again = await gateway.getCvVersion(UID, versionId);
+    expect(again && isWrittenVersion(again) && again.asked).toBeUndefined();
+  });
+});

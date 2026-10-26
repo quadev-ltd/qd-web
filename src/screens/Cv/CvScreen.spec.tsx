@@ -231,6 +231,80 @@ describe('CvScreen', () => {
       ).toBeInTheDocument();
     });
 
+    it('sends what is asked of it (D97)', async () => {
+      const user = userEvent.setup();
+      const gateway = createMockProfileGateway();
+      gateway.createCvVersion.mockResolvedValue({
+        versionId: 'v9',
+        status: 'creating',
+      });
+      setUp({ versions: [cvVersionFixture()], gateway });
+      const panel = await openPanel();
+
+      await user.type(
+        within(panel).getByLabelText('cv.askedField'),
+        '  Put first: on-call.  ',
+      );
+      await user.click(
+        within(panel).getByRole('button', { name: 'cv.createButton' }),
+      );
+
+      expect(gateway.createCvVersion).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ asked: 'Put first: on-call.' }),
+      );
+    });
+
+    it('starts with what was asked of the job’s latest CV, to change or clear (D97)', async () => {
+      const user = userEvent.setup();
+      const gateway = createMockProfileGateway();
+      setUp({
+        versions: [
+          writtenVersionFixture({
+            id: 'w0',
+            createdAt: 1,
+            asked: 'Older, not this one.',
+          }),
+          writtenVersionFixture({
+            id: 'w1',
+            createdAt: 2,
+            asked: 'Leave out: Kestrel.',
+          }),
+        ],
+        gateway,
+      });
+      const panel = await openPanel();
+
+      expect(within(panel).getByLabelText('cv.askedField')).toHaveValue(
+        'Leave out: Kestrel.',
+      );
+      expect(within(panel).getByText('cv.askedCarriedJob')).toBeInTheDocument();
+      await user.click(
+        within(panel).getByRole('button', { name: 'cv.askedClearButton' }),
+      );
+      await user.click(
+        within(panel).getByRole('button', { name: 'cv.createButton' }),
+      );
+
+      expect(gateway.createCvVersion).toHaveBeenCalledExactlyOnceWith(
+        expect.not.objectContaining({ asked: expect.anything() }),
+      );
+    });
+
+    it('starts empty when the job’s latest CV asked nothing (D97)', async () => {
+      setUp({
+        versions: [
+          writtenVersionFixture({ id: 'w0', createdAt: 1, asked: 'Older.' }),
+          writtenVersionFixture({ id: 'w1', createdAt: 2 }),
+        ],
+      });
+      const panel = await openPanel();
+
+      expect(within(panel).getByLabelText('cv.askedField')).toHaveValue('');
+      expect(
+        within(panel).queryByText('cv.askedCarriedJob'),
+      ).not.toBeInTheDocument();
+    });
+
     it('writes a general one for a role, on one page', async () => {
       const gateway = createMockProfileGateway();
       setUp({ versions: [cvVersionFixture()], gateway });

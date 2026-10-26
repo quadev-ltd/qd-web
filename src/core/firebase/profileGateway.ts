@@ -11,6 +11,7 @@ import {
 } from './applications';
 import { getCvDetails, updateCvDetails } from './cvDetails';
 import {
+  addCvNoteToProfile,
   answerCvQuestion,
   copyCvVersion,
   createCvVersion,
@@ -98,6 +99,7 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   copyCvVersion,
   reviseCvLine,
   rewriteCvVersion,
+  addCvNoteToProfile,
   getUsageLimits,
   getCvDetails,
   updateCvDetails,

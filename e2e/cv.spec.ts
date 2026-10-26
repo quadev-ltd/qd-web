@@ -240,6 +240,11 @@ test('the convention follows the job’s country unless changed, a US resume pri
   // Written again: still a US resume
   const before = page.url();
   await page.getByRole('button', { name: /^Write again/ }).click();
+  // D97: "Write this CV again" opens first, with what was asked (nothing here).
+  await page
+    .getByRole('dialog', { name: 'Write this CV again' })
+    .getByRole('button', { name: 'Write again' })
+    .click();
   await expect(page).not.toHaveURL(before);
   await expect(cv).toContainText('Maya Okafor');
   await expect(page.getByText('US resume · Letter')).toBeVisible();
@@ -308,6 +313,11 @@ test('a written CV revised: a line edited, another removed and restored, a role�
   await expect(questions).toContainText('Answered: Nine engineers.');
   await page
     .getByRole('button', { name: 'Write again with my answers (1)' })
+    .click();
+  // D97: "Write this CV again" opens first, with what was asked (nothing here).
+  await page
+    .getByRole('dialog', { name: 'Write this CV again' })
+    .getByRole('button', { name: 'Write again' })
     .click();
   await expect(
     page.getByText(
@@ -531,4 +541,100 @@ test('the CV details at the top of every CV: filled from the CV, corrected, and 
   await expect(panel.getByLabel('Right to work (optional)')).toHaveValue('');
   await panel.getByRole('button', { name: 'Cancel' }).click();
   await expect(panel).toBeHidden();
+});
+
+test('what is asked of a CV (D97): written with it, what was done with each request, a fact added to the profile, written again, carried to the next', async ({
+  page,
+}) => {
+  await openProfile(page);
+  await seedProfile(page);
+  await openCv(page);
+
+  // A general CV, the first: three ways to start the box
+  await page.getByRole('button', { name: 'Write a general CV' }).click();
+  const panel = page.getByRole('dialog', { name: 'Write a general CV' });
+  const box = panel.getByLabel(
+    'Anything to put first, leave out or add? (optional)',
+  );
+  await panel.getByRole('button', { name: 'Put first' }).click();
+  await expect(box).toBeFocused();
+  await page.keyboard.type('my on-call work');
+  await panel
+    .getByRole('button', { name: 'Something not in my profile' })
+    .click();
+  await page.keyboard.type('ran the hiring loop for two engineers in 2025');
+  await box.press('End');
+  await page.keyboard.type('\nMake it sound like I was the tech lead.');
+  await expect(box).toHaveValue(
+    'Put first: my on-call work\nAlso: ran the hiring loop for two engineers in 2025\nMake it sound like I was the tech lead.',
+  );
+  await writeCv(page, 'Write a general CV');
+
+  // "What we did and why": what was asked, in the candidate's words, and what was done with each
+  const notes = page.getByRole('region', { name: 'What we did and why' });
+  await expect(notes).toContainText('What you asked for');
+  await expect(notes).toContainText('about what you asked');
+  const outcomes = notes.getByRole('list', {
+    name: 'What we did with what you asked',
+  });
+  await expect(outcomes.getByRole('listitem')).toHaveCount(3);
+  await expect(outcomes).toContainText('Put my on-call work first');
+  await expect(outcomes).toContainText('Didn’t use');
+
+  // The fact given is a line, from what was asked, kept only in this CV until added
+  await page
+    .getByRole('article', { name: 'Your CV' })
+    .getByRole('button', { name: /ran the hiring loop/ })
+    .click();
+  const line = page
+    .getByRole('region', { name: 'This line' })
+    .or(page.getByRole('dialog', { name: 'This line' }));
+  await expect(line).toContainText('What you asked to add');
+  await expect(line).toContainText('Only in this CV');
+  await expect(line).toContainText('uses 1 of today’s 20 readings');
+  await line
+    .getByRole('button', { name: 'Add it to my profile as a note' })
+    .click();
+  await expect(line).toContainText('Added to your profile');
+  await line.getByRole('link', { name: 'Open the note' }).click();
+  await expect(
+    page.getByRole('heading', { level: 1, name: /Added from your CV of/ }),
+  ).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('article', { name: 'Your CV' })).toBeVisible();
+
+  // Written again with what was asked changed
+  await page
+    .getByRole('region', { name: 'What we did and why' })
+    .getByRole('button', { name: 'Change it and write again' })
+    .click();
+  const again = page.getByRole('dialog', { name: 'Write this CV again' });
+  const againBox = again.getByLabel(
+    'Anything to put first, leave out or add? (optional)',
+  );
+  await expect(againBox).toHaveValue(/^Put first: my on-call work/);
+  await expect(again).toContainText('What you asked for this CV.');
+  await againBox.fill('Put first: my payments work');
+  await again.getByRole('button', { name: 'Write again' }).click();
+  await expect(page).toHaveURL(/\/cv\/versions\/.+/);
+  await expect(page.getByRole('article', { name: 'Your CV' })).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'What we did and why' }),
+  ).toContainText('Put first: my payments work');
+
+  // The next general CV starts with what was asked of the latest
+  await page.getByRole('link', { name: 'CVs', exact: true }).first().click();
+  await page.getByRole('button', { name: 'New version' }).click();
+  const next = page.getByRole('dialog', { name: 'New CV version' });
+  await next.getByText('No job in particular').click();
+  await expect(
+    next.getByLabel('Anything to put first, leave out or add? (optional)'),
+  ).toHaveValue('Put first: my payments work');
+  await expect(next).toContainText(
+    /From your general CV of .+\. Change it or clear it\./,
+  );
+  await next.getByRole('button', { name: 'Clear' }).click();
+  await expect(
+    next.getByLabel('Anything to put first, leave out or add? (optional)'),
+  ).toHaveValue('');
 });

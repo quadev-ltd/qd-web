@@ -265,7 +265,20 @@ export interface ProfileGateway {
    * is now, the answers, and the lines edited and removed. Made in the background, like a new
    * one; the version written again from doesn't change. Resolves the new one's id.
    */
-  rewriteCvVersion(versionId: string): Promise<{ versionId: string }>;
+  rewriteCvVersion(
+    versionId: string,
+    /** What the candidate asks of it (D97), as the panel shows it; empty: nothing. */
+    asked?: string,
+  ): Promise<{ versionId: string }>;
+  /**
+   * "Add it to my profile as a note" (D97): one line of what was asked (`N…`) as a note resource,
+   * read as any note is. The statement then has its `resourceId`.
+   */
+  addCvNoteToProfile(
+    versionId: string,
+    statementId: string,
+    title: string,
+  ): Promise<{ resourceId: string }>;
 
   /**
    * The user's overrides of the AI services' daily limits (`usageLimits/{uid}`); `null` when

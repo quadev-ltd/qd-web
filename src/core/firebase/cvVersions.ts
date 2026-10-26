@@ -37,6 +37,8 @@ import {
   REVISE_CV_LINE,
   type ReviseCvLineRequest,
   ReviseCvLineResponseSchema,
+  ADD_CV_NOTE_TO_PROFILE,
+  AddCvNoteToProfileResponseSchema,
   REWRITE_CV_VERSION,
   RewriteCvVersionResponseSchema,
 } from '@/core/profile/cvVersions';
@@ -166,13 +168,31 @@ export const reviseCvLine = async (
 
 export const rewriteCvVersion = async (
   versionId: string,
+  asked?: string,
 ): Promise<{ versionId: string }> => {
   const { versionId: written } = await call(
     REWRITE_CV_VERSION,
     RewriteCvVersionResponseSchema,
-    { versionId },
+    { versionId, ...(asked ? { asked } : {}) },
   );
   return { versionId: written };
+};
+
+/**
+ * "Add it to my profile as a note" (D97): one line of what was asked of a written CV, word for
+ * word, as a note resource, read as any note is (one of the day's readings).
+ */
+export const addCvNoteToProfile = async (
+  versionId: string,
+  statementId: string,
+  title: string,
+): Promise<{ resourceId: string }> => {
+  const { resourceId } = await call(
+    ADD_CV_NOTE_TO_PROFILE,
+    AddCvNoteToProfileResponseSchema,
+    { versionId, statementId, title },
+  );
+  return { resourceId };
 };
 
 /** How many versions the backend made for this user today (UTC). */

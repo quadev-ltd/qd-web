@@ -8,12 +8,15 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
+import AskedField from './AskedField';
+import { carriedAsked } from './askedMeta';
 import ChoiceGroup from './ChoiceGroup';
 import {
   CONVENTION_MEANING_KEYS,
   CONVENTION_OPTION_KEYS,
   countryName,
 } from './conventions';
+import { versionDay } from './cvMeta';
 import { detailsLines } from './details/CvDetailsCard';
 import CvDetailsPanel from './details/CvDetailsPanel';
 import { useCvPaths } from './useCvPaths';
@@ -28,6 +31,7 @@ import { type JobApplication, jobStatusOf } from '@/core/profile/applications';
 import { useApplications } from '@/core/profile/ApplicationsProvider';
 import { CV_PAGE_COUNTS, type CvPageCount } from '@/core/profile/cvDocument';
 import {
+  CV_ASKED_MAX_CHARS,
   CV_ROLE_MAX_CHARS,
   CV_VERSION_CONVENTIONS,
   CV_VERSIONS_MAX,
@@ -97,14 +101,29 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
   const [isBusy, setIsBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
   const [limitRefused, setLimitRefused] = useState(false);
+  // D97: what is asked of it, per target. Each target starts with what was asked of its latest
+  // version; what the candidate types, or clears, stays with that target.
+  const [typed, setTyped] = useState<Record<string, string>>({});
+  const [cleared, setCleared] = useState<Record<string, true>>({});
 
   const left = madeToday === null ? null : Math.max(0, max - madeToday);
   const limitReached = left === 0 || limitRefused;
   const full = versions.length >= CV_VERSIONS_MAX;
   const trimmedRole = role.trim();
   const roleTooLong = trimmedRole.length > CV_ROLE_MAX_CHARS;
+  const targetKey = kind === 'job' ? `job:${applicationId ?? ''}` : 'general';
+  const carried = carriedAsked(
+    versions,
+    kind === 'job' ? { kind: 'job', applicationId } : { kind: 'general' },
+  );
+  const asked =
+    typed[targetKey] ?? (cleared[targetKey] ? '' : (carried?.asked ?? ''));
+  const askedTooLong = asked.trim().length > CV_ASKED_MAX_CHARS;
   const blocked =
-    limitReached || full || (kind === 'job' ? !applicationId : roleTooLong);
+    limitReached ||
+    full ||
+    askedTooLong ||
+    (kind === 'job' ? !applicationId : roleTooLong);
   const application =
     kind === 'job' ? jobs.find(({ id }) => id === applicationId) : undefined;
   const suggested = defaultCvConvention({ kind }, application);
@@ -157,6 +176,7 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
         pages,
         // Always the one shown, so the CV is what the panel said.
         convention,
+        ...(asked.trim() ? { asked: asked.trim() } : {}),
       });
       // Into the list before its page opens; the page follows it while it is written.
       await refreshVersion(versionId).catch(() => null);
@@ -279,6 +299,25 @@ export const NewCvVersionPanel: React.FC<NewCvVersionPanelProps> = ({
             {convention === suggested && ` ${why}`}
           </p>
         </div>
+        <AskedField
+          value={asked}
+          onChange={value => setTyped({ ...typed, [targetKey]: value })}
+          carried={
+            carried && !cleared[targetKey]
+              ? t(
+                  kind === 'job'
+                    ? 'cv.askedCarriedJob'
+                    : 'cv.askedCarriedGeneral',
+                  { date: versionDay(carried.from) },
+                )
+              : undefined
+          }
+          onClear={() => {
+            setCleared({ ...cleared, [targetKey]: true });
+            setTyped({ ...typed, [targetKey]: '' });
+          }}
+          disabled={isBusy}
+        />
         <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-border-subtle px-3.5 py-3">
           <div className="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
             <span className="text-sm leading-normal font-medium">
