@@ -139,9 +139,12 @@ export const updateApplication = async (
 
 export const removeApplication = async (
   applicationId: string,
+  options?: { removePractice?: boolean },
 ): Promise<void> => {
   await call(REMOVE_JOB_APPLICATION, RemoveJobApplicationResponseSchema, {
     applicationId,
+    // D99: sent only when asked, so the practice stays by default.
+    ...(options?.removePractice ? { removePractice: true } : {}),
   });
 };
 

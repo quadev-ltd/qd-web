@@ -58,6 +58,19 @@ describe('SignedInShell', () => {
     );
   });
 
+  it('has Sessions after CVs with text practice (D94)', () => {
+    renderShell({
+      flags: { interviewAssistant: true, cvTool: true, textPractice: true },
+    });
+
+    expect(navLabels()).toEqual([
+      'profile.title',
+      'applications.title',
+      'cv.title',
+      'sessions.title',
+    ]);
+  });
+
   it('has Profile · Applications without the CV tool', () => {
     renderShell({ flags: { interviewAssistant: true, cvTool: false } });
 

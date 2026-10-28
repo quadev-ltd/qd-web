@@ -1,13 +1,16 @@
 // Text practice (D94) through Firebase: the owner's practice turns read with Firestore Lite and
 // the callables of quadev-backend's `interview-profile` codebase. The contract is in
 // src/core/profile/practice.ts. None of the reads needs a composite index (the backend's
-// docs/api.md): they filter on equality and the page picks the newest.
+// docs/api.md): the marks filter on equality and the page picks the newest; Sessions orders by
+// one field.
 import {
   collection,
   doc,
   type DocumentData,
+  getCount,
   getDoc,
   getDocs,
+  orderBy,
   query,
   where,
 } from 'firebase/firestore/lite';
@@ -21,7 +24,9 @@ import {
   type PracticeTurn,
   PracticeTurnSchema,
   practiceTurnsPath,
+  REMOVE_APPLICATION_PRACTICE,
   REMOVE_PRACTICE_TURN,
+  RemoveApplicationPracticeResponseSchema,
   RemovePracticeTurnResponseSchema,
   START_PRACTICE_TURN,
   type StartPracticeTurnRequest,
@@ -61,6 +66,33 @@ export const getPracticeTurn = (
     return snapshot.exists()
       ? (parse('getPracticeTurn', [snapshot])[0] ?? null)
       : null;
+  });
+
+/** Every turn of the user (500 at most), the most recently practised first: Sessions. */
+export const getPracticeTurns = (uid: string): Promise<PracticeTurn[]> =>
+  mapped(async () => {
+    const snapshot = await getDocs(
+      query(
+        collection(db(), practiceTurnsPath(uid)),
+        orderBy('updatedAt', 'desc'),
+      ),
+    );
+    return parse('getPracticeTurns', snapshot.docs);
+  });
+
+/** How many turns one application has (D99): a count, not a read of each. */
+export const countApplicationPractice = (
+  uid: string,
+  applicationId: string,
+): Promise<number> =>
+  mapped(async () => {
+    const snapshot = await getCount(
+      query(
+        collection(db(), practiceTurnsPath(uid)),
+        where('applicationId', '==', applicationId),
+      ),
+    );
+    return snapshot.data().count;
   });
 
 /** The turns of one list of an interview's likely questions, in no order. */
@@ -115,6 +147,18 @@ export const removePracticeTurn = async (turnId: string): Promise<void> => {
   await call(REMOVE_PRACTICE_TURN, RemovePracticeTurnResponseSchema, {
     turnId,
   });
+};
+
+/** Removes every turn of one application (D99), there or removed. Resolves how many. */
+export const removeApplicationPractice = async (
+  applicationId: string,
+): Promise<{ removed: number }> => {
+  const { removed } = await call(
+    REMOVE_APPLICATION_PRACTICE,
+    RemoveApplicationPracticeResponseSchema,
+    { applicationId },
+  );
+  return { removed };
 };
 
 /** How many practice calls the backend made for this user today (UTC). */

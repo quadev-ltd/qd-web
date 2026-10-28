@@ -6,7 +6,12 @@ import PageShell from './PageShell';
 
 import { ACCOUNT_PATH, HOME_PATH } from '@/core/auth/paths';
 import { useFlag, useFlagsReady } from '@/core/flags/FlagsProvider';
-import { APPLICATIONS_PATH, CV_PATH, PROFILE_PATH } from '@/core/profile/paths';
+import {
+  APPLICATIONS_PATH,
+  CV_PATH,
+  PROFILE_PATH,
+  SESSIONS_PATH,
+} from '@/core/profile/paths';
 import { useProfile, useSessionUser, useSignOut } from '@/core/session/hooks';
 
 export interface SignedInShellProps {
@@ -33,6 +38,8 @@ export const SignedInShell: React.FC<SignedInShellProps> = ({
   // The CV tool is part of the interview tools, with a flag of its own (delivery 2b).
   const interviewTools = useFlag('interviewAssistant');
   const cvTool = useFlag('cvTool');
+  // Sessions holds the practice kept (D94), with text practice.
+  const textPractice = useFlag('textPractice');
   const flagsReady = useFlagsReady();
 
   const firstName = profile?.firstName ?? '';
@@ -54,6 +61,9 @@ export const SignedInShell: React.FC<SignedInShellProps> = ({
             homePath={interviewTools ? undefined : HOME_PATH}
             applicationsPath={interviewTools ? APPLICATIONS_PATH : undefined}
             cvPath={interviewTools && cvTool ? CV_PATH : undefined}
+            sessionsPath={
+              interviewTools && textPractice ? SESSIONS_PATH : undefined
+            }
             profilePath={PROFILE_PATH}
           />
         ) : (

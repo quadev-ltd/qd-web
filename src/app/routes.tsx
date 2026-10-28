@@ -40,6 +40,8 @@ import {
   CV_VERSION_PATH,
   PROFILE_PATH,
   RESOURCE_PATH,
+  SESSION_PRACTICE_PATH,
+  SESSIONS_PATH,
 } from '@/core/profile/paths';
 import { useAppDispatch } from '@/core/state/hooks';
 import { accountDeletedNoticeCleared } from '@/core/state/slices/exitSlice';
@@ -201,6 +203,22 @@ const accountRoutes: RouteObject[] = [
                   Component: (
                     await import('@/screens/Practice/PracticeTurnScreen')
                   ).BriefPracticeScreen,
+                }),
+              },
+              // Sessions (D94): the practice kept, by job, with the applications' names.
+              {
+                path: SESSIONS_PATH,
+                lazy: async () => ({
+                  Component: (await import('@/screens/Sessions/SessionsScreen'))
+                    .SessionsScreen,
+                }),
+              },
+              {
+                path: SESSION_PRACTICE_PATH,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/screens/Practice/PracticeTurnScreen')
+                  ).SessionPracticeScreen,
                 }),
               },
               {

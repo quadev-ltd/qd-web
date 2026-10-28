@@ -48,10 +48,13 @@ import {
   writeInterviewQuestions,
 } from './interviews';
 import {
+  countApplicationPractice,
   getBriefPracticeTurns,
   getListPracticeTurns,
   getPracticeToday,
   getPracticeTurn,
+  getPracticeTurns,
+  removeApplicationPractice,
   removePracticeTurn,
   startPracticeTurn,
 } from './practice';
@@ -96,6 +99,9 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   removeInterview,
   writeInterviewQuestions,
   getInterviewQuestionsToday,
+  getPracticeTurns,
+  countApplicationPractice,
+  removeApplicationPractice,
   getPracticeTurn,
   getListPracticeTurns,
   getBriefPracticeTurns,

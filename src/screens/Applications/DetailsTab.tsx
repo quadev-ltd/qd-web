@@ -13,6 +13,7 @@ import { useReadPostingAgain } from './useReadPostingAgain';
 import Icon from '@/components/Icon';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import { useFlag } from '@/core/flags/FlagsProvider';
 import { type JobApplication } from '@/core/profile/applications';
 import { parseProfileLink } from '@/core/profile/contract';
 import { APPLICATIONS_PATH } from '@/core/profile/paths';
@@ -37,6 +38,8 @@ export const DetailsTab: React.FC<{ application: JobApplication }> = ({
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [removing, setRemoving] = useState(false);
+  // D99: with text practice, the candidate chooses whether its practice stays.
+  const textPractice = useFlag('textPractice');
   const posting = parseProfileLink(application.postingUrl ?? '');
   const readAgain = useReadPostingAgain(
     application.id,
@@ -125,7 +128,11 @@ export const DetailsTab: React.FC<{ application: JobApplication }> = ({
             {t('applications.removeTitle')}
           </h2>
           <p className="text-[15px] leading-normal text-muted">
-            {t('applications.removeDescription')}
+            {t(
+              textPractice
+                ? 'applications.removeDescriptionPractice'
+                : 'applications.removeDescription',
+            )}
           </p>
           <Button
             variant="quietDanger"

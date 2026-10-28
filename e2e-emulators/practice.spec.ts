@@ -173,3 +173,91 @@ test('practice: the backend refuses over the day’s limit, and the page says so
     questions.getByRole('button', { name: 'Practise', exact: true }),
   ).toBeDisabled();
 });
+
+/** "Remove this application?" from the application's Details, the list's practice counted. */
+const askToRemove = async (page: Page) => {
+  await page
+    .getByRole('link', { name: /^fake-/ })
+    .first()
+    .click();
+  await page.getByRole('link', { name: 'Details' }).click();
+  await page
+    .getByRole('button', { name: 'Remove this application' })
+    .last()
+    .click();
+  return page.getByRole('dialog', { name: 'Remove this application?' });
+};
+
+const practiseFirst = async (page: Page) => {
+  const questions = await openWrittenList(page);
+  await questions
+    .getByRole('button', { name: 'Practise', exact: true })
+    .click();
+  await expect(page.getByRole('region', { name: 'Key points' })).toBeVisible({
+    timeout: 30_000,
+  });
+};
+
+test('Sessions (D99): an application removed with its practice kept, by the count query and removeJobApplication, then removeApplicationPractice', async ({
+  page,
+}) => {
+  const account = await createAccount({
+    interviewAssistant: true,
+    textPractice: true,
+  });
+  await signIn(page, account);
+  await practiseFirst(page);
+
+  const dialog = await askToRemove(page);
+  const box = dialog.getByRole('checkbox', {
+    name: 'Also remove its practice (1 question)',
+  });
+  await expect(box).not.toBeChecked();
+  await dialog.getByRole('button', { name: 'Remove the application' }).click();
+  await expect(page).toHaveURL('/applications');
+
+  // Kept, marked applicationRemoved, named from the turn's snapshot
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'Sessions' })
+    .click();
+  const card = page.getByRole('region', { name: /^fake-/ });
+  await expect(card).toContainText('Application removed');
+  await expect(card.getByRole('listitem')).toHaveCount(1);
+
+  await card.getByRole('button', { name: 'Remove all' }).click();
+  await page
+    .getByRole('dialog', { name: /^Remove all practice for/ })
+    .getByRole('button', { name: 'Remove all' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Nothing practised yet' }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Nothing practised yet' }),
+  ).toBeVisible();
+});
+
+test('Sessions (D99): an application removed with its practice, by removeJobApplication with removePractice', async ({
+  page,
+}) => {
+  const account = await createAccount({
+    interviewAssistant: true,
+    textPractice: true,
+  });
+  await signIn(page, account);
+  await practiseFirst(page);
+
+  const dialog = await askToRemove(page);
+  await dialog
+    .getByRole('checkbox', { name: 'Also remove its practice (1 question)' })
+    .check();
+  await dialog.getByRole('button', { name: 'Remove the application' }).click();
+  await expect(page).toHaveURL('/applications');
+
+  await page.goto('/sessions');
+  await expect(
+    page.getByRole('heading', { name: 'Nothing practised yet' }),
+  ).toBeVisible();
+});

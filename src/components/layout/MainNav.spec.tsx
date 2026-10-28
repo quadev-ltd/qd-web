@@ -5,11 +5,15 @@ import { MainNav } from './MainNav';
 import { renderWithProviders } from '@/testUtil/renderWithProviders';
 
 /** With the interview tools: Profile · Applications · CVs (with the CV tool) (D85, D91). */
-const renderTools = (route: string, { cvTool = true } = {}) =>
+const renderTools = (
+  route: string,
+  { cvTool = true, textPractice = false } = {},
+) =>
   renderWithProviders(
     <MainNav
       applicationsPath="/applications"
       cvPath={cvTool ? '/cv' : undefined}
+      sessionsPath={textPractice ? '/sessions' : undefined}
       profilePath="/profile"
     />,
     { route },
@@ -59,6 +63,18 @@ describe('MainNav', () => {
     expect(
       screen.queryByRole('link', { name: 'home.accountLink' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('reads Profile · Applications · CVs · Sessions with text practice, and marks Sessions on a practice opened there', () => {
+    renderTools('/sessions/turn-1', { textPractice: true });
+
+    expect(labels()).toEqual([
+      'profile.title',
+      'applications.title',
+      'cv.title',
+      'sessions.title',
+    ]);
+    expect(current()).toEqual(['sessions.title']);
   });
 
   it('reads Profile · Applications without the CV tool', () => {

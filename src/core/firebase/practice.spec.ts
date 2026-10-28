@@ -1,7 +1,9 @@
 import {
   collection,
+  getCount,
   getDoc,
   getDocs,
+  orderBy,
   query,
   Timestamp,
   where,
@@ -9,10 +11,13 @@ import {
 import { httpsCallable } from 'firebase/functions';
 
 import {
+  countApplicationPractice,
   getBriefPracticeTurns,
   getListPracticeTurns,
   getPracticeToday,
   getPracticeTurn,
+  getPracticeTurns,
+  removeApplicationPractice,
   removePracticeTurn,
   startPracticeTurn,
 } from './practice';
@@ -47,9 +52,12 @@ vi.mock('firebase/firestore/lite', () => {
     Timestamp: FakeTimestamp,
     collection: vi.fn((_db: unknown, path: string) => ({ collection: path })),
     doc: vi.fn((_db: unknown, path: string) => ({ doc: path })),
+    getCount: vi.fn(),
     getDoc: vi.fn(),
     getDocs: vi.fn(),
-    orderBy: vi.fn(),
+    orderBy: vi.fn((field: string, direction: string) => ({
+      orderBy: [field, direction],
+    })),
     query: vi.fn((...parts: unknown[]) => ({ query: parts })),
     where: vi.fn((field: string, op: string, value: unknown) => ({
       where: [field, op, value],
@@ -191,6 +199,27 @@ describe('reading practice turns (D94)', () => {
     expect(where).toHaveBeenCalledWith('question.source', '==', 'brief');
   });
 
+  it('reads every turn for Sessions, the most recently practised first', async () => {
+    vi.mocked(getDocs).mockResolvedValueOnce({
+      docs: [document('t1', stored())],
+    } as never);
+
+    const turns = await getPracticeTurns('uid-1');
+
+    expect(turns.map(({ id }) => id)).toEqual(['t1']);
+    expect(orderBy).toHaveBeenCalledWith('updatedAt', 'desc');
+    expect(where).not.toHaveBeenCalled();
+  });
+
+  it('counts an application’s turns with a count query (D99)', async () => {
+    vi.mocked(getCount).mockResolvedValueOnce({
+      data: () => ({ count: 3 }),
+    } as never);
+
+    await expect(countApplicationPractice('uid-1', 'a1')).resolves.toBe(3);
+    expect(where).toHaveBeenCalledWith('applicationId', '==', 'a1');
+  });
+
   it('reads how many practice calls were made today, 0 when none', async () => {
     vi.mocked(getDoc).mockResolvedValueOnce({
       data: () => ({ services: { practice: { calls: 3 } } }),
@@ -258,6 +287,19 @@ describe('starting and removing a practice (D94)', () => {
         question: { source: 'typed', text: 'Why us?' },
       }),
     ).rejects.toEqual(new ProfileError(expected));
+  });
+
+  it('removes all of an application’s with removeApplicationPractice, and resolves how many', async () => {
+    callable.mockResolvedValue({ data: { applicationId: 'a1', removed: 2 } });
+
+    await expect(removeApplicationPractice('a1')).resolves.toEqual({
+      removed: 2,
+    });
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'removeApplicationPractice',
+    );
+    expect(callable).toHaveBeenCalledWith({ applicationId: 'a1' });
   });
 
   it('removes one with removePracticeTurn', async () => {

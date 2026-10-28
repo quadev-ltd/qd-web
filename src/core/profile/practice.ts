@@ -102,6 +102,8 @@ export type PracticeTurn = z.infer<typeof PracticeTurnSchema>;
 
 export const START_PRACTICE_TURN = 'startPracticeTurn';
 export const REMOVE_PRACTICE_TURN = 'removePracticeTurn';
+/** Every turn of one application (D99), whether the application is still there or not. */
+export const REMOVE_APPLICATION_PRACTICE = 'removeApplicationPractice';
 
 /** The question to practise: typed, one of an interview's list, or one of the brief's. */
 export type PracticeQuestionRequest =
@@ -127,6 +129,11 @@ export const StartPracticeTurnResponseSchema = z.object({
 });
 export const RemovePracticeTurnResponseSchema = z.object({
   turnId: documentId,
+});
+/** How many turns were removed: 0 when it had none. */
+export const RemoveApplicationPracticeResponseSchema = z.object({
+  applicationId: documentId,
+  removed: z.number().int().nonnegative(),
 });
 
 // ---------- What the pages work out ----------

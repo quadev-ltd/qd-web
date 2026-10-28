@@ -158,8 +158,14 @@ export interface ProfileGateway {
   updateApplication(
     request: UpdateJobApplicationRequest,
   ): Promise<{ revision: number }>;
-  /** Removes an application and its brief. */
-  removeApplication(applicationId: string): Promise<void>;
+  /**
+   * Removes an application, its brief and its interviews. Its practice stays, marked, unless
+   * `removePractice` (D99).
+   */
+  removeApplication(
+    applicationId: string,
+    options?: { removePractice?: boolean },
+  ): Promise<void>;
   /**
    * Prepares the brief of an application, replacing the one it had: one model call, up to a
    * minute. The brief is then on the application (`getApplication`).
@@ -215,6 +221,14 @@ export interface ProfileGateway {
 
   // ---------- Text practice (D94) ----------
 
+  /** Every practice turn (500 at most), the most recently practised first: Sessions. */
+  getPracticeTurns(uid: string): Promise<PracticeTurn[]>;
+  /** How many practice turns one application has, there or removed (D99). */
+  countApplicationPractice(uid: string, applicationId: string): Promise<number>;
+  /** Removes every practice turn of one application, there or removed (D99). */
+  removeApplicationPractice(
+    applicationId: string,
+  ): Promise<{ removed: number }>;
   /** One practice turn; `null` when it does not exist (any more). */
   getPracticeTurn(uid: string, turnId: string): Promise<PracticeTurn | null>;
   /** The turns of one list of an interview's likely questions (its `listId`), in no order. */

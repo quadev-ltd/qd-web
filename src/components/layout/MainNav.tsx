@@ -17,20 +17,23 @@ export interface MainNavProps {
   applicationsPath?: string;
   /** The CV section, for an account with the CV tool; its versions keep it marked. */
   cvPath?: string;
+  /** Sessions, for an account with text practice (D94); a practice opened there keeps it marked. */
+  sessionsPath?: string;
   /** The interview profile. Its pages (a resource) keep it marked. */
   profilePath: string;
 }
 
 /**
  * The main navigation of the signed-in pages, next to the brand in the header: the sections
- * named after what is in them (D85), Profile first (D91): Profile · Applications · CVs, or
- * Home · Profile for an account without the interview tools. The account is behind the name
+ * named after what is in them (D85), Profile first (D91): Profile · Applications · CVs ·
+ * Sessions, or Home · Profile for an account without the interview tools. The account is behind the name
  * (AccountMenu).
  */
 export const MainNav: React.FC<MainNavProps> = ({
   homePath,
   applicationsPath,
   cvPath,
+  sessionsPath,
   profilePath,
 }) => {
   const { t } = useTranslation();
@@ -54,6 +57,11 @@ export const MainNav: React.FC<MainNavProps> = ({
       {cvPath && (
         <NavLink to={cvPath} className={linkClass}>
           {t('cv.title')}
+        </NavLink>
+      )}
+      {sessionsPath && (
+        <NavLink to={sessionsPath} className={linkClass}>
+          {t('sessions.title')}
         </NavLink>
       )}
     </nav>

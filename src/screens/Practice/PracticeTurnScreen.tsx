@@ -3,11 +3,12 @@
 // resource it came from, or "Advice". Answering it and the feedback come with the backend's slice
 // 3: until then, a card says so (doc 15 §25.4 choice 1). Then "Remove this practice".
 //
-// The same page opens under an interview (its likely questions, or its own question) and under
-// an application (its brief's questions), so the way back leads where the candidate came from.
+// The same page opens under an interview (its likely questions, or its own question), under an
+// application (its brief's questions) and from Sessions, so the way back leads where the candidate
+// came from. Only Sessions opens a practice whose application or interview was removed.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 
 import Icon from '@/components/Icon';
 import Breadcrumb, {
@@ -29,6 +30,7 @@ import {
   applicationInterviewsPath,
   applicationPath,
   APPLICATIONS_PATH,
+  SESSIONS_PATH,
 } from '@/core/profile/paths';
 import { type PracticeTurn } from '@/core/profile/practice';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
@@ -176,7 +178,7 @@ const AnswerSoonCard: React.FC = () => {
 };
 
 /** Where the page was opened from, which decides the way back. */
-export type PracticeFrom = 'interview' | 'brief';
+export type PracticeFrom = 'interview' | 'brief' | 'sessions';
 
 export const PracticeTurnScreen: React.FC<{ from: PracticeFrom }> = ({
   from,
@@ -193,7 +195,11 @@ export const PracticeTurnScreen: React.FC<{ from: PracticeFrom }> = ({
   const [removing, setRemoving] = useState(false);
 
   const turn = state.status === 'loaded' ? state.turn : null;
-  const application = applications.find(({ id }) => id === applicationId);
+  // From Sessions the address has no application: the practice says which it was for.
+  const application = applications.find(
+    ({ id }) =>
+      id === (from === 'sessions' ? turn?.applicationId : applicationId),
+  );
   const interview =
     from === 'interview'
       ? byApplication[applicationId]?.interviews.find(
@@ -208,31 +214,35 @@ export const PracticeTurnScreen: React.FC<{ from: PracticeFrom }> = ({
       ? interviewTitle(t, turn.interview)
       : t('interviews.untitled');
 
-  const steps: BreadcrumbStep[] = [
-    { label: t('applications.title'), to: APPLICATIONS_PATH },
-    { label: jobTitle, to: applicationPath(applicationId) },
-    ...(from === 'interview'
-      ? [
-          {
-            label: t('applications.interviewsTab'),
-            to: applicationInterviewsPath(applicationId),
-          },
-          {
-            label: interviewName,
-            to: applicationInterviewPath(applicationId, interviewId),
-          },
-        ]
+  // From Sessions, one step in: the single link back (D96).
+  const steps: BreadcrumbStep[] =
+    from === 'sessions'
+      ? [{ label: t('sessions.title'), to: SESSIONS_PATH }]
       : [
-          {
-            label: t('applications.briefTab'),
-            to: applicationPath(applicationId),
-          },
-        ]),
-  ];
+          { label: t('applications.title'), to: APPLICATIONS_PATH },
+          { label: jobTitle, to: applicationPath(applicationId) },
+          ...(from === 'interview'
+            ? [
+                {
+                  label: t('applications.interviewsTab'),
+                  to: applicationInterviewsPath(applicationId),
+                },
+                {
+                  label: interviewName,
+                  to: applicationInterviewPath(applicationId, interviewId),
+                },
+              ]
+            : [
+                {
+                  label: t('applications.briefTab'),
+                  to: applicationPath(applicationId),
+                },
+              ]),
+        ];
   const back = steps[steps.length - 1];
   // At phone width: "‹ Technical interview", or "‹ Senior Backend Engineer · Brief" (D96).
   const backLabel =
-    from === 'interview' ? back.label : `${jobTitle} · ${back.label}`;
+    from === 'brief' ? `${jobTitle} · ${back.label}` : back.label;
 
   let body: React.ReactNode;
   if (state.status === 'loading') {
@@ -328,7 +338,16 @@ export const PracticeTurnScreen: React.FC<{ from: PracticeFrom }> = ({
       title={t('practice.documentTitle')}
       mainClassName={PROFILE_MAIN}>
       <div className="mx-auto flex max-w-[1120px] flex-col gap-5">
-        <Breadcrumb steps={steps} backLabel={backLabel} />
+        {from === 'sessions' ? (
+          <Link
+            to={back.to}
+            className="flex min-h-11 items-center gap-1 self-start text-[15px] leading-natural font-medium no-underline hover:underline">
+            <Icon name="left" size={18} />
+            {back.label}
+          </Link>
+        ) : (
+          <Breadcrumb steps={steps} backLabel={backLabel} />
+        )}
         {body}
       </div>
     </SignedInShell>
@@ -343,6 +362,11 @@ export const InterviewPracticeScreen: React.FC = () => (
 /** A question of the brief practised: under the application. */
 export const BriefPracticeScreen: React.FC = () => (
   <PracticeTurnScreen from="brief" />
+);
+
+/** Any question practised, opened from Sessions: back to Sessions. */
+export const SessionPracticeScreen: React.FC = () => (
+  <PracticeTurnScreen from="sessions" />
 );
 
 export default PracticeTurnScreen;
