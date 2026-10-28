@@ -27,6 +27,7 @@ import {
   type CreateInterviewRequest,
   type UpdateInterviewRequest,
 } from './interviews';
+import { type PracticeTurn, type StartPracticeTurnRequest } from './practice';
 import { type StoredUsageLimits } from './usageLimits';
 
 /** Where a file goes, as `createResource` answers for a file. */
@@ -211,6 +212,33 @@ export interface ProfileGateway {
   ): Promise<{ questions: number }>;
   /** How many lists of likely questions were written for this user today (UTC), for the limit. */
   getInterviewQuestionsToday(uid: string): Promise<number>;
+
+  // ---------- Text practice (D94) ----------
+
+  /** One practice turn; `null` when it does not exist (any more). */
+  getPracticeTurn(uid: string, turnId: string): Promise<PracticeTurn | null>;
+  /** The turns of one list of an interview's likely questions (its `listId`), in no order. */
+  getListPracticeTurns(
+    uid: string,
+    interviewId: string,
+    listId: string,
+  ): Promise<PracticeTurn[]>;
+  /** The turns of an application's brief questions, in no order. */
+  getBriefPracticeTurns(
+    uid: string,
+    applicationId: string,
+  ): Promise<PracticeTurn[]>;
+  /**
+   * Starts practising a question: its key points are written from the profile (one model call,
+   * 5 to 15 seconds) and the turn is stored. A question of an interview's list without a
+   * `listId` gives the list one: read the interview again after.
+   */
+  startPracticeTurn(
+    request: StartPracticeTurnRequest,
+  ): Promise<{ turnId: string }>;
+  removePracticeTurn(turnId: string): Promise<void>;
+  /** How many practice calls were made for this user today (UTC), for the limit. */
+  getPracticeToday(uid: string): Promise<number>;
 
   // ---------- CV versions (delivery 2b) ----------
 

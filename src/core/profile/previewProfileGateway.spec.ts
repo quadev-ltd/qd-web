@@ -2119,6 +2119,186 @@ describe('previewProfileGateway, the likely questions of an interview (D94)', ()
   });
 });
 
+describe('previewProfileGateway, text practice (D94 slice 2)', () => {
+  const withList = async () => {
+    const context = await setUp();
+    const { applicationId } = await context.gateway.createApplication({
+      job: { source: 'text', text: 'Senior Backend Engineer. Go and Kafka.' },
+      title: 'Senior Backend Engineer',
+      company: 'Northwind Logistics',
+    });
+    context.pass(PREVIEW_READ_MS);
+    await context.gateway.getApplications(UID);
+    const { interviewId } = await context.gateway.createInterview({
+      applicationId,
+      name: 'Technical interview',
+      date: '2026-10-28',
+      startTime: '14:00',
+      timeZone: 'Europe/London',
+    });
+    await context.gateway.writeInterviewQuestions(applicationId, interviewId);
+    const interview = await context.gateway.getInterview(
+      UID,
+      applicationId,
+      interviewId,
+    );
+    return {
+      ...context,
+      applicationId,
+      interviewId,
+      listId: interview?.questions?.listId ?? '',
+    };
+  };
+
+  it('gives each list written its own id', async () => {
+    const { gateway, applicationId, interviewId, listId } = await withList();
+    expect(listId).not.toBe('');
+
+    await gateway.writeInterviewQuestions(applicationId, interviewId);
+    const again = await gateway.getInterview(UID, applicationId, interviewId);
+    expect(again?.questions?.listId).not.toBe(listId);
+  });
+
+  it('starts a practice of a list’s question with its key points and a snapshot of where it came from, and counts the day', async () => {
+    const { gateway, applicationId, interviewId, listId } = await withList();
+
+    const { turnId } = await gateway.startPracticeTurn({
+      applicationId,
+      interviewId,
+      question: { source: 'interview', listId, questionId: 'q1' },
+    });
+
+    const turn = await gateway.getPracticeTurn(UID, turnId);
+    expect(turn).toMatchObject({
+      applicationId,
+      application: {
+        title: 'Senior Backend Engineer',
+        company: 'Northwind Logistics',
+      },
+      interviewId,
+      interview: { name: 'Technical interview' },
+      question: { source: 'interview', listId, questionId: 'q1' },
+      attempts: [],
+    });
+    expect(turn?.keyPoints.length).toBeGreaterThanOrEqual(3);
+    await expect(
+      gateway.getListPracticeTurns(UID, interviewId, listId),
+    ).resolves.toHaveLength(1);
+    await expect(gateway.getPracticeToday(UID)).resolves.toBe(1);
+  });
+
+  it('starts a new practice each time, and removes one', async () => {
+    const { gateway, applicationId, interviewId, listId } = await withList();
+    const request = {
+      applicationId,
+      interviewId,
+      question: { source: 'interview' as const, listId, questionId: 'q1' },
+    };
+    const first = await gateway.startPracticeTurn(request);
+    await gateway.startPracticeTurn(request);
+
+    await gateway.removePracticeTurn(first.turnId);
+
+    await expect(
+      gateway.getListPracticeTurns(UID, interviewId, listId),
+    ).resolves.toHaveLength(1);
+    await expect(
+      gateway.getPracticeTurn(UID, first.turnId),
+    ).resolves.toBeNull();
+    await expect(
+      codeOf(gateway.removePracticeTurn(first.turnId)),
+    ).resolves.toBe(ProfileErrorCode.NotFound);
+  });
+
+  it('refuses a question of a list written again since, or one that isn’t in it', async () => {
+    const { gateway, applicationId, interviewId, listId } = await withList();
+    await gateway.writeInterviewQuestions(applicationId, interviewId);
+
+    await expect(
+      codeOf(
+        gateway.startPracticeTurn({
+          applicationId,
+          interviewId,
+          question: { source: 'interview', listId, questionId: 'q1' },
+        }),
+      ),
+    ).resolves.toBe(ProfileErrorCode.QuestionChanged);
+  });
+
+  it('practises a typed question and a question of the brief, which must be the brief’s', async () => {
+    const { gateway, applicationId } = await withList();
+    await gateway.prepareBrief(applicationId);
+    const application = await gateway.getApplication(UID, applicationId);
+    const text = application?.brief?.questions[0]?.text ?? '';
+
+    const typed = await gateway.startPracticeTurn({
+      applicationId,
+      question: { source: 'typed', text: '  Why logistics?  ' },
+    });
+    const brief = await gateway.startPracticeTurn({
+      applicationId,
+      question: { source: 'brief', text },
+    });
+
+    await expect(
+      gateway.getPracticeTurn(UID, typed.turnId),
+    ).resolves.toMatchObject({
+      question: { source: 'typed', text: 'Why logistics?' },
+    });
+    expect(
+      (await gateway.getBriefPracticeTurns(UID, applicationId)).map(
+        ({ id }) => id,
+      ),
+    ).toEqual([brief.turnId]);
+    await expect(
+      codeOf(
+        gateway.startPracticeTurn({
+          applicationId,
+          question: { source: 'brief', text: 'Not in the brief' },
+        }),
+      ),
+    ).resolves.toBe(ProfileErrorCode.QuestionChanged);
+  });
+
+  it('refuses at the day’s limit, and fails as the backend can, storing nothing', async () => {
+    const { gateway, applicationId } = await withList();
+    const typed = {
+      applicationId,
+      question: { source: 'typed' as const, text: 'Why us?' },
+    };
+
+    gateway.controls.failNextPractice('model');
+    await expect(codeOf(gateway.startPracticeTurn(typed))).resolves.toBe(
+      ProfileErrorCode.Unknown,
+    );
+    await expect(gateway.getPracticeToday(UID)).resolves.toBe(1);
+
+    gateway.controls.setPracticeToday(40);
+    await expect(codeOf(gateway.startPracticeTurn(typed))).resolves.toBe(
+      ProfileErrorCode.DailyLimit,
+    );
+  });
+
+  it('keeps the practice of a removed interview and a removed application, marked', async () => {
+    const { gateway, applicationId, interviewId, listId } = await withList();
+    const { turnId } = await gateway.startPracticeTurn({
+      applicationId,
+      interviewId,
+      question: { source: 'interview', listId, questionId: 'q1' },
+    });
+
+    await gateway.removeInterview(applicationId, interviewId);
+    await expect(gateway.getPracticeTurn(UID, turnId)).resolves.toMatchObject({
+      interviewRemoved: true,
+    });
+    await gateway.removeApplication(applicationId);
+    await expect(gateway.getPracticeTurn(UID, turnId)).resolves.toMatchObject({
+      applicationRemoved: true,
+      interviewRemoved: true,
+    });
+  });
+});
+
 describe('previewProfileGateway, what is asked of a CV (D97)', () => {
   const written = async (asked?: string) => {
     const context = await setUp();

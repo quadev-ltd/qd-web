@@ -145,16 +145,14 @@ describe('seedInterviews', () => {
 });
 
 describe('previewQuestionsFor', () => {
-  it('writes eight questions with the brief’s kinds and why each is likely, with new ids each time', () => {
+  it('writes eight questions with the brief’s kinds and why each is likely, with the backend’s ids', () => {
     const first = previewQuestionsFor(
       { description: 'Two engineers.', type: 'system-design' },
       { title: 'Senior Backend Engineer', company: 'Northwind Logistics' },
-      1,
     );
     const second = previewQuestionsFor(
       { description: '' },
       { title: 'Senior Backend Engineer' },
-      2,
     );
 
     expect(first).toHaveLength(8);
@@ -164,6 +162,15 @@ describe('previewQuestionsFor', () => {
     expect(first[1].why).toBe('It is a system design interview.');
     expect(first[0].why).toMatch(/^What you know about this interview/);
     expect(second[0].why).toMatch(/^The job says/);
-    expect(first.map(({ id }) => id)).not.toEqual(second.map(({ id }) => id));
+    expect(first.map(({ id }) => id)).toEqual([
+      'q1',
+      'q2',
+      'q3',
+      'q4',
+      'q5',
+      'q6',
+      'q7',
+      'q8',
+    ]);
   });
 });

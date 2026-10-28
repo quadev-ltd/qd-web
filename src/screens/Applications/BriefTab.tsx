@@ -38,6 +38,7 @@ import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
 import { dailyLimitResetTime } from '@/core/profile/limits';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
 import { useSessionUser } from '@/core/session/hooks';
+import useBriefPractice from '@/screens/Practice/useBriefPractice';
 import AddResourcePanel from '@/screens/Profile/AddResource/AddResourcePanel';
 import { formatDay } from '@/screens/Profile/Resource/resourceMeta';
 
@@ -94,6 +95,8 @@ export const BriefTab: React.FC<{ application: JobApplication }> = ({
   const [pasting, setPasting] = useState(false);
   const { brief } = application;
   const items = useProfileItems(brief?.builtAt);
+  // D94: each likely question can be practised.
+  const practice = useBriefPractice(application);
   // After a failed first reading, a posting can be tried again; its text was never edited.
   const tryAgain = useReadPostingAgain(application.id, false);
 
@@ -321,7 +324,11 @@ export const BriefTab: React.FC<{ application: JobApplication }> = ({
           lookup={lookup}
           onAddStory={() => setAdding('note')}
         />
-        <QuestionsCard questions={brief.questions} lookup={lookup} />
+        <QuestionsCard
+          questions={brief.questions}
+          lookup={lookup}
+          practice={practice}
+        />
       </div>
       {panel}
     </div>

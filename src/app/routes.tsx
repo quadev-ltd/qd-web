@@ -29,8 +29,10 @@ import {
   APPLICATION_CV_VERSION_PATH,
   APPLICATION_DETAILS_PATH,
   APPLICATION_INTERVIEW_PATH,
+  APPLICATION_INTERVIEW_PRACTICE_PATH,
   APPLICATION_INTERVIEWS_PATH,
   APPLICATION_PATH,
+  APPLICATION_PRACTICE_PATH,
   APPLICATIONS_PATH,
   CV_COMPARE_PATH,
   CV_DETAILS_PATH,
@@ -181,6 +183,24 @@ const accountRoutes: RouteObject[] = [
                   Component: (
                     await import('@/screens/Applications/interviews/InterviewScreen')
                   ).InterviewScreen,
+                }),
+              },
+              // A question practised (D94): under the interview or the application it was
+              // practised from, so the way back leads there (D96).
+              {
+                path: APPLICATION_INTERVIEW_PRACTICE_PATH,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/screens/Practice/PracticeTurnScreen')
+                  ).InterviewPracticeScreen,
+                }),
+              },
+              {
+                path: APPLICATION_PRACTICE_PATH,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/screens/Practice/PracticeTurnScreen')
+                  ).BriefPracticeScreen,
                 }),
               },
               {

@@ -47,6 +47,14 @@ import {
   updateInterview,
   writeInterviewQuestions,
 } from './interviews';
+import {
+  getBriefPracticeTurns,
+  getListPracticeTurns,
+  getPracticeToday,
+  getPracticeTurn,
+  removePracticeTurn,
+  startPracticeTurn,
+} from './practice';
 import { getUsageLimits } from './usageLimits';
 
 import { type ProfileGateway } from '@/core/profile/gateway';
@@ -88,6 +96,12 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   removeInterview,
   writeInterviewQuestions,
   getInterviewQuestionsToday,
+  getPracticeTurn,
+  getListPracticeTurns,
+  getBriefPracticeTurns,
+  startPracticeTurn,
+  removePracticeTurn,
+  getPracticeToday,
   getCvVersions,
   getCvVersion,
   createCvVersion,

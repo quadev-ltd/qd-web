@@ -42,6 +42,27 @@ export const applicationInterviewPath = (
 ) =>
   `${applicationInterviewsPath(applicationId)}/${encodeURIComponent(interviewId)}`;
 
+/**
+ * A question practised (X7, D94), opened from an interview's likely questions or its own
+ * question: under the interview, so the way back leads there (D96).
+ */
+export const APPLICATION_INTERVIEW_PRACTICE_PATH = `${APPLICATION_INTERVIEW_PATH}/practice/:turnId`;
+
+export const applicationInterviewPracticePath = (
+  applicationId: string,
+  interviewId: string,
+  turnId: string,
+) =>
+  `${applicationInterviewPath(applicationId, interviewId)}/practice/${encodeURIComponent(turnId)}`;
+
+/** A question of the brief practised (X7, D94): under the application, back to its brief. */
+export const APPLICATION_PRACTICE_PATH = `${APPLICATION_PATH}/practice/:turnId`;
+
+export const applicationPracticePath = (
+  applicationId: string,
+  turnId: string,
+) => `${applicationPath(applicationId)}/practice/${encodeURIComponent(turnId)}`;
+
 /** The CV section (delivery 2b): the versions of the candidate's CVs. */
 export const CV_PATH = '/cv';
 

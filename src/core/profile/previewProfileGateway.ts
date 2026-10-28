@@ -64,6 +64,11 @@ import { ProfileError, ProfileErrorCode } from './errors';
 import { type ProfileGateway } from './gateway';
 import { type ApplicationInterview, INTERVIEWS_MAX } from './interviews';
 import { browserTimeZone } from './interviewTime';
+import {
+  PRACTICE_QUESTION_MAX_CHARS,
+  PRACTICE_TURNS_MAX,
+  type PracticeTurn,
+} from './practice';
 import { askedOf, followAsked, noteStatementsOf } from './previewCvAsked';
 import {
   checkedFields,
@@ -72,6 +77,7 @@ import {
   seedInterviews,
   timesOf,
 } from './previewInterviews';
+import { previewKeyPointsFor } from './previewPractice';
 import {
   PREVIEW_CV_DETAILS,
   PREVIEW_FACTS,
@@ -83,6 +89,7 @@ import {
   CV_VERSION_DAILY_LIMIT,
   INTERVIEW_QUESTIONS_DAILY_LIMIT,
   effectiveLimits,
+  PRACTICE_DAILY_LIMIT,
   serviceOverride,
   type StoredUsageLimits,
   USAGE_SERVICES,
@@ -165,6 +172,10 @@ interface PreviewProfile {
   interviews?: Record<string, ApplicationInterview[]>;
   /** How many lists of likely questions were written today (D94). */
   interviewQuestionsToday?: number;
+  /** The practice turns (D94), the newest last. */
+  practiceTurns?: PracticeTurn[];
+  /** How many practice calls were made today. */
+  practiceToday?: number;
 }
 
 /** How the fake reads a page again: when it ends, and how. */
@@ -225,6 +236,10 @@ export interface PreviewProfileControls {
   failNextQuestions(reason: 'model' | 'quota'): void;
   /** How many lists of likely questions were already written today. */
   setInterviewQuestionsToday(count: number): void;
+  /** The next practice cannot start: the model failed, or today's limit was reached. */
+  failNextPractice(reason: 'model' | 'quota'): void;
+  /** How many practice calls were already made today. */
+  setPracticeToday(count: number): void;
   /**
    * A version as they were made before D83: edits to the profile's CV (doc 18), made in the
    * background like any other. The pages no longer ask for one; their review stays. Resolves its id.
@@ -497,6 +512,13 @@ const questionsDailyLimit = (profile: PreviewProfile) =>
     serviceOverride(profile.usageLimits, USAGE_SERVICES.interviewQuestions),
   ).maxCallsPerDay;
 
+/** The practice calls this account can make today (D94). */
+const practiceDailyLimit = (profile: PreviewProfile) =>
+  effectiveLimits(
+    PRACTICE_DAILY_LIMIT,
+    serviceOverride(profile.usageLimits, USAGE_SERVICES.practice),
+  ).maxCallsPerDay;
+
 /** The CV versions this account can have made today: its override on top of the default. */
 const cvDailyLimit = (profile: PreviewProfile) =>
   effectiveLimits(
@@ -623,6 +645,7 @@ export const createPreviewProfileGateway = ({
 
   let nextBriefFailure: 'model' | 'quota' | null = null;
   let nextQuestionsFailure: 'model' | 'quota' | null = null;
+  let nextPracticeFailure: 'model' | 'quota' | null = null;
   let nextJobFailure: ProfileResourceFailure | null = null;
   let nextRereadOutcome: ProfileResourceFailure | 'changed' | null = null;
 
@@ -1284,6 +1307,13 @@ export const createPreviewProfileGateway = ({
     },
     setInterviewQuestionsToday: count => {
       currentProfile().interviewQuestionsToday = count;
+      save();
+    },
+    failNextPractice: reason => {
+      nextPracticeFailure = reason;
+    },
+    setPracticeToday: count => {
+      currentProfile().practiceToday = count;
       save();
     },
     // Set once the gateway exists, below: it asks the gateway for the version.
@@ -2321,8 +2351,16 @@ export const createPreviewProfileGateway = ({
       profile.applications = applicationsOf(profile).filter(
         ({ id }) => id !== applicationId,
       );
-      // Its interviews go with it, as removeJobApplication does.
+      // Its interviews go with it, as removeJobApplication does; its practice stays (D94).
       delete profile.interviews?.[applicationId];
+      for (const turn of profile.practiceTurns ?? []) {
+        if (turn.applicationId === applicationId) {
+          turn.applicationRemoved = true;
+          if (turn.interviewId !== undefined) {
+            turn.interviewRemoved = true;
+          }
+        }
+      }
       save();
     },
 
@@ -2436,6 +2474,12 @@ export const createPreviewProfileGateway = ({
       const kept = interviews.filter(({ id }) => id !== interviewId);
       (profile.interviews ??= {})[applicationId] = kept;
       application.interviewTimes = timesOf(kept);
+      // Its practice stays, marked (FR-1f).
+      for (const turn of profile.practiceTurns ?? []) {
+        if (turn.interviewId === interviewId) {
+          turn.interviewRemoved = true;
+        }
+      }
       save();
     },
     writeInterviewQuestions: async (applicationId, interviewId) => {
@@ -2465,13 +2509,11 @@ export const createPreviewProfileGateway = ({
         save();
         throw new ProfileError(ProfileErrorCode.Unknown);
       }
-      const items = previewQuestionsFor(
-        interview,
-        application,
-        profile.interviewQuestionsToday,
-      );
-      // Neither the interview's revision nor its updatedAt changes.
+      const items = previewQuestionsFor(interview, application);
+      // Neither the interview's revision nor its updatedAt changes. A new list has a new id,
+      // so the practice of the one before no longer marks its questions.
       interview.questions = {
+        listId: newId('list'),
         items,
         builtAt: now(),
         interviewRevision: interview.revision,
@@ -2483,6 +2525,129 @@ export const createPreviewProfileGateway = ({
     },
     getInterviewQuestionsToday: async uid =>
       read(uid).interviewQuestionsToday ?? 0,
+
+    getPracticeTurn: async (uid, turnId) => {
+      const found = read(uid).practiceTurns?.find(({ id }) => id === turnId);
+      return found ? structuredClone(found) : null;
+    },
+    getListPracticeTurns: async (uid, interviewId, listId) =>
+      structuredClone(
+        (read(uid).practiceTurns ?? []).filter(
+          turn =>
+            turn.interviewId === interviewId && turn.question.listId === listId,
+        ),
+      ),
+    getBriefPracticeTurns: async (uid, applicationId) =>
+      structuredClone(
+        (read(uid).practiceTurns ?? []).filter(
+          turn =>
+            turn.applicationId === applicationId &&
+            turn.question.source === 'brief',
+        ),
+      ),
+    startPracticeTurn: async ({ applicationId, interviewId, question }) => {
+      const profile = currentProfile();
+      const application = applicationOf(profile, applicationId);
+      const interview =
+        interviewId === undefined
+          ? undefined
+          : interviewsOf(profile, applicationId).find(
+              ({ id }) => id === interviewId,
+            );
+      if (interviewId !== undefined && !interview) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      if (isJobPending(application)) {
+        throw new ProfileError(ProfileErrorCode.Reading);
+      }
+      let asked: PracticeTurn['question'];
+      if (question.source === 'typed') {
+        const text = question.text.trim();
+        if (!text || text.length > PRACTICE_QUESTION_MAX_CHARS) {
+          throw new ProfileError(ProfileErrorCode.Invalid);
+        }
+        // The backend's model reads the kind of a typed question.
+        asked = { text, kind: 'behavioural', source: 'typed' };
+      } else if (question.source === 'interview') {
+        const list = interview?.questions;
+        const item = list?.items.find(({ id }) => id === question.questionId);
+        if (!interview) {
+          throw new ProfileError(ProfileErrorCode.Invalid);
+        }
+        if (!list || !item || question.listId !== list.listId) {
+          throw new ProfileError(ProfileErrorCode.QuestionChanged);
+        }
+        asked = {
+          text: item.text,
+          kind: item.kind,
+          source: 'interview',
+          listId: list.listId,
+          questionId: item.id,
+        };
+      } else {
+        const found = application.brief?.questions.find(
+          ({ text }) => text === question.text,
+        );
+        if (!found) {
+          throw new ProfileError(ProfileErrorCode.QuestionChanged);
+        }
+        asked = { text: found.text, kind: found.kind, source: 'brief' };
+      }
+      const turns = profile.practiceTurns ?? [];
+      if (turns.length >= PRACTICE_TURNS_MAX) {
+        throw new ProfileError(ProfileErrorCode.MaxPracticeTurns);
+      }
+      const failure = nextPracticeFailure;
+      nextPracticeFailure = null;
+      const today = profile.practiceToday ?? 0;
+      if (failure === 'quota' || today >= practiceDailyLimit(profile)) {
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+      }
+      await wait(PREVIEW_BRIEF_MS);
+      profile.practiceToday = today + 1;
+      if (failure === 'model') {
+        save();
+        throw new ProfileError(ProfileErrorCode.Unknown);
+      }
+      // A list written before it had an id gets one now, as the backend does.
+      if (asked.source === 'interview' && interview?.questions) {
+        interview.questions.listId ??= newId('list');
+        asked.listId = interview.questions.listId;
+      }
+      const at = now();
+      const turn: PracticeTurn = {
+        id: newId('turn'),
+        applicationId,
+        application: {
+          title: application.title || undefined,
+          company: application.company || undefined,
+        },
+        ...(interview
+          ? {
+              interviewId: interview.id,
+              interview: { name: interview.name, type: interview.type },
+            }
+          : {}),
+        question: asked,
+        keyPoints: previewKeyPointsFor(profile.items),
+        attempts: [],
+        createdAt: at,
+        updatedAt: at,
+      };
+      profile.practiceTurns = [...turns, turn];
+      save();
+      return { turnId: turn.id };
+    },
+    removePracticeTurn: async turnId => {
+      const profile = currentProfile();
+      const turns = profile.practiceTurns ?? [];
+      if (!turns.some(({ id }) => id === turnId)) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      profile.practiceTurns = turns.filter(({ id }) => id !== turnId);
+      save();
+    },
+    getPracticeToday: async uid => read(uid).practiceToday ?? 0,
   };
   controls.createEditVersion = async (target = { kind: 'general' }) => {
     // The newest CV with its text, as the pages offered first.

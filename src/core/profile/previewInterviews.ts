@@ -208,13 +208,12 @@ export const seedInterviews = (
 
 /**
  * The likely questions the fake writes for an interview (D94): eight, with the brief's kinds,
- * each saying why it is likely from what the interview, the job or the profile give. New ids each
- * time, as the backend's.
+ * each saying why it is likely from what the interview, the job or the profile give. Their ids
+ * are `q1` to `q8`, as the backend's: what tells one list from the next is its `listId`.
  */
 export const previewQuestionsFor = (
   interview: Pick<ApplicationInterview, 'description' | 'type'>,
   job: { title: string; company?: string },
-  write: number,
 ): InterviewQuestions['items'] => {
   const where = job.company ? `${job.title} at ${job.company}` : job.title;
   const from = interview.description
@@ -266,7 +265,7 @@ export const previewQuestionsFor = (
       ],
     ];
   return items.map(([text, kind, why], index) => ({
-    id: `q${index + 1}-${write}`,
+    id: `q${index + 1}`,
     text,
     kind,
     why,
