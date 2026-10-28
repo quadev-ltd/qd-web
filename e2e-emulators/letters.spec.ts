@@ -95,7 +95,9 @@ test('a letter written by the backend’s fake: read back with its sources, copi
   // contact (job-read 1.2.0), and the reference follows the role.
   expect(copied).toMatch(/\nDear fake-[^\n]+,\n/);
   expect(copied).toMatch(/\(ref\. fake-[^)]+\)/);
-  expect(copied).toContain('fake-why: Parcels are the same problem as payments.');
+  expect(copied).toContain(
+    'fake-why: Parcels are the same problem as payments.',
+  );
 
   await page.getByRole('button', { name: 'Mark as sent' }).click();
   await expect(page.getByText('Sent', { exact: true })).toBeVisible();
