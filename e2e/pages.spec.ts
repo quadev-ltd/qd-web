@@ -617,6 +617,8 @@ test('a posting read again, its outcome and "Replace your edited text?": accessi
 test('CV versions: nothing in the profile, no version yet, the panel, the details, being written, written, the list and the remove dialog: accessible and no horizontal scroll', async ({
   page,
 }) => {
+  // Eleven accessibility checks: 11 s here, up to 35 s on a busy CI runner (qd-web #63).
+  test.slow();
   await openProfile(page);
   const cv = () =>
     page
