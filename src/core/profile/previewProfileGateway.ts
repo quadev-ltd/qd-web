@@ -2343,7 +2343,7 @@ export const createPreviewProfileGateway = ({
       save();
     },
 
-    removeApplication: async applicationId => {
+    removeApplication: async (applicationId, options) => {
       const profile = currentProfile();
       if (!applicationsOf(profile).some(({ id }) => id === applicationId)) {
         throw new ProfileError(ProfileErrorCode.NotFound);
@@ -2351,8 +2351,14 @@ export const createPreviewProfileGateway = ({
       profile.applications = applicationsOf(profile).filter(
         ({ id }) => id !== applicationId,
       );
-      // Its interviews go with it, as removeJobApplication does; its practice stays (D94).
+      // Its interviews go with it, as removeJobApplication does; its practice stays (D94),
+      // unless the candidate asked for it to go too (D99).
       delete profile.interviews?.[applicationId];
+      if (options?.removePractice) {
+        profile.practiceTurns = profile.practiceTurns?.filter(
+          turn => turn.applicationId !== applicationId,
+        );
+      }
       for (const turn of profile.practiceTurns ?? []) {
         if (turn.applicationId === applicationId) {
           turn.applicationRemoved = true;
@@ -2526,6 +2532,22 @@ export const createPreviewProfileGateway = ({
     getInterviewQuestionsToday: async uid =>
       read(uid).interviewQuestionsToday ?? 0,
 
+    getPracticeTurns: async uid =>
+      structuredClone(read(uid).practiceTurns ?? []).sort(
+        (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
+      ),
+    countApplicationPractice: async (uid, applicationId) =>
+      (read(uid).practiceTurns ?? []).filter(
+        turn => turn.applicationId === applicationId,
+      ).length,
+    removeApplicationPractice: async applicationId => {
+      const profile = currentProfile();
+      const turns = profile.practiceTurns ?? [];
+      const kept = turns.filter(turn => turn.applicationId !== applicationId);
+      profile.practiceTurns = kept;
+      save();
+      return { removed: turns.length - kept.length };
+    },
     getPracticeTurn: async (uid, turnId) => {
       const found = read(uid).practiceTurns?.find(({ id }) => id === turnId);
       return found ? structuredClone(found) : null;

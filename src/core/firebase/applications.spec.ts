@@ -193,12 +193,19 @@ describe('changing applications', () => {
     );
   });
 
-  it('removes one with removeJobApplication', async () => {
-    callable.mockResolvedValue({ data: { applicationId: 'a9' } });
+  it('removes one with removeJobApplication, keeping its practice unless asked (D99)', async () => {
+    callable.mockResolvedValue({
+      data: { applicationId: 'a9', practiceRemoved: 0, practiceKept: 2 },
+    });
 
     await removeApplication('a9');
+    expect(callable).toHaveBeenLastCalledWith({ applicationId: 'a9' });
 
-    expect(callable).toHaveBeenCalledWith({ applicationId: 'a9' });
+    await removeApplication('a9', { removePractice: true });
+    expect(callable).toHaveBeenLastCalledWith({
+      applicationId: 'a9',
+      removePractice: true,
+    });
   });
 
   it('says so when the account already has the most applications it can hold', async () => {

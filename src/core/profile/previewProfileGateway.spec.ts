@@ -2279,6 +2279,45 @@ describe('previewProfileGateway, text practice (D94 slice 2)', () => {
     );
   });
 
+  it('lists every practice, the latest first, counts an application’s and removes them all (D99)', async () => {
+    const { gateway, applicationId, interviewId, listId, pass } =
+      await withList();
+    const first = await gateway.startPracticeTurn({
+      applicationId,
+      interviewId,
+      question: { source: 'interview', listId, questionId: 'q1' },
+    });
+    pass(1000);
+    const second = await gateway.startPracticeTurn({
+      applicationId,
+      question: { source: 'typed', text: 'Why us?' },
+    });
+
+    expect((await gateway.getPracticeTurns(UID)).map(({ id }) => id)).toEqual([
+      second.turnId,
+      first.turnId,
+    ]);
+    await expect(
+      gateway.countApplicationPractice(UID, applicationId),
+    ).resolves.toBe(2);
+    await expect(
+      gateway.removeApplicationPractice(applicationId),
+    ).resolves.toEqual({ removed: 2 });
+    await expect(gateway.getPracticeTurns(UID)).resolves.toEqual([]);
+  });
+
+  it('removes an application’s practice with it when asked (D99)', async () => {
+    const { gateway, applicationId } = await withList();
+    await gateway.startPracticeTurn({
+      applicationId,
+      question: { source: 'typed', text: 'Why us?' },
+    });
+
+    await gateway.removeApplication(applicationId, { removePractice: true });
+
+    await expect(gateway.getPracticeTurns(UID)).resolves.toEqual([]);
+  });
+
   it('keeps the practice of a removed interview and a removed application, marked', async () => {
     const { gateway, applicationId, interviewId, listId } = await withList();
     const { turnId } = await gateway.startPracticeTurn({

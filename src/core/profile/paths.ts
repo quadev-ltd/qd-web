@@ -63,6 +63,15 @@ export const applicationPracticePath = (
   turnId: string,
 ) => `${applicationPath(applicationId)}/practice/${encodeURIComponent(turnId)}`;
 
+/** Sessions (D85, D94): the practice kept, one card per job. Mock interviews will join it. */
+export const SESSIONS_PATH = '/sessions';
+
+/** A question practised, opened from Sessions: the way back leads there (D96). */
+export const SESSION_PRACTICE_PATH = `${SESSIONS_PATH}/:turnId`;
+
+export const sessionPracticePath = (turnId: string) =>
+  `${SESSIONS_PATH}/${encodeURIComponent(turnId)}`;
+
 /** The CV section (delivery 2b): the versions of the candidate's CVs. */
 export const CV_PATH = '/cv';
 

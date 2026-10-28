@@ -344,6 +344,68 @@ test('practising a question (D94 slice 2): the list with "Practise", being start
   await expectAccessibleAndNotTooWide(page);
 });
 
+test('Sessions and removing kept practice (D99): the remove dialog with its box, Sessions with a removed job, "Remove all" and nothing kept: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openApplications(page);
+  await page.evaluate(() => window.qdPreview?.setFlag('textPractice', true));
+  await seedApplications(page);
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Senior Backend Engineer' })
+    .getByRole('link')
+    .click();
+  await page.getByRole('link', { name: 'Interviews' }).click();
+  await page.getByRole('link', { name: 'Technical interview' }).click();
+  const questions = page.getByRole('region', {
+    name: 'Likely questions for this interview',
+  });
+  await questions
+    .getByRole('button', { name: 'Write likely questions' })
+    .click();
+  await questions
+    .getByRole('listitem')
+    .first()
+    .getByRole('button', { name: 'Practise' })
+    .click();
+  await expect(page.getByRole('region', { name: 'Key points' })).toBeVisible();
+
+  // Removing the application, with its practice to keep or remove
+  await page.goto('/applications');
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Senior Backend Engineer' })
+    .getByRole('link')
+    .click();
+  await page.getByRole('link', { name: 'Details' }).click();
+  await page
+    .getByRole('button', { name: 'Remove this application' })
+    .last()
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Remove this application?' });
+  await expect(dialog.getByRole('checkbox')).toBeVisible();
+  await expectInsideViewport(page, dialog);
+  await expectAccessibleAndNotTooWide(page);
+  await dialog.getByRole('button', { name: 'Remove the application' }).click();
+  await expect(page).toHaveURL('/applications');
+
+  // Sessions, with the removed job's practice
+  await page.goto('/sessions');
+  await expect(page.getByText('Application removed')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await page.getByRole('button', { name: 'Remove all' }).click();
+  const removeAll = page.getByRole('dialog', {
+    name: /^Remove all practice for/,
+  });
+  await expectInsideViewport(page, removeAll);
+  await expectAccessibleAndNotTooWide(page);
+  await removeAll.getByRole('button', { name: 'Remove all' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Nothing practised yet' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+});
+
 test('the brief, not prepared, ready with a requirement and a question open, out of date and failed: accessible and no horizontal scroll', async ({
   page,
 }) => {
@@ -555,6 +617,8 @@ test('a posting read again, its outcome and "Replace your edited text?": accessi
 test('CV versions: nothing in the profile, no version yet, the panel, the details, being written, written, the list and the remove dialog: accessible and no horizontal scroll', async ({
   page,
 }) => {
+  // Eleven accessibility checks: 11 s here, up to 35 s on a busy CI runner (qd-web #63).
+  test.slow();
   await openProfile(page);
   const cv = () =>
     page

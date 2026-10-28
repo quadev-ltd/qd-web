@@ -4,8 +4,8 @@
   applications foundation, the home that lists them, a new application with the pasted job, the
   page of an application (its details, the job, "Edit", "Remove"), its brief (slice 7), and the job
   as its text, a file or a link, read and named by the backend (slice 8, research doc 17), and its
-  interviews (slice 22, D89), their likely questions (slice 23, D94) and practising a question
-  (slice 26, D94).
+  interviews (slice 22, D89), their likely questions (slice 23, D94), practising a question
+  (slice 26, D94), and Sessions with removing kept practice (slice 27, D99).
 - **Scope:** `src/core/profile/applications.ts`, `src/core/profile/ApplicationsProvider.tsx`, the
   `applications` slice of the store, `src/core/firebase/applications.ts`, `src/screens/Applications/`
   and `src/screens/Home/InterviewHome.tsx`
@@ -227,10 +227,31 @@ the practice's page says so in their place.
   comes back. A count of changes in the same slice makes every page read its marks again.
 - **An address per way in (D96):** under the interview
   (`/applications/:id/interviews/:interviewId/practice/:turnId`) and under the application for the
-  brief (`/applications/:id/practice/:turnId`), each with its breadcrumb. Sessions comes next.
+  brief (`/applications/:id/practice/:turnId`), each with its breadcrumb, and `/sessions/:turnId`
+  from Sessions, with its single link back.
 - **The preview's fake writes questions with the backend's ids** (`q1` to `q8`) and a `listId` per
   list, and key points as the backend's offline `answer-guide` does: the profile's first visible
   items, then advice.
+
+## Sessions and removing kept practice (D94, D99, 28 Oct 2026)
+
+Sessions, the section D85 named, holds the practice kept (canvas version 57, R1; research doc 15
+§25). It is in the bar after CVs with `textPractice`, and its routes sit with the applications',
+whose names it shows.
+
+- **One read of every turn,** ordered by `updatedAt` (one field, no composite index; 500 at most),
+  grouped by application on the page, the most recently practised job first, and read again after
+  every change (the `practice` slice's count). A job is named as the application is now, or from
+  the turn's snapshot once it is removed (`applicationRemoved`).
+- **"Remove all"** is only on a removed application's card, asked first, and calls
+  `removeApplicationPractice`. A turn of a removed application or interview opens from Sessions
+  only.
+- **"Remove this application?" counts the application's turns when it opens** (`getCount`, a
+  count query, not a read of each) and offers "Also remove its practice (N questions)", unticked,
+  only when there are some. Until the count is read, the dialog can't remove; a count that fails
+  leaves the box out, and the practice stays, the default. `removePractice` is sent only when
+  ticked, so the call is unchanged otherwise. The new `practiceRemoved` and `practiceKept` of the
+  response are not read: Sessions reads the turns again.
 
 ## Consequences
 

@@ -5,6 +5,7 @@ import { Route, Routes } from 'react-router';
 import {
   BriefPracticeScreen,
   InterviewPracticeScreen,
+  SessionPracticeScreen,
 } from './PracticeTurnScreen';
 
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
@@ -43,6 +44,8 @@ const setUp = ({
         element={<p>the interview</p>}
       />
       <Route path="/applications/:applicationId" element={<p>the brief</p>} />
+      <Route path="/sessions/:turnId" element={<SessionPracticeScreen />} />
+      <Route path="/sessions" element={<p>sessions</p>} />
     </Routes>,
     {
       gateway,
@@ -154,6 +157,42 @@ describe('a question practised (X7, D94 slice 2)', () => {
         name: 'Senior Backend Engineer · applications.briefTab',
       }),
     ).toHaveAttribute('href', '/applications/a1');
+  });
+
+  it('opened from Sessions, leads back to Sessions, and names a removed application from the practice', async () => {
+    const user = userEvent.setup();
+    const gateway = createMockProfileGateway();
+    gateway.getPracticeTurn.mockResolvedValue(
+      practiceTurnFixture({
+        applicationId: 'gone',
+        application: { title: 'Data Engineer', company: 'Lumen Bank' },
+        applicationRemoved: true,
+        interviewRemoved: true,
+      }),
+    );
+    setUp({ gateway, route: '/sessions/turn-1' });
+
+    expect(
+      await screen.findByText(
+        'Technical interview · Data Engineer, Lumen Bank',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'breadcrumb.label' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('main')).getByRole('link', {
+        name: 'sessions.title',
+      }),
+    ).toHaveAttribute('href', '/sessions');
+
+    await user.click(
+      screen.getByRole('button', { name: 'practice.removeLink' }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'practice.removeConfirmButton' }),
+    );
+    expect(await screen.findByText('sessions')).toBeInTheDocument();
   });
 
   it('says a practice that is gone isn’t here any more, with the way back', async () => {
