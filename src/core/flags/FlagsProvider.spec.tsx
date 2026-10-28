@@ -78,6 +78,7 @@ describe('FlagsProvider', () => {
       interviewAssistant: false,
       cvTool: false,
       textPractice: false,
+      coverLetters: false,
       aiDiagnostics: false,
     });
     expect(result.current.ready).toBe(true);

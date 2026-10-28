@@ -31,6 +31,7 @@ import {
   APPLICATION_INTERVIEW_PATH,
   APPLICATION_INTERVIEW_PRACTICE_PATH,
   APPLICATION_INTERVIEWS_PATH,
+  APPLICATION_LETTER_PATH,
   APPLICATION_PATH,
   APPLICATION_PRACTICE_PATH,
   APPLICATIONS_PATH,
@@ -289,6 +290,15 @@ const accountRoutes: RouteObject[] = [
                   Component: (
                     await import('@/screens/Cv/compare/CvCompareScreen')
                   ).CvCompareScreen,
+                }),
+              },
+              // A cover letter (D98), under its application's "CV and letter" tab: with the
+              // versions, whose CV it goes with, and the CV details of its heading.
+              {
+                path: APPLICATION_LETTER_PATH,
+                lazy: async () => ({
+                  Component: (await import('@/screens/Letters/LetterRoute'))
+                    .LetterRoute,
                 }),
               },
             ],

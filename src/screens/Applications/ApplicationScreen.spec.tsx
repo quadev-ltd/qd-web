@@ -356,3 +356,46 @@ describe('the application’s menu (D95)', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('ApplicationScreen, the CV tab (D98)', () => {
+  const renderTab = (flags: { coverLetters: boolean }) =>
+    renderProfilePage(
+      <Routes>
+        <Route
+          path="/applications/:applicationId/cv"
+          element={<ApplicationScreen tab="cv" />}
+        />
+      </Routes>,
+      {
+        route: '/applications/a1/cv',
+        interviewProfile: { uid: 'uid-1', status: 'loaded' },
+        applications: loaded(),
+        flags: { cvTool: true, ...flags },
+      },
+    );
+
+  it('reads "CV and letter" with cover letters, with the CVs and then the letters', async () => {
+    renderTab({ coverLetters: true });
+
+    expect(
+      screen.getByRole('link', { name: 'applications.cvAndLetterTab' }),
+    ).toHaveAttribute('aria-current', 'page');
+    expect(
+      screen.getByRole('heading', { name: 'applications.cvPartTitle' }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'letters.sectionTitle' }),
+    ).toBeInTheDocument();
+  });
+
+  it('reads "CV" without them, with no letters', () => {
+    renderTab({ coverLetters: false });
+
+    expect(
+      screen.getByRole('link', { name: 'applications.cvTab' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'letters.sectionTitle' }),
+    ).not.toBeInTheDocument();
+  });
+});

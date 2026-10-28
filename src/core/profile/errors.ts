@@ -24,6 +24,10 @@ export const ProfileErrorCode = {
   NoItems: 'profile/no-items',
   /** That line of what was asked of a CV is in the profile already (D97). */
   AlreadyAdded: 'profile/already-added',
+  /** The account already holds as many cover letters as it can (D98). */
+  MaxLetters: 'profile/max-letters',
+  /** The CV a letter is to go with is being made, or could not be. */
+  CvNotReady: 'profile/cv-not-ready',
   /** The account already holds as many practice turns as it can (D94). */
   MaxPracticeTurns: 'profile/max-practice-turns',
   /** The question to practise changed since the page read it: read the page again. */
@@ -77,6 +81,8 @@ const EXPECTED_CODES: ReadonlySet<string> = new Set([
   ProfileErrorCode.AlreadyAdded,
   ProfileErrorCode.MaxCvVersions,
   ProfileErrorCode.MaxPracticeTurns,
+  ProfileErrorCode.MaxLetters,
+  ProfileErrorCode.CvNotReady,
   ProfileErrorCode.QuestionChanged,
   ProfileErrorCode.NoCvText,
   ProfileErrorCode.NoItems,

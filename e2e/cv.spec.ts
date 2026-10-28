@@ -16,12 +16,13 @@ import {
   seedProfile,
 } from './support';
 
-/** Today as the pages write it, "18 Oct 2026". */
+/** Today as the pages write it, "18 Oct 2026", in the browser's zone (playwright.config.ts). */
 const today = () =>
   new Date().toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+    timeZone: 'Europe/London',
   });
 
 const openCv = async (page: Page) => {

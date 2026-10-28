@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
+  type CvBlock,
   cvBlocks,
   cvFileName,
+  type CvPaper,
   cvPaper,
   makeDocx,
   makePdf,
@@ -24,75 +26,62 @@ import { useCvVersions } from '@/core/profile/CvVersionsProvider';
 import { logProfileError } from '@/core/profile/errors';
 import { useSessionUser } from '@/core/session/hooks';
 
-export interface DownloadButtonProps {
-  version: CvVersion;
+export interface BlocksDownloadButtonProps {
+  /** The file's blocks, worked out when it is asked for. */
+  blocks: () => CvBlock[];
+  paper: CvPaper;
   /** What the file is called, without its extension. */
   fileTitle: string;
+  /** "Download PDF" as the page's main action (a CV), or beside another (a letter's "Copy the text"). */
+  variant?: 'primary' | 'secondary';
+  /** For the log: what was downloaded. */
+  operation: string;
 }
 
 /**
- * The one download of a version (D75): "Download PDF", with an arrow for Word (.docx). The file
- * is made here: a written version from its structure, its header from the CV's details as they
- * are now; an edit version from its text, once nothing is left to review.
+ * "Download PDF", with an arrow for Word (.docx): the file made here from its blocks. A CV
+ * version's (DownloadButton) and a cover letter's (D98).
  */
-export const DownloadButton: React.FC<DownloadButtonProps> = ({
-  version,
+export const BlocksDownloadButton: React.FC<BlocksDownloadButtonProps> = ({
+  blocks,
+  paper,
   fileTitle,
+  variant = 'primary',
+  operation,
 }) => {
   const { t } = useTranslation();
   const uid = useSessionUser()?.uid;
-  const { details } = useCvVersions();
   const [busy, setBusy] = useState<'pdf' | 'docx'>();
   const [menu, setMenu] = useState(false);
   const [failed, setFailed] = useState(false);
-
   const closeOnEscape = (event: React.KeyboardEvent) => {
     if (event.key === 'Escape') {
       setMenu(false);
     }
   };
-
   const download = async (format: 'pdf' | 'docx') => {
     setMenu(false);
     setBusy(format);
     setFailed(false);
     try {
-      const blocks = isWrittenVersion(version)
-        ? writtenBlocks(
-            version.document ?? {
-              summary: [],
-              experience: [],
-              projects: [],
-              skills: [],
-              education: [],
-              certifications: [],
-              languages: [],
-            },
-            details,
-            version.convention,
-          )
-        : cvBlocks(cvVersionText(version));
-      // A US resume on US Letter; every other CV, and an edit version, on A4.
-      const paper = cvPaper(
-        isWrittenVersion(version) ? version.convention : undefined,
-      );
+      const made = blocks();
       const file =
         format === 'pdf'
-          ? await makePdf(blocks, { paper })
-          : await makeDocx(blocks, paper);
+          ? await makePdf(made, { paper })
+          : await makeDocx(made, paper);
       saveFile(file, cvFileName([fileTitle], format));
     } catch (error) {
-      logProfileError(`downloadCv(${format})`, error, uid);
+      logProfileError(`${operation}(${format})`, error, uid);
       setFailed(true);
     } finally {
       setBusy(undefined);
     }
   };
-
   return (
     <div className="flex flex-col gap-2.5">
       <div className="relative flex self-start">
         <Button
+          variant={variant}
           disabled={busy !== undefined}
           aria-busy={busy === 'pdf'}
           onClick={() => {
@@ -113,7 +102,8 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
           disabled={busy !== undefined}
           onClick={() => setMenu(open => !open)}
           onKeyDown={closeOnEscape}
-          className="rounded-l-none border-l border-white/45 px-3">
+          variant={variant}
+          className={`rounded-l-none px-3 ${variant === 'primary' ? 'border-l border-white/45' : 'border-l-0'}`}>
           <Icon name="down" size={18} />
         </Button>
         {menu && (
@@ -141,6 +131,51 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
         </Banner>
       )}
     </div>
+  );
+};
+
+export interface DownloadButtonProps {
+  version: CvVersion;
+  /** What the file is called, without its extension. */
+  fileTitle: string;
+}
+
+/**
+ * The one download of a version (D75): "Download PDF", with an arrow for Word (.docx). The file
+ * is made here: a written version from its structure, its header from the CV's details as they
+ * are now; an edit version from its text, once nothing is left to review.
+ */
+export const DownloadButton: React.FC<DownloadButtonProps> = ({
+  version,
+  fileTitle,
+}) => {
+  const { details } = useCvVersions();
+  return (
+    <BlocksDownloadButton
+      fileTitle={fileTitle}
+      operation="downloadCv"
+      // A US resume on US Letter; every other CV, and an edit version, on A4.
+      paper={cvPaper(
+        isWrittenVersion(version) ? version.convention : undefined,
+      )}
+      blocks={() =>
+        isWrittenVersion(version)
+          ? writtenBlocks(
+              version.document ?? {
+                summary: [],
+                experience: [],
+                projects: [],
+                skills: [],
+                education: [],
+                certifications: [],
+                languages: [],
+              },
+              details,
+              version.convention,
+            )
+          : cvBlocks(cvVersionText(version))
+      }
+    />
   );
 };
 

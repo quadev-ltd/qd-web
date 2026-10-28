@@ -2454,3 +2454,151 @@ describe('previewProfileGateway, what is asked of a CV (D97)', () => {
     expect(again && isWrittenVersion(again) && again.asked).toBeUndefined();
   });
 });
+
+describe('previewProfileGateway, cover letters (D98)', () => {
+  /** An application with its job read, and a profile with items unless `empty`. */
+  const withJob = async ({ empty = false } = {}) => {
+    const context = await setUp();
+    if (!empty) {
+      await context.gateway.createResource(note);
+      context.pass(PREVIEW_READ_MS);
+      await context.gateway.getResources(UID);
+    }
+    const { applicationId } = await context.gateway.createApplication({
+      job: {
+        source: 'text',
+        text: 'Northwind Logistics moves two million parcels a day. Go and Kafka.',
+      },
+      title: 'Senior Backend Engineer',
+      company: 'Northwind Logistics',
+    });
+    context.pass(PREVIEW_READ_MS);
+    await context.gateway.getApplications(UID);
+    return { ...context, applicationId };
+  };
+
+  it('stores a letter being written at once, and writes it with its sources', async () => {
+    const { gateway, applicationId, pass } = await withJob();
+
+    const { letterId } = await gateway.createCoverLetter({
+      applicationId,
+      convention: 'international',
+      why: 'Parcels are like payments.',
+      asked: 'Put first: my on-call work',
+    });
+    await expect(gateway.getCoverLetter(UID, letterId)).resolves.toMatchObject({
+      status: 'creating',
+      convention: 'international',
+      length: { kind: 'page' },
+      job: { role: 'Senior Backend Engineer', company: 'Northwind Logistics' },
+    });
+
+    pass(PREVIEW_CV_MS);
+    const letter = await gateway.getCoverLetter(UID, letterId);
+    expect(letter?.status).toBe('ready');
+    const sources = (letter?.paragraphs ?? []).flatMap(({ sentences }) =>
+      sentences.flatMap(({ sources: own }) => own.map(({ kind }) => kind)),
+    );
+    expect(new Set(sources)).toEqual(new Set(['statement', 'item', 'job']));
+    expect(letter?.statements.map(({ id }) => id)).toEqual(['W1', 'N1']);
+    expect(letter?.outcomes).toEqual([
+      expect.objectContaining({ about: 'asked', outcome: 'done' }),
+    ]);
+    await expect(gateway.getCoverLettersToday(UID)).resolves.toBe(1);
+    await expect(
+      gateway.getApplicationLetters(UID, applicationId),
+    ).resolves.toHaveLength(1);
+  });
+
+  it('writes one from a draft with a number only the draft gives, marked', async () => {
+    const { gateway, applicationId, pass } = await withJob();
+
+    const { letterId } = await gateway.createCoverLetter({
+      applicationId,
+      draft: { text: 'saw the role. my notice is 4 weeks' },
+    });
+    pass(PREVIEW_CV_MS);
+
+    const letter = await gateway.getCoverLetter(UID, letterId);
+    const marked = (letter?.paragraphs ?? [])
+      .flatMap(({ sentences }) => sentences)
+      .find(({ draftOnly }) => draftOnly?.length);
+    const [mark] = marked?.draftOnly ?? [];
+    expect(marked?.text.slice(mark.at, mark.at + mark.text.length)).toBe(
+      mark.text,
+    );
+    expect(letter?.draft).toEqual({
+      text: 'saw the role. my notice is 4 weeks',
+      mode: 'polish',
+    });
+    expect(letter?.outcomes.map(({ about }) => about)).toEqual([
+      'draft',
+      'draft',
+    ]);
+  });
+
+  it('refuses as the backend does: nothing to write from, the day’s limit, a CV of another job', async () => {
+    const empty = await withJob({ empty: true });
+    await expect(
+      codeOf(
+        empty.gateway.createCoverLetter({ applicationId: empty.applicationId }),
+      ),
+    ).resolves.toBe(ProfileErrorCode.NoItems);
+    // A draft is enough.
+    await expect(
+      empty.gateway.createCoverLetter({
+        applicationId: empty.applicationId,
+        draft: { text: 'hi' },
+      }),
+    ).resolves.toMatchObject({ letterId: expect.any(String) });
+
+    const { gateway, applicationId } = await withJob();
+    await expect(
+      codeOf(
+        gateway.createCoverLetter({ applicationId, cvVersionId: 'missing' }),
+      ),
+    ).resolves.toBe(ProfileErrorCode.NotFound);
+    gateway.controls.setCoverLettersToday(10);
+    await expect(
+      codeOf(gateway.createCoverLetter({ applicationId })),
+    ).resolves.toBe(ProfileErrorCode.DailyLimit);
+  });
+
+  it('fails as the backend can, and marks one letter sent per application', async () => {
+    const { gateway, applicationId, pass } = await withJob();
+    gateway.controls.failNextLetter('model');
+    const failed = await gateway.createCoverLetter({ applicationId });
+    const first = await gateway.createCoverLetter({ applicationId });
+    const second = await gateway.createCoverLetter({ applicationId });
+    pass(PREVIEW_CV_MS);
+
+    await expect(
+      gateway.getCoverLetter(UID, failed.letterId),
+    ).resolves.toMatchObject({ status: 'failed', failure: 'model' });
+    await expect(
+      codeOf(gateway.markCoverLetterSent(failed.letterId, true)),
+    ).resolves.toBe(ProfileErrorCode.Invalid);
+
+    await gateway.markCoverLetterSent(first.letterId, true);
+    await gateway.markCoverLetterSent(second.letterId, true);
+    const letters = await gateway.getApplicationLetters(UID, applicationId);
+    expect(
+      letters.filter(({ sentAt }) => sentAt !== undefined).map(({ id }) => id),
+    ).toEqual([second.letterId]);
+  });
+
+  it('removes a letter, and an application’s letters with it', async () => {
+    const { gateway, applicationId } = await withJob();
+    const one = await gateway.createCoverLetter({ applicationId });
+    const two = await gateway.createCoverLetter({ applicationId });
+
+    await gateway.removeCoverLetter(one.letterId);
+    await expect(gateway.getCoverLetter(UID, one.letterId)).resolves.toBeNull();
+    await expect(codeOf(gateway.removeCoverLetter(one.letterId))).resolves.toBe(
+      ProfileErrorCode.NotFound,
+    );
+
+    await gateway.removeApplication(applicationId);
+    await expect(gateway.getCoverLetter(UID, two.letterId)).resolves.toBeNull();
+  });
+});

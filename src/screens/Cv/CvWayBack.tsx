@@ -12,6 +12,7 @@ import Breadcrumb, {
 } from '@/components/layout/Breadcrumb';
 import { useApplications } from '@/core/profile/ApplicationsProvider';
 import { applicationPath, APPLICATIONS_PATH } from '@/core/profile/paths';
+import { useCvTabLabel } from '@/screens/Letters/useCvTabLabel';
 
 export const CvWayBack: React.FC<{
   paths: CvPaths;
@@ -23,6 +24,8 @@ export const CvWayBack: React.FC<{
 }> = ({ paths, from }) => {
   const { t } = useTranslation();
   const { applications } = useApplications();
+  // "CV and letter" with cover letters (D98).
+  const tab = useCvTabLabel();
   const { applicationId } = paths;
   if (!applicationId) {
     if (from) {
@@ -46,7 +49,7 @@ export const CvWayBack: React.FC<{
       steps={[
         { label: t('applications.title'), to: APPLICATIONS_PATH },
         { label: title, to: applicationPath(applicationId) },
-        { label: t('applications.cvTab'), to: paths.list },
+        { label: tab, to: paths.list },
         ...(from ? [from] : []),
       ]}
       backLabel={
@@ -54,7 +57,7 @@ export const CvWayBack: React.FC<{
           ? undefined
           : t('breadcrumb.pageOfApplication', {
               title,
-              page: t('applications.cvTab'),
+              page: tab,
             })
       }
     />

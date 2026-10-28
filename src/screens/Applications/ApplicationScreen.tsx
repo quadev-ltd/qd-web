@@ -30,6 +30,8 @@ import {
   APPLICATIONS_PATH,
 } from '@/core/profile/paths';
 import ApplicationCvTab from '@/screens/Cv/ApplicationCvTab';
+import ApplicationLetters from '@/screens/Letters/ApplicationLetters';
+import { useCvTabLabel } from '@/screens/Letters/useCvTabLabel';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 import { shortAddress } from '@/screens/Profile/Resource/resourceMeta';
 
@@ -56,6 +58,9 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
   const { t } = useTranslation();
   // The CV tab comes with the CV tool (delivery 2b).
   const cvTool = useFlag('cvTool');
+  // "CV and letter" with cover letters (D98).
+  const cvTab = useCvTabLabel();
+  const coverLetters = useFlag('coverLetters');
   const { applicationId = '' } = useParams();
   const { status, applications } = useApplications();
   const { reload } = useApplicationsActions();
@@ -163,7 +168,7 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
         </NavLink>
         {cvTool && (
           <NavLink to={applicationCvPath(application.id)} className={tabClass}>
-            {t('applications.cvTab')}
+            {cvTab}
           </NavLink>
         )}
       </nav>
@@ -173,7 +178,24 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
         <DetailsTab application={application} />
       ) : tab === 'cv' && cvTool ? (
         <CvVersionsProvider>
-          <ApplicationCvTab application={application} />
+          {coverLetters ? (
+            // D98: "CV and letter", the CVs and then the letters for this job.
+            <div className="flex flex-col gap-8">
+              <section
+                aria-labelledby="cv-part"
+                className="flex flex-col gap-4">
+                <h2
+                  id="cv-part"
+                  className="font-display text-[20px] leading-tight font-semibold">
+                  {t('applications.cvPartTitle')}
+                </h2>
+                <ApplicationCvTab application={application} />
+              </section>
+              <ApplicationLetters application={application} />
+            </div>
+          ) : (
+            <ApplicationCvTab application={application} />
+          )}
         </CvVersionsProvider>
       ) : (
         <BriefTab application={application} />

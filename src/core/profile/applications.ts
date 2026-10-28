@@ -150,6 +150,18 @@ export const JobApplicationSchema = z.object({
    * (D86).
    */
   country: z.string().transform(jobCountry).optional().catch(undefined),
+  /**
+   * Whether the posting asks for a cover letter, read by job-read 1.2.0 (D98): none for a job read
+   * before it. Only `required` shows "This job asks for a cover letter".
+   */
+  letterAsked: z
+    .enum(['required', 'optional', 'not-said'])
+    .optional()
+    .catch(undefined),
+  /** Whom the posting says to write to, as it says it ("Priya Shah, Engineering Manager"). */
+  contact: z.string().min(1).optional().catch(undefined),
+  /** The job's reference in the posting ("NW-2231"). */
+  jobReference: z.string().min(1).optional().catch(undefined),
   /** Goes up by one with every change the brief is built from. */
   revision: z.number().catch(0),
   brief: ApplicationBriefSchema.optional().catch(undefined),

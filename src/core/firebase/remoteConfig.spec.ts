@@ -52,6 +52,7 @@ describe('the flags from Remote Config', () => {
       interviewAssistant: false,
       cvTool: false,
       textPractice: false,
+      coverLetters: false,
       aiDiagnostics: false,
     });
   });
@@ -95,6 +96,7 @@ describe('the flags from Remote Config', () => {
         .sort(),
     ).toEqual([
       'aiDiagnostics',
+      'coverLetters',
       'cvTool',
       'interviewAssistant',
       'smartInspection',

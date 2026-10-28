@@ -46,6 +46,7 @@ import {
   UpdateSkillMapItemResponseSchema,
   usageDayPath,
 } from '@/core/profile/contract';
+import { CoverLetterRefusal } from '@/core/profile/coverLetters';
 import { CvRefusal } from '@/core/profile/cvVersions';
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import {
@@ -101,6 +102,11 @@ const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
   // Text practice (D94): read the page again, or remove some practice first.
   [PracticeRefusal.QuestionChanged]: ProfileErrorCode.QuestionChanged,
   [PracticeRefusal.TurnLimit]: ProfileErrorCode.MaxPracticeTurns,
+  // Cover letters (D98). `not-ready` and `no-items` are the CV's own reasons, read as above. The
+  // pages only offer to restore a saved letter.
+  [CoverLetterRefusal.MaxLetters]: ProfileErrorCode.MaxLetters,
+  [CoverLetterRefusal.CvNotReady]: ProfileErrorCode.CvNotReady,
+  [CoverLetterRefusal.NotSaved]: ProfileErrorCode.Invalid,
 };
 
 /**

@@ -53,10 +53,12 @@ export const createAccount = async ({
   interviewAssistant,
   cvTool,
   textPractice,
+  coverLetters,
 }: {
   interviewAssistant?: boolean;
   cvTool?: boolean;
   textPractice?: boolean;
+  coverLetters?: boolean;
 } = {}): Promise<TestAccount> => {
   const email = `e2e-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
   const created = await send(
@@ -86,7 +88,7 @@ export const createAccount = async ({
     OWNER,
   );
   const flags = Object.fromEntries(
-    Object.entries({ interviewAssistant, cvTool, textPractice })
+    Object.entries({ interviewAssistant, cvTool, textPractice, coverLetters })
       .filter(([, value]) => value !== undefined)
       .map(([key, value]) => [key, { booleanValue: value }]),
   );

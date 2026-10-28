@@ -13,6 +13,7 @@ export const USAGE_SERVICES = {
   cvVersion: 'cvVersion',
   interviewQuestions: 'interviewQuestions',
   practice: 'practice',
+  coverLetter: 'coverLetter',
   aiDiagnostics: 'aiDiagnostics',
 } as const;
 export type UsageService = (typeof USAGE_SERVICES)[keyof typeof USAGE_SERVICES];
@@ -45,6 +46,12 @@ export const INTERVIEW_QUESTIONS_DAILY_LIMIT: DailyLimits = {
 export const PRACTICE_DAILY_LIMIT: DailyLimits = {
   maxCallsPerDay: 40,
   maxCostUsdPerDay: 1,
+};
+
+/** Cover letters (D98, doc 22): letters written or written again per user and day. */
+export const COVER_LETTER_DAILY_LIMIT: DailyLimits = {
+  maxCallsPerDay: 10,
+  maxCostUsdPerDay: 0.5,
 };
 
 /** No override can go above this, so a typo cannot run up a bill. */

@@ -34,6 +34,11 @@ export const FLAGS = {
     description:
       'Text practice (doc 21): likely questions per interview, key points and feedback on typed answers.',
   },
+  coverLetters: {
+    default: false,
+    description:
+      'Cover letters (doc 22, D98): a letter for one application, from the profile, the job and its CV.',
+  },
   aiDiagnostics: {
     default: false,
     description:
