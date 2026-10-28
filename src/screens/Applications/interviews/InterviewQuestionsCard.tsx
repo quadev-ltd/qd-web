@@ -1,11 +1,14 @@
 // "Likely questions for this interview" (A8, D92, D94, research doc 21 §2), with the `textPractice`
 // flag: not written yet, with "Write likely questions" and the lists left today; being written;
 // written, each question with its kind and why it is likely; out of date, kept, with a banner
-// naming what changed and "Write again". Practising a question comes with the backend's slices
-// 2 and 3.
-import { useEffect, useState } from 'react';
+// naming what changed and "Write again". Each question can be practised (X7, doc 15 §25): its
+// newest practice is marked "Practised", with "Practise again"; a question of the candidate's own
+// is practised from a side panel.
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
+
+import { interviewTitle } from './interviewText';
 
 import Icon from '@/components/Icon';
 import Spinner from '@/components/Spinner';
@@ -29,7 +32,11 @@ import {
   interviewQuestionsStateOf,
 } from '@/core/profile/interviews';
 import { dailyLimitResetTime } from '@/core/profile/limits';
-import { applicationDetailsPath } from '@/core/profile/paths';
+import {
+  applicationDetailsPath,
+  applicationInterviewPracticePath,
+} from '@/core/profile/paths';
+import { type PracticeMark } from '@/core/profile/practice';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
 import {
   effectiveLimits,
@@ -39,7 +46,22 @@ import {
   USAGE_SERVICES,
 } from '@/core/profile/usageLimits';
 import { useInterviews } from '@/core/profile/useInterviews';
+import {
+  usePractice,
+  usePracticeLeft,
+  usePracticeMarks,
+} from '@/core/profile/usePractice';
 import { useSessionUser } from '@/core/session/hooks';
+import OwnQuestionPanel from '@/screens/Practice/OwnQuestionPanel';
+import {
+  type PracticeFailure,
+  PracticeFailureBanner,
+  practiceFailureOf,
+} from '@/screens/Practice/practiceFailure';
+import {
+  PractiseAction,
+  PractisedChip,
+} from '@/screens/Practice/PractiseAction';
 import { formatDay } from '@/screens/Profile/Resource/resourceMeta';
 
 /** Questions shown before "Show all". */
@@ -109,35 +131,56 @@ const useListsLeft = (builtAt: number | null | undefined) => {
   return { max, left: Math.max(0, max - today.written) };
 };
 
-const QuestionList: React.FC<{ items: InterviewQuestions['items'] }> = ({
-  items,
-}) => {
+/** What the list needs to offer "Practise" on each question. */
+interface ListPractice {
+  marks: Map<string, PracticeMark> | null;
+  isStarting: (questionId: string) => boolean;
+  /** Another practice is being started, none are left today, or the list can't be practised. */
+  disabled: boolean;
+  onPractise: (questionId: string) => void;
+  pathOf: (turnId: string) => string;
+}
+
+const QuestionList: React.FC<{
+  items: InterviewQuestions['items'];
+  practice: ListPractice;
+}> = ({ items, practice }) => {
   const { t } = useTranslation();
   const [all, setAll] = useState(false);
   const shown = all ? items : items.slice(0, SHOWN);
   return (
     <>
       <ol className="flex flex-col">
-        {shown.map(({ id, text, kind, why }) => (
-          <li
-            key={id}
-            className="flex flex-col gap-2 border-t border-border-faint py-4 first:border-t-0">
-            <span className="flex">
-              <Chip>{t(KIND_LABELS[kind])}</Chip>
-            </span>
-            <p className="text-base leading-normal font-bold wrap-anywhere">
-              {text}
-            </p>
-            {why && (
-              <p className="flex items-start gap-1.5 text-sm leading-normal text-muted">
-                <span aria-hidden="true" className="flex pt-0.5">
-                  <Icon name="bulb" size={16} />
-                </span>
-                <span className="min-w-0 flex-1 wrap-anywhere">{why}</span>
+        {shown.map(({ id, text, kind, why }) => {
+          const mark = practice.marks?.get(id);
+          return (
+            <li
+              key={id}
+              className="flex flex-col gap-2 border-t border-border-faint py-4 first:border-t-0">
+              <span className="flex flex-wrap gap-2">
+                <Chip>{t(KIND_LABELS[kind])}</Chip>
+                {mark && <PractisedChip mark={mark} />}
+              </span>
+              <p className="text-base leading-normal font-bold wrap-anywhere">
+                {text}
               </p>
-            )}
-          </li>
-        ))}
+              {why && (
+                <p className="flex items-start gap-1.5 text-sm leading-normal text-muted">
+                  <span aria-hidden="true" className="flex pt-0.5">
+                    <Icon name="bulb" size={16} />
+                  </span>
+                  <span className="min-w-0 flex-1 wrap-anywhere">{why}</span>
+                </p>
+              )}
+              <PractiseAction
+                practised={mark && { mark, to: practice.pathOf(mark.turnId) }}
+                starting={practice.isStarting(id)}
+                disabled={practice.disabled}
+                onPractise={() => practice.onPractise(id)}
+              />
+            </li>
+          );
+        })}
       </ol>
       {!all && items.length > SHOWN && (
         <div className="border-t border-border-faint pt-2">
@@ -159,14 +202,41 @@ export const InterviewQuestionsCard: React.FC<{
   interview: ApplicationInterview;
 }> = ({ application, interview }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const gateway = useProfileGateway();
   const uid = useSessionUser()?.uid;
   const { profileRevision } = useApplications();
   const { refreshProfileRevision } = useApplicationsActions();
-  const { writeQuestions, writingQuestions } = useInterviews(application.id);
+  const { writeQuestions, writingQuestions, refresh } = useInterviews(
+    application.id,
+  );
   const [failure, setFailure] = useState<Failure | null>(null);
   const { questions } = interview;
   const lists = useListsLeft(questions?.builtAt);
   const writing = Boolean(writingQuestions[interview.id]);
+  const practice = usePractice();
+  const { left: practiceLeft, counted } = usePracticeLeft();
+  const [practiceFailure, setPracticeFailure] = useState<{
+    failure: PracticeFailure;
+    questionId?: string;
+  } | null>(null);
+  const [own, setOwn] = useState(false);
+  const listId = questions?.listId;
+  const marks = usePracticeMarks(
+    listId
+      ? reader => gateway.getListPracticeTurns(reader, interview.id, listId)
+      : null,
+    turn => turn.question.questionId,
+    `${interview.id}/${listId ?? ''}`,
+  );
+  // A practice started here opens when it is stored, unless the candidate has left the page.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   // The profile may have changed on its own page since it was read: one read says so.
   useEffect(() => {
@@ -183,6 +253,49 @@ export const InterviewQuestionsCard: React.FC<{
   const limitReached = failure === 'limit' || lists?.left === 0;
   const noJob = failure === 'noJob' || !application.jobDescription;
   const jobReading = failure === 'reading' || isJobPending(application);
+
+  const practicePath = (turnId: string) =>
+    applicationInterviewPracticePath(application.id, interview.id, turnId);
+
+  const practise = async (questionId: string) => {
+    setPracticeFailure(null);
+    try {
+      const turnId = await practice.start({
+        applicationId: application.id,
+        interviewId: interview.id,
+        question: {
+          source: 'interview',
+          ...(listId ? { listId } : {}),
+          questionId,
+        },
+      });
+      // A list written before it had an id was given one: read it again.
+      if (!listId) {
+        await refresh(interview.id);
+      }
+      if (mounted.current) {
+        navigate(practicePath(turnId));
+      }
+    } catch (error) {
+      logProfileError('startPracticeTurn', error, uid);
+      const reason = practiceFailureOf(error);
+      // The list was written again elsewhere: show it as it is now.
+      if (reason === 'changed') {
+        await refresh(interview.id);
+      }
+      if (mounted.current) {
+        setPracticeFailure({ failure: reason, questionId });
+      }
+      counted();
+    }
+  };
+  const practiceBlocked =
+    practice.anyStarting ||
+    writing ||
+    jobReading ||
+    practiceLeft?.left === 0 ||
+    practiceFailure?.failure === 'limit' ||
+    practiceFailure?.failure === 'turnLimit';
 
   const write = async () => {
     setFailure(null);
@@ -255,6 +368,19 @@ export const InterviewQuestionsCard: React.FC<{
         <Banner tone="danger" role="alert">
           {t('applications.notAvailableMessage')}
         </Banner>
+      )}
+      {practiceFailure && (
+        <PracticeFailureBanner
+          failure={practiceFailure.failure}
+          max={practiceLeft?.max}
+          retryDisabled={practiceBlocked}
+          onRetry={() => {
+            const { questionId } = practiceFailure;
+            if (questionId) {
+              practise(questionId);
+            }
+          }}
+        />
       )}
     </>
   );
@@ -340,7 +466,54 @@ export const InterviewQuestionsCard: React.FC<{
         </Banner>
       )}
       {questions && state.kind === 'outOfDate' && blocked}
-      {questions && <QuestionList items={questions.items} />}
+      {questions && (
+        <>
+          <QuestionList
+            items={questions.items}
+            practice={{
+              marks,
+              isStarting: questionId =>
+                practice.isStarting({
+                  applicationId: application.id,
+                  interviewId: interview.id,
+                  question: { source: 'interview', questionId },
+                }),
+              disabled: practiceBlocked,
+              onPractise: practise,
+              pathOf: practicePath,
+            }}
+          />
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border-faint pt-2">
+            <Button
+              variant="quiet"
+              size="small"
+              onClick={() => setOwn(true)}
+              disabled={practiceBlocked}
+              className="gap-2 text-[15px]">
+              <Icon name="plus" size={18} />
+              {t('practice.ownButton')}
+            </Button>
+            {practiceLeft && practiceFailure?.failure !== 'limit' && (
+              <p className="text-sm leading-normal text-muted">
+                {t('practice.callsLeft', practiceLeft)}
+              </p>
+            )}
+          </div>
+        </>
+      )}
+      {own && (
+        <OwnQuestionPanel
+          applicationId={application.id}
+          interviewId={interview.id}
+          description={[interviewTitle(t, interview), application.title]
+            .filter(Boolean)
+            .join(' · ')}
+          left={practiceLeft}
+          onClose={() => setOwn(false)}
+          onStarted={turnId => navigate(practicePath(turnId))}
+          onCounted={counted}
+        />
+      )}
     </Card>
   );
 };

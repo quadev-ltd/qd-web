@@ -4,7 +4,8 @@
   applications foundation, the home that lists them, a new application with the pasted job, the
   page of an application (its details, the job, "Edit", "Remove"), its brief (slice 7), and the job
   as its text, a file or a link, read and named by the backend (slice 8, research doc 17), and its
-  interviews (slice 22, D89) and their likely questions (slice 23, D94).
+  interviews (slice 22, D89), their likely questions (slice 23, D94) and practising a question
+  (slice 26, D94).
 - **Scope:** `src/core/profile/applications.ts`, `src/core/profile/ApplicationsProvider.tsx`, the
   `applications` slice of the store, `src/core/firebase/applications.ts`, `src/screens/Applications/`
   and `src/screens/Home/InterviewHome.tsx`
@@ -202,6 +203,34 @@ From the owner's use of the site (research doc 15 §23, canvas version 46, doc 1
   application ("Applications › Senior Backend Engineer › CV") and an interview ("… › Interviews"),
   each step a link, the separators hidden from screen readers. At 720 px and below, one link back to
   the page before. Pages one step in keep their single back link.
+
+## Practising a question (D94, text practice slice 2, 28 Oct 2026)
+
+A question of an interview's list, of the brief, or of the candidate's own is practised: the backend
+writes 3 to 5 key points from the profile (`startPracticeTurn`, one model call) and keeps the turn
+in `users/{uid}/practiceTurns` (research doc 15 §25, canvas version 57, doc 13 §25 and §29; built
+against quadev-backend #57, `4ae7328`). Answering and its feedback wait for the backend's slice 3:
+the practice's page says so in their place.
+
+- **Turns are their own part of the gateway and the contract** (`src/core/profile/practice.ts`,
+  `src/core/firebase/practice.ts`): they live under the user, not the application, and outlive both
+  the interview and the application (D94). Two new error codes, `profile/question-changed` and
+  `profile/max-practice-turns`, for the refusals of the same reasons, logged as normal refusals.
+- **The marks are read by equality, as the backend says, and the page picks the newest:** an
+  interview's list by `interviewId` and `question.listId`, grouped by `questionId`; the brief by
+  `applicationId` and `question.source`, grouped by the question's text. No composite index, no
+  listener. "Practise again" opens the newest turn and calls nothing. A list written before it had a
+  `listId` is practised without one and read again after, since the call gives it one.
+- **Starting takes 5 to 15 seconds, so the store marks it** (`practice` slice, keyed by where the
+  question comes from), one at a time. The practice opens when it is stored only if the page that
+  started it is still open; elsewhere, the question just shows "Practised" when the candidate
+  comes back. A count of changes in the same slice makes every page read its marks again.
+- **An address per way in (D96):** under the interview
+  (`/applications/:id/interviews/:interviewId/practice/:turnId`) and under the application for the
+  brief (`/applications/:id/practice/:turnId`), each with its breadcrumb. Sessions comes next.
+- **The preview's fake writes questions with the backend's ids** (`q1` to `q8`) and a `listId` per
+  list, and key points as the backend's offline `answer-guide` does: the profile's first visible
+  items, then advice.
 
 ## Consequences
 

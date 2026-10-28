@@ -16,13 +16,18 @@ import {
   type SkillMapItem,
   type SkillMapKind,
 } from '@/core/profile/contract';
+import { type PracticeMark } from '@/core/profile/practice';
+import {
+  PractiseAction,
+  PractisedChip,
+} from '@/screens/Practice/PractiseAction';
 
 /** Requirements listed before "Show all". */
 export const REQUIREMENTS_SHOWN = 6;
 /** Questions listed before "Show all". */
 export const QUESTIONS_SHOWN = 4;
 
-const ITEM_KIND_KEYS = {
+export const ITEM_KIND_KEYS = {
   skill: 'applications.kindSkill',
   experience: 'applications.kindExperience',
   project: 'applications.kindProject',
@@ -33,7 +38,7 @@ const ITEM_KIND_KEYS = {
   language: 'applications.kindLanguage',
 } as const satisfies Record<SkillMapKind, string>;
 
-const QUESTION_KIND_KEYS = {
+export const QUESTION_KIND_KEYS = {
   behavioural: 'applications.questionBehavioural',
   technical: 'applications.questionTechnical',
   role: 'applications.questionRole',
@@ -45,6 +50,19 @@ export interface ProfileLookup {
   /** `null` while the items are being read. */
   items: Map<string, SkillMapItem> | null;
   resources: ProfileResource[];
+}
+
+/** With text practice (D94): "Practise this question" on each question, and its marks. */
+export interface BriefPractice {
+  /** The newest practice of each question, by its text. */
+  marks: Map<string, PracticeMark> | null;
+  isStarting: (text: string) => boolean;
+  /** Another practice is being started, or none are left today. */
+  disabled: boolean;
+  onPractise: (text: string) => void;
+  pathOf: (turnId: string) => string;
+  /** Under the questions: the calls left today and what went wrong. */
+  footer: React.ReactNode;
 }
 
 /** An item the brief names, as text with where it came from. One that is gone is left out. */
@@ -258,14 +276,17 @@ export const RequirementsCard: React.FC<{
 const Question: React.FC<{
   question: BriefQuestion;
   lookup: ProfileLookup;
-}> = ({ question, lookup }) => {
+  practice?: BriefPractice;
+}> = ({ question, lookup, practice }) => {
   const { t } = useTranslation();
+  const mark = practice?.marks?.get(question.text);
   return (
     <Opening
       header={
         <>
-          <span className="flex">
+          <span className="flex flex-wrap gap-2">
             <Chip tone="info">{t(QUESTION_KIND_KEYS[question.kind])}</Chip>
+            {mark && <PractisedChip mark={mark} />}
           </span>
           <span className="text-[16px] leading-normal font-medium wrap-anywhere">
             {question.text}
@@ -311,6 +332,15 @@ const Question: React.FC<{
           })}
         </ul>
       </div>
+      {practice && (
+        <PractiseAction
+          practised={mark && { mark, to: practice.pathOf(mark.turnId) }}
+          starting={practice.isStarting(question.text)}
+          disabled={practice.disabled}
+          onPractise={() => practice.onPractise(question.text)}
+          label={t('practice.practiseThisButton')}
+        />
+      )}
     </Opening>
   );
 };
@@ -318,7 +348,8 @@ const Question: React.FC<{
 export const QuestionsCard: React.FC<{
   questions: BriefQuestion[];
   lookup: ProfileLookup;
-}> = ({ questions, lookup }) => {
+  practice?: BriefPractice;
+}> = ({ questions, lookup, practice }) => {
   const { t } = useTranslation();
   const [showAll, setShowAll] = useState(false);
   const headingId = useId();
@@ -345,6 +376,7 @@ export const QuestionsCard: React.FC<{
             key={`${index}-${question.text}`}
             question={question}
             lookup={lookup}
+            practice={practice}
           />
         ))}
       </ul>
@@ -357,6 +389,7 @@ export const QuestionsCard: React.FC<{
           {t('applications.showAllCountButton', { count: questions.length })}
         </Button>
       )}
+      {practice?.footer}
     </Card>
   );
 };

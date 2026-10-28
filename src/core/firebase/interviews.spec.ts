@@ -290,6 +290,7 @@ describe('likely questions (D94)', () => {
       document('i1', {
         ...stored(100),
         questions: {
+          listId: 'list-1',
           items: [
             {
               id: 'q1',
@@ -311,6 +312,7 @@ describe('likely questions (D94)', () => {
     const interview = await getInterview('uid-1', 'a1', 'i1');
 
     expect(interview?.questions).toEqual({
+      listId: 'list-1',
       items: [
         {
           id: 'q1',

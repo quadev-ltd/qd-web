@@ -31,7 +31,10 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ steps, backLabel }) => {
         className="self-start max-[720px]:hidden">
         <ol className="flex flex-wrap items-center gap-x-2">
           {steps.map((step, index) => (
-            <li key={step.to} className="flex min-w-0 items-center gap-x-2">
+            // Two steps can lead to the same page: an application and its brief.
+            <li
+              key={`${index}:${step.to}`}
+              className="flex min-w-0 items-center gap-x-2">
               {index > 0 && (
                 <span aria-hidden="true" className="flex text-muted">
                   <Icon name="right" size={16} />

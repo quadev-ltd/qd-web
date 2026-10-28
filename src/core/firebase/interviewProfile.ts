@@ -55,6 +55,7 @@ import {
   type UploadTarget,
 } from '@/core/profile/gateway';
 import { INTERVIEW_LIMIT_REASON } from '@/core/profile/interviews';
+import { PracticeRefusal } from '@/core/profile/practice';
 
 // ---------- Errors ----------
 
@@ -97,6 +98,9 @@ const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
   [CvRefusal.EditRetired]: ProfileErrorCode.Invalid,
   // "Add it to my profile as a note" (D97): the page says it is there already.
   [CvRefusal.AlreadyAdded]: ProfileErrorCode.AlreadyAdded,
+  // Text practice (D94): read the page again, or remove some practice first.
+  [PracticeRefusal.QuestionChanged]: ProfileErrorCode.QuestionChanged,
+  [PracticeRefusal.TurnLimit]: ProfileErrorCode.MaxPracticeTurns,
 };
 
 /**

@@ -67,6 +67,12 @@ const lengthMinutes = z
  * the brief's kinds and a line on why it is likely. Replaced as a whole each time, with new ids.
  */
 export const InterviewQuestionsSchema = z.object({
+  /**
+   * New on each write, so a practice turn marks the question of the list it was practised from,
+   * not the question with the same id in a later list. A list written before 28 Oct 2026 has none
+   * until one of its questions is practised.
+   */
+  listId: z.string().min(1).optional().catch(undefined),
   items: z
     .array(
       z.object({

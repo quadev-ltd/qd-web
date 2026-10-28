@@ -12,6 +12,7 @@ export const USAGE_SERVICES = {
   applicationBrief: 'applicationBrief',
   cvVersion: 'cvVersion',
   interviewQuestions: 'interviewQuestions',
+  practice: 'practice',
   aiDiagnostics: 'aiDiagnostics',
 } as const;
 export type UsageService = (typeof USAGE_SERVICES)[keyof typeof USAGE_SERVICES];
@@ -35,6 +36,15 @@ export const CV_VERSION_DAILY_LIMIT: DailyLimits = {
 export const INTERVIEW_QUESTIONS_DAILY_LIMIT: DailyLimits = {
   maxCallsPerDay: 10,
   maxCostUsdPerDay: 0.5,
+};
+
+/**
+ * Text practice (D94, doc 21 §4): the key points of a question and, from the backend's slice 3, the
+ * feedback on each answer, per user and day.
+ */
+export const PRACTICE_DAILY_LIMIT: DailyLimits = {
+  maxCallsPerDay: 40,
+  maxCostUsdPerDay: 1,
 };
 
 /** No override can go above this, so a typo cannot run up a bill. */

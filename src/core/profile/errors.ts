@@ -24,6 +24,10 @@ export const ProfileErrorCode = {
   NoItems: 'profile/no-items',
   /** That line of what was asked of a CV is in the profile already (D97). */
   AlreadyAdded: 'profile/already-added',
+  /** The account already holds as many practice turns as it can (D94). */
+  MaxPracticeTurns: 'profile/max-practice-turns',
+  /** The question to practise changed since the page read it: read the page again. */
+  QuestionChanged: 'profile/question-changed',
   /** The application has no job description, so nothing can be written from it. */
   NoJobDescription: 'profile/no-job-description',
   /** The resource or the item does not exist (any more). */
@@ -72,6 +76,8 @@ const EXPECTED_CODES: ReadonlySet<string> = new Set([
   ProfileErrorCode.MaxInterviews,
   ProfileErrorCode.AlreadyAdded,
   ProfileErrorCode.MaxCvVersions,
+  ProfileErrorCode.MaxPracticeTurns,
+  ProfileErrorCode.QuestionChanged,
   ProfileErrorCode.NoCvText,
   ProfileErrorCode.NoItems,
   ProfileErrorCode.NoJobDescription,

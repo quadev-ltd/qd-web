@@ -280,6 +280,70 @@ test('likely questions (D94): not written, being written, written and out of dat
   await expectAccessibleAndNotTooWide(page);
 });
 
+test('practising a question (D94 slice 2): the list with "Practise", being started, the practice, a question of your own, practised and refused: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openApplications(page);
+  await page.evaluate(() => window.qdPreview?.setFlag('textPractice', true));
+  await seedApplications(page);
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Senior Backend Engineer' })
+    .getByRole('link')
+    .click();
+  await page.getByRole('link', { name: 'Interviews' }).click();
+  await page.getByRole('link', { name: 'Technical interview' }).click();
+  const questions = page.getByRole('region', {
+    name: 'Likely questions for this interview',
+  });
+  await questions
+    .getByRole('button', { name: 'Write likely questions' })
+    .click();
+  await expect(questions).toContainText('practice calls left today');
+  await expectAccessibleAndNotTooWide(page);
+
+  // Being started, then the practice
+  const first = questions.getByRole('listitem').first();
+  await first.getByRole('button', { name: 'Practise' }).click();
+  await expect(
+    first.getByRole('button', { name: 'Writing key points…' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await expect(page.getByRole('region', { name: 'Key points' })).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await page.getByRole('button', { name: 'Remove this practice' }).click();
+  const remove = page.getByRole('dialog', { name: 'Remove this practice?' });
+  await expectInsideViewport(page, remove);
+  await expectAccessibleAndNotTooWide(page);
+  await remove.getByRole('button', { name: 'Cancel' }).click();
+
+  // Practised, with a question of your own open
+  await page
+    .getByRole('link', { name: 'Technical interview', exact: true })
+    .click();
+  await expect(first).toContainText('Practised');
+  await expectAccessibleAndNotTooWide(page);
+  await questions
+    .getByRole('button', { name: 'Practise a question of your own' })
+    .click();
+  const panel = page.getByRole('dialog', {
+    name: 'Practise a question of your own',
+  });
+  await expect(panel).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await panel.getByRole('button', { name: 'Close' }).click();
+
+  // Refused: none left today
+  await page.evaluate(() => window.qdPreviewProfile?.failNextPractice('quota'));
+  await questions
+    .getByRole('listitem')
+    .nth(1)
+    .getByRole('button', { name: 'Practise' })
+    .click();
+  await expect(questions.getByRole('alert')).toContainText('the daily limit');
+  await expectAccessibleAndNotTooWide(page);
+});
+
 test('the brief, not prepared, ready with a requirement and a question open, out of date and failed: accessible and no horizontal scroll', async ({
   page,
 }) => {
