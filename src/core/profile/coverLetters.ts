@@ -371,7 +371,25 @@ export interface CreateCoverLetterRequest {
   draft?: { text: string; mode?: CoverLetterDraftMode };
 }
 
+/** A sentence revised: edited in the candidate's words (`text` with `edit` only), removed, or restored. */
+export type ReviseCoverLetterSentenceRequest =
+  { action: 'edit'; text: string } | { action: 'remove' | 'restore' };
+
+/**
+ * "Write this letter again": `asked` is what the panel shows (empty: nothing); `draft` is "Improve
+ * my version", the candidate's text polished in place of the letter's draft.
+ */
+export interface RewriteCoverLetterRequest {
+  asked?: string;
+  draft?: string;
+}
+
 const documentId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
+
+export const AnswerCoverLetterQuestionResponseSchema = z.object({
+  letterId: documentId,
+  open: z.number().int().nonnegative(),
+});
 
 export const CoverLetterCreatingResponseSchema = z.object({
   letterId: documentId,

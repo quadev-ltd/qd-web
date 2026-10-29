@@ -193,3 +193,147 @@ test('a letter that couldn’t be written is tried again; removed; none left tod
     again.getByRole('button', { name: 'Write my letter' }),
   ).toBeDisabled();
 });
+
+/** A letter written for the job, ready on its page. */
+const writeOne = async (page: Page) => {
+  await openLetters(page);
+  const panel = await newLetter(page, 'Write a cover letter');
+  await panel
+    .getByLabel('Why this job? (recommended)')
+    .fill('Tracking parcels is the same kind of problem as matching payments.');
+  await panel.getByRole('button', { name: 'Write my letter' }).click();
+  await expect(letter(page)).toBeVisible({ timeout: 10_000 });
+};
+
+const sentencePanel = (page: Page) =>
+  page.getByRole('region', { name: 'This sentence' });
+
+test('changing a letter: a sentence edited, removed and restored; a question answered; written again from a quick change', async ({
+  page,
+}) => {
+  await writeOne(page);
+
+  // Removed: out of the text copied; restored as written
+  await letter(page)
+    .getByRole('button', { name: /^Paragraph 2:/ })
+    .first()
+    .click();
+  await sentencePanel(page)
+    .getByRole('button', { name: 'Remove this sentence' })
+    .click();
+  // At 390 the sentence is a panel over the page: closed to copy, opened again to restore.
+  const phone = test.info().project.name === 'phone';
+  if (phone) {
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+  }
+  await page.getByRole('button', { name: 'Copy the text' }).click();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).not.toContain('Mentored two junior engineers');
+  if (phone) {
+    await letter(page)
+      .getByRole('button', { name: /^Paragraph 2, removed:/ })
+      .click();
+  }
+  await sentencePanel(page)
+    .getByRole('button', { name: 'Restore this sentence' })
+    .click();
+
+  // Edited in my words
+  await sentencePanel(page)
+    .getByRole('button', { name: 'Edit', exact: true })
+    .click();
+  await sentencePanel(page)
+    .getByLabel('This sentence, in your words')
+    .fill('I mentored two engineers through their first incident review.');
+  await sentencePanel(page)
+    .getByRole('button', { name: 'Save', exact: true })
+    .click();
+  await expect(letter(page)).toContainText(
+    'I mentored two engineers through their first incident review.',
+  );
+  await expect(letter(page)).toContainText('From edited by you');
+  if (phone) {
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+  }
+
+  // A question answered
+  const questions = page.getByRole('region', { name: /^Questions/ });
+  await questions
+    .getByLabel('Your answer')
+    .fill('Priya Shah, Engineering Manager');
+  await questions.getByRole('button', { name: 'Save the answer' }).click();
+  await expect(questions).toContainText('Answered');
+
+  // Written again from a quick change: the answer and the edit come back
+  await page.getByRole('button', { name: 'Shorter', exact: true }).click();
+  const again = page.getByRole('dialog', { name: 'Write this letter again' });
+  await expect(again.getByLabel('What you asked for')).toHaveValue(
+    'Make it shorter.',
+  );
+  await again.getByRole('button', { name: 'Write again' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Writing your letter' }),
+  ).toBeVisible();
+  await expect(letter(page)).toBeVisible({ timeout: 10_000 });
+  await expect(letter(page)).toContainText('Priya Shah, Engineering Manager');
+  await expect(letter(page)).toContainText(
+    'I mentored two engineers through their first incident review.',
+  );
+  await page.getByRole('button', { name: /What we did and why/ }).click();
+  await expect(page.getByText('Followed “Make it shorter.”.')).toBeVisible();
+});
+
+test('the whole letter edited: saved as my version, restored; improved into a new letter', async ({
+  page,
+}) => {
+  await writeOne(page);
+
+  await page.getByRole('button', { name: 'Edit the whole letter' }).click();
+  await page
+    .getByLabel('Your letter')
+    .fill(
+      'I want to build parcel tracking at Northwind.\n\nI led the ledger move.',
+    );
+  await page.getByRole('button', { name: 'Save my version' }).click();
+
+  await expect(
+    page.getByRole('heading', { name: 'Your version' }),
+  ).toBeVisible();
+  await expect(page.getByText('Edited by you', { exact: true })).toBeVisible();
+  await expect(letter(page)).toContainText(
+    'I want to build parcel tracking at Northwind.',
+  );
+  await expect(
+    page.getByRole('switch', { name: 'Show where each sentence comes from' }),
+  ).toBeHidden();
+  await expect(
+    page.getByRole('heading', { name: 'Change it quickly' }),
+  ).toBeHidden();
+  await page.getByRole('button', { name: 'Copy the text' }).click();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toContain(
+    'Dear Hiring Manager,\n\nI want to build parcel tracking',
+  );
+
+  // Restored as a whole
+  await page
+    .getByRole('button', { name: 'Restore the written letter' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Your version' }),
+  ).toBeHidden();
+  await expect(letter(page)).toContainText('Dear Hiring Manager,');
+  await expect(letter(page)).not.toContainText(
+    'I want to build parcel tracking',
+  );
+
+  // Improved: my words polished into a new letter, from them as a draft
+  await page.getByRole('button', { name: 'Edit the whole letter' }).click();
+  await page
+    .getByLabel('Your letter')
+    .fill('i want to build parcel tracking. my notice is 4 weeks');
+  await page.getByRole('button', { name: 'Improve my version' }).click();
+  await expect(letter(page)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/Written from your draft on/)).toBeVisible();
+  await expect(letter(page).locator('mark')).toHaveText('4 weeks');
+});

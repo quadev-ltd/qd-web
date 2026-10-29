@@ -2,16 +2,27 @@
 // says this": each profile item as its resource says it, the candidate's own words quoted, the job
 // posting (its words when the backend found them, otherwise the way to its text in Details), and the
 // CV it goes with. A sentence that frames the letter has no facts, and one the candidate edited is
-// in their words. Editing and removing it come with the next slice (doc 15 §26.2).
+// in their words. Then Edit (in their words: no source needed), "Remove this sentence" (kept, to
+// restore), and Restore for one removed or edited.
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
 import { type LetterSourceShown } from './letterSources';
 
+import FormTextArea from '@/components/FormTextArea';
 import Icon from '@/components/Icon';
+import Spinner from '@/components/Spinner';
+import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
 import Chip from '@/components/ui/Chip';
-import { type CoverLetterSentence } from '@/core/profile/coverLetters';
+import {
+  COVER_LETTER_SENTENCE_MAX_CHARS,
+  type CoverLetterSentence,
+  type ReviseCoverLetterSentenceRequest,
+} from '@/core/profile/coverLetters';
+import { logProfileError } from '@/core/profile/errors';
+import { useSessionUser } from '@/core/session/hooks';
 import { type CvPaths } from '@/screens/Cv/useCvPaths';
 import { RESOURCE_TYPE_KEYS } from '@/screens/Profile/AddResource/resourceTypes';
 import { formatDay } from '@/screens/Profile/Resource/resourceMeta';
@@ -153,6 +164,10 @@ export interface SentencePanelProps {
   onClose: () => void;
   /** In a side panel at phone width, which has its own heading and close button. */
   bare?: boolean;
+  /** Edits it in the candidate's words, removes it, or restores what was written (slice 29). */
+  onRevise: (request: ReviseCoverLetterSentenceRequest) => Promise<void>;
+  /** A saved letter (every sentence the candidate's): nothing to restore a sentence to. */
+  saved: boolean;
 }
 
 export const SentencePanel: React.FC<SentencePanelProps> = ({
@@ -163,8 +178,116 @@ export const SentencePanel: React.FC<SentencePanelProps> = ({
   paths,
   onClose,
   bare = false,
+  onRevise,
+  saved,
 }) => {
   const { t } = useTranslation();
+  const uid = useSessionUser()?.uid;
+  const [editing, setEditing] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const length = editing?.trim().length ?? 0;
+  const tooLong = length > COVER_LETTER_SENTENCE_MAX_CHARS;
+
+  const revise = async (request: ReviseCoverLetterSentenceRequest) => {
+    setBusy(true);
+    setFailed(false);
+    try {
+      await onRevise(request);
+      setEditing(undefined);
+    } catch (error) {
+      logProfileError('reviseCoverLetterSentence', error, uid);
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const actions =
+    editing !== undefined ? (
+      <form
+        noValidate
+        onSubmit={event => {
+          event.preventDefault();
+          if (length > 0 && !tooLong) {
+            revise({ action: 'edit', text: editing.trim() });
+          }
+        }}
+        className="flex flex-col gap-3">
+        <FormTextArea
+          name="sentence"
+          rows={4}
+          label={t('letters.editSentenceField')}
+          hint={t('letters.editSentenceHint')}
+          value={editing}
+          onChange={event => setEditing(event.target.value)}
+          disabled={busy}
+          counter={{ length, max: COVER_LETTER_SENTENCE_MAX_CHARS }}
+        />
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="submit"
+            size="small"
+            disabled={busy || length === 0 || tooLong}
+            aria-busy={busy}
+            className="gap-2">
+            {busy && <Spinner size="small" decorative />}
+            {t('letters.saveSentenceButton')}
+          </Button>
+          <Button
+            variant="quiet"
+            size="small"
+            disabled={busy}
+            onClick={() => setEditing(undefined)}>
+            {t('letters.cancelButton')}
+          </Button>
+        </div>
+      </form>
+    ) : sentence.state === 'removed' ? (
+      <Button
+        variant="secondary"
+        size="small"
+        disabled={busy}
+        aria-busy={busy}
+        onClick={() => revise({ action: 'restore' })}
+        className="gap-2 self-start">
+        <Icon name="refresh" size={18} />
+        {t('letters.restoreSentenceButton')}
+      </Button>
+    ) : (
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="secondary"
+          size="small"
+          disabled={busy}
+          onClick={() => setEditing(sentence.text)}
+          className="gap-2">
+          <Icon name="edit" size={18} />
+          {t('letters.editSentenceButton')}
+        </Button>
+        <Button
+          variant="quietDanger"
+          size="small"
+          disabled={busy}
+          onClick={() => revise({ action: 'remove' })}
+          className="gap-2">
+          <Icon name="trash" size={18} />
+          {t('letters.removeSentenceButton')}
+        </Button>
+        {sentence.state === 'edited' && !saved && (
+          <Button
+            variant="quiet"
+            size="small"
+            disabled={busy}
+            onClick={() => revise({ action: 'restore' })}
+            className="gap-2">
+            <Icon name="refresh" size={18} />
+            {t('letters.restoreWrittenButton')}
+          </Button>
+        )}
+      </div>
+    );
+
   return (
     <section
       aria-label={t('letters.thisSentence')}
@@ -189,9 +312,15 @@ export const SentencePanel: React.FC<SentencePanelProps> = ({
           </Button>
         )}
       </div>
-      <p className="text-base leading-normal font-medium wrap-anywhere">
+      <p
+        className={`text-base leading-normal font-medium wrap-anywhere ${sentence.state === 'removed' ? 'text-muted line-through' : ''}`}>
         {sentence.text}
       </p>
+      {sentence.state === 'removed' && (
+        <p className="text-sm leading-normal text-muted">
+          {t('letters.removedSentence')}
+        </p>
+      )}
       <div className="flex flex-col gap-2.5">
         <p className="text-[13px] font-bold tracking-[0.04em] text-muted uppercase">
           {t('letters.whereItSaysThis')}
@@ -217,6 +346,12 @@ export const SentencePanel: React.FC<SentencePanelProps> = ({
           </ul>
         )}
       </div>
+      {actions}
+      {failed && (
+        <Banner tone="danger" role="alert">
+          {t('letters.reviseFailedMessage')}
+        </Banner>
+      )}
     </section>
   );
 };

@@ -13,6 +13,8 @@ import {
 import {
   type CoverLetter,
   type CreateCoverLetterRequest,
+  type ReviseCoverLetterSentenceRequest,
+  type RewriteCoverLetterRequest,
 } from './coverLetters';
 import {
   type CvDetails,
@@ -245,6 +247,30 @@ export interface ProfileGateway {
   removeCoverLetter(letterId: string): Promise<void>;
   /** How many letters were written for this user today (UTC), for the limit. */
   getCoverLettersToday(uid: string): Promise<number>;
+  /**
+   * "Write this letter again" from a ready letter: a new letter, written in the background, with
+   * the candidate's answers and edits; the original doesn't change. Resolves the new one's id.
+   */
+  rewriteCoverLetter(
+    letterId: string,
+    request: RewriteCoverLetterRequest,
+  ): Promise<{ letterId: string }>;
+  /** Edits one sentence of a ready letter, removes it (kept to restore), or restores it. */
+  reviseCoverLetterSentence(
+    letterId: string,
+    sentenceId: string,
+    request: ReviseCoverLetterSentenceRequest,
+  ): Promise<void>;
+  /** Answers one question, or skips it without an answer. Resolves how many are still open. */
+  answerCoverLetterQuestion(
+    letterId: string,
+    questionId: string,
+    answer?: string,
+  ): Promise<{ open: number }>;
+  /** "Save my version": the body as the candidate wrote it, in place. */
+  saveCoverLetterText(letterId: string, text: string): Promise<void>;
+  /** "Restore the written letter" after "Save my version". */
+  restoreCoverLetterText(letterId: string): Promise<void>;
 
   // ---------- Text practice (D94) ----------
 

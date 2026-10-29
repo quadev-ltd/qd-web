@@ -2,18 +2,28 @@
 // (D96), "Cover letter · {company}" with what it was written from, then by its state. Being written:
 // "Writing your letter", read again every 2 seconds. Could not be written: why, with "Try again",
 // which asks for a new letter with the same settings. Ready: "What we did and why", "What we did
-// with your draft", the letter with its sources and marks, a sentence opened beside it, and the copy
-// card. "Remove this letter" at the foot of every state.
+// with your draft", the letter with its sources and marks, a sentence opened beside it to edit,
+// remove or restore, the copy card, "Change it quickly" and the questions, and "Edit the whole
+// letter"; a saved letter shows "Your version" instead of its sources, quick changes and questions.
+// "Remove this letter" at the foot of every state.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
 
+import EditWholeLetter from './EditWholeLetter';
+import {
+  DraftCard,
+  LetterQuestionsCard,
+  QuickChangesCard,
+  YourVersionCard,
+} from './LetterChangeCards';
 import LetterCopyCard from './LetterCopyCard';
 import LetterDocument from './LetterDocument';
 import { goesWithOf, letterDay, letterSubtitle } from './letterMeta';
 import { DraftOutcomes, LetterNotes } from './LetterNotes';
 import { useLetterSources } from './letterSources';
 import RemoveLetterDialog from './RemoveLetterDialog';
+import RewriteLetterPanel, { type QuickChange } from './RewriteLetterPanel';
 import SentencePanel from './SentencePanel';
 
 import Icon from '@/components/Icon';
@@ -23,6 +33,7 @@ import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/ButtonLink';
 import Card from '@/components/ui/Card';
+import Chip from '@/components/ui/Chip';
 import SidePanel from '@/components/ui/SidePanel';
 import { useMediaQuery } from '@/components/useMediaQuery';
 import { useApplications } from '@/core/profile/ApplicationsProvider';
@@ -30,6 +41,7 @@ import {
   type CoverLetter,
   coverLetterLength,
   coverLetterText,
+  isLetterSaved,
 } from '@/core/profile/coverLetters';
 import { useCvVersions } from '@/core/profile/CvVersionsProvider';
 import {
@@ -82,8 +94,18 @@ const ReadyLetter: React.FC<{
   const { applications } = useApplications();
   const { sourcesOf, namesOf } = useLetterSources(letter);
   const wide = useMediaQuery('(min-width: 768px)');
+  const { revise } = useCoverLetters(letter.applicationId);
   const [showSources, setShowSources] = useState(true);
+  const [showDraft, setShowDraft] = useState(true);
   const [selected, setSelected] = useState<string>();
+  const [editingAll, setEditingAll] = useState(false);
+  const [again, setAgain] = useState<{
+    chosen?: QuickChange;
+    draft?: boolean;
+  }>();
+  // After "Save my version", every sentence is the candidate's: no sources, quick changes or
+  // questions (doc 22 §11.5).
+  const saved = isLetterSaved(letter);
   // Dated today, as it copies and downloads.
   const [today] = useState(() => new Date());
   const application = applications.find(
@@ -99,6 +121,7 @@ const ReadyLetter: React.FC<{
     .find(({ sentence }) => sentence);
   const panel = found?.sentence && (
     <SentencePanel
+      key={found.sentence.id}
       sentence={found.sentence}
       paragraph={found.index + 1}
       sources={sourcesOf(found.sentence)}
@@ -106,6 +129,8 @@ const ReadyLetter: React.FC<{
       paths={paths}
       onClose={() => setSelected(undefined)}
       bare={!wide}
+      saved={saved}
+      onRevise={request => revise(letter.id, found.sentence?.id ?? '', request)}
     />
   );
   const box = letter.length.kind === 'box';
@@ -113,10 +138,16 @@ const ReadyLetter: React.FC<{
     ? coverLetterLength(coverLetterText(letter, details))
     : undefined;
 
+  if (editingAll) {
+    return (
+      <EditWholeLetter letter={letter} onDone={() => setEditingAll(false)} />
+    );
+  }
+
   return (
     <>
-      <DraftOutcomes letter={letter} />
-      <LetterNotes letter={letter} />
+      {!saved && <DraftOutcomes letter={letter} />}
+      {!saved && <LetterNotes letter={letter} />}
       <div className="flex flex-wrap items-start gap-6">
         <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-2.5">
           <div className="flex flex-wrap items-center gap-2">
@@ -132,22 +163,48 @@ const ReadyLetter: React.FC<{
                 })}
               </span>
             )}
-            <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px] font-medium">
-              <input
-                type="checkbox"
-                role="switch"
-                checked={showSources}
-                onChange={event => setShowSources(event.target.checked)}
-                className="size-[18px] accent-primary"
-              />
-              {t('letters.showSources')}
-            </label>
+            {saved ? (
+              <Chip tone="brand" icon="edit">
+                {t('letters.editedChip')}
+              </Chip>
+            ) : (
+              <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px] font-medium">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={showSources}
+                  onChange={event => setShowSources(event.target.checked)}
+                  className="size-[18px] accent-primary"
+                />
+                {t('letters.showSources')}
+              </label>
+            )}
+            {letter.draft && !saved && (
+              <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px] font-medium">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={showDraft}
+                  onChange={event => setShowDraft(event.target.checked)}
+                  className="size-[18px] accent-primary"
+                />
+                {t('letters.showDraft')}
+              </label>
+            )}
+            <Button
+              variant="quiet"
+              size="small"
+              onClick={() => setEditingAll(true)}
+              className="gap-2 text-[15px]">
+              <Icon name="edit" size={18} />
+              {t('letters.editAllButton')}
+            </Button>
           </div>
           <LetterDocument
             letter={letter}
             details={details}
             date={today}
-            showSources={showSources}
+            showSources={showSources && !saved}
             sourcesOf={namesOf}
             selected={selected}
             onSelect={id => setSelected(id === selected ? undefined : id)}
@@ -157,7 +214,15 @@ const ReadyLetter: React.FC<{
           aria-label={t('letters.asideLabel')}
           className="flex min-w-0 flex-[1_1_340px] flex-col gap-3.5">
           {wide && panel}
+          {saved && <YourVersionCard letter={letter} />}
+          {!saved && showDraft && (
+            <DraftCard
+              letter={letter}
+              onChange={() => setAgain({ draft: true })}
+            />
+          )}
           <LetterCopyCard
+            saved={saved}
             letter={letter}
             details={details}
             date={today}
@@ -175,8 +240,23 @@ const ReadyLetter: React.FC<{
             })}
             onMarkSent={onMarkSent}
           />
+          {!saved && (
+            <QuickChangesCard
+              letter={letter}
+              onChoose={chosen => setAgain({ chosen })}
+            />
+          )}
+          {!saved && <LetterQuestionsCard letter={letter} />}
         </aside>
       </div>
+      {again && (
+        <RewriteLetterPanel
+          letter={letter}
+          chosen={again.chosen}
+          draft={again.draft}
+          onClose={() => setAgain(undefined)}
+        />
+      )}
       {!wide && panel && (
         <SidePanel
           title={t('letters.thisSentence')}

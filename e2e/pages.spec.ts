@@ -483,6 +483,83 @@ test('cover letters (D98): the tab, the panel in each mode, being written, the l
   await expectAccessibleAndNotTooWide(page);
 });
 
+test('changing a cover letter (D98): a sentence edited and removed, a quick change, the questions, the whole letter edited and saved, a draft beside it: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openApplications(page);
+  await page.evaluate(() => {
+    window.qdPreview?.setFlag('cvTool', true);
+    window.qdPreview?.setFlag('coverLetters', true);
+  });
+  await seedApplications(page);
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Senior Backend Engineer' })
+    .getByRole('link')
+    .click();
+  await page.getByRole('link', { name: 'CV and letter' }).click();
+  await page.getByRole('button', { name: 'Improve my draft' }).click();
+  const panel = page.getByRole('dialog', { name: 'New cover letter' });
+  await panel
+    .getByLabel('Your draft')
+    .fill('saw the role and it fits me. my notice is 4 weeks');
+  await panel.getByRole('button', { name: 'Improve my draft' }).click();
+  const letter = page.getByRole('article', { name: 'Your cover letter' });
+  await expect(letter).toBeVisible({ timeout: 10_000 });
+  // The draft beside it, and the questions
+  await expect(
+    page.getByRole('region', { name: 'Your draft', exact: true }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // A sentence edited, then removed
+  await letter
+    .getByRole('button', { name: /^Paragraph 2:/ })
+    .first()
+    .click();
+  const sentence = page.getByRole('region', { name: 'This sentence' });
+  await sentence.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expectAccessibleAndNotTooWide(page);
+  await sentence.getByRole('button', { name: 'Cancel' }).click();
+  await sentence.getByRole('button', { name: 'Remove this sentence' }).click();
+  await expect(
+    sentence.getByRole('button', { name: 'Restore this sentence' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  if (test.info().project.name === 'phone') {
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+  }
+
+  // A quick change: "Write this letter again"
+  await page.getByRole('button', { name: 'Shorter', exact: true }).click();
+  const again = page.getByRole('dialog', { name: 'Write this letter again' });
+  await expect(again).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await again.getByRole('button', { name: 'Close', exact: true }).click();
+
+  // The draft written again from the card
+  await page
+    .getByRole('region', { name: 'Your draft', exact: true })
+    .getByRole('button', { name: 'Change it and write again' })
+    .click();
+  const draftAgain = page.getByRole('dialog', {
+    name: 'Write it again from your draft',
+  });
+  await expect(draftAgain).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await draftAgain.getByRole('button', { name: 'Close', exact: true }).click();
+
+  // The whole letter edited, then saved as my version
+  await page.getByRole('button', { name: 'Edit the whole letter' }).click();
+  await expect(page.getByLabel('Your letter')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await page.getByRole('button', { name: 'Save my version' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Your version' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+});
+
 test('the brief, not prepared, ready with a requirement and a question open, out of date and failed: accessible and no horizontal scroll', async ({
   page,
 }) => {

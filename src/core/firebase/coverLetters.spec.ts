@@ -8,12 +8,17 @@ import {
 import { httpsCallable } from 'firebase/functions';
 
 import {
+  answerCoverLetterQuestion,
   createCoverLetter,
   getApplicationLetters,
   getCoverLetter,
   getCoverLettersToday,
   markCoverLetterSent,
   removeCoverLetter,
+  restoreCoverLetterText,
+  reviseCoverLetterSentence,
+  rewriteCoverLetter,
+  saveCoverLetterText,
 } from './coverLetters';
 
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
@@ -227,5 +232,107 @@ describe('asking for a letter, marking it and removing it (D98)', () => {
       'removeCoverLetter',
     );
     expect(callable).toHaveBeenLastCalledWith({ letterId: 'l1' });
+  });
+});
+
+describe('changing a letter (D98, slice 29)', () => {
+  it('writes it again with what is asked, or from the candidate’s version, and resolves the new letter', async () => {
+    callable.mockResolvedValue({
+      data: { letterId: 'l2', status: 'creating' },
+    });
+
+    await expect(
+      rewriteCoverLetter('l1', { asked: 'Make it shorter.' }),
+    ).resolves.toEqual({ letterId: 'l2' });
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'rewriteCoverLetter',
+    );
+    expect(callable).toHaveBeenLastCalledWith({
+      letterId: 'l1',
+      asked: 'Make it shorter.',
+    });
+
+    await rewriteCoverLetter('l1', { draft: 'My version.' });
+    expect(callable).toHaveBeenLastCalledWith({
+      letterId: 'l1',
+      draft: 'My version.',
+    });
+  });
+
+  it('edits, removes and restores a sentence', async () => {
+    callable.mockResolvedValue({ data: { letterId: 'l1' } });
+
+    await reviseCoverLetterSentence('l1', 's3', {
+      action: 'edit',
+      text: 'My words.',
+    });
+    expect(callable).toHaveBeenLastCalledWith({
+      letterId: 'l1',
+      sentenceId: 's3',
+      action: 'edit',
+      text: 'My words.',
+    });
+    await reviseCoverLetterSentence('l1', 's3', { action: 'remove' });
+    expect(callable).toHaveBeenLastCalledWith({
+      letterId: 'l1',
+      sentenceId: 's3',
+      action: 'remove',
+    });
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'reviseCoverLetterSentence',
+    );
+  });
+
+  it('answers a question, or skips it without an answer, and resolves how many are open', async () => {
+    callable.mockResolvedValue({ data: { letterId: 'l1', open: 1 } });
+
+    await expect(
+      answerCoverLetterQuestion('l1', 'q1', 'Priya Shah'),
+    ).resolves.toEqual({ open: 1 });
+    expect(callable).toHaveBeenLastCalledWith({
+      letterId: 'l1',
+      questionId: 'q1',
+      answer: 'Priya Shah',
+    });
+    await answerCoverLetterQuestion('l1', 'q2');
+    expect(callable).toHaveBeenLastCalledWith({
+      letterId: 'l1',
+      questionId: 'q2',
+    });
+  });
+
+  it('saves the candidate’s version, and restores the written letter', async () => {
+    callable.mockResolvedValue({ data: { letterId: 'l1' } });
+
+    await saveCoverLetterText('l1', 'One.\n\nTwo.');
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'saveCoverLetterText',
+    );
+    expect(callable).toHaveBeenLastCalledWith({
+      letterId: 'l1',
+      text: 'One.\n\nTwo.',
+    });
+    await restoreCoverLetterText('l1');
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'restoreCoverLetterText',
+    );
+    expect(callable).toHaveBeenLastCalledWith({ letterId: 'l1' });
+  });
+
+  it('turns the refusal of a restore with nothing saved into an invalid request', async () => {
+    callable.mockRejectedValue(
+      Object.assign(new Error('refused'), {
+        code: 'functions/failed-precondition',
+        details: { reason: 'not-saved' },
+      }),
+    );
+
+    await expect(restoreCoverLetterText('l1')).rejects.toEqual(
+      new ProfileError(ProfileErrorCode.Invalid),
+    );
   });
 });

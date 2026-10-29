@@ -8,6 +8,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type CoverLetter,
   type CreateCoverLetterRequest,
+  type ReviseCoverLetterSentenceRequest,
+  type RewriteCoverLetterRequest,
 } from './coverLetters';
 import { logProfileError } from './errors';
 import { RESOURCE_POLL_MS } from './InterviewProfileProvider';
@@ -118,6 +120,59 @@ export const useCoverLetters = (applicationId: string) => {
     [applicationId, dispatch, gateway],
   );
 
+  /** "Write this letter again", or "Improve my version": a new letter. Resolves its id. */
+  const rewrite = useCallback(
+    async (letterId: string, request: RewriteCoverLetterRequest) => {
+      const { letterId: written } = await gateway.rewriteCoverLetter(
+        letterId,
+        request,
+      );
+      await refresh(written).catch(() => null);
+      return written;
+    },
+    [gateway, refresh],
+  );
+
+  /** A sentence edited, removed or restored, then the letter read again. */
+  const revise = useCallback(
+    async (
+      letterId: string,
+      sentenceId: string,
+      request: ReviseCoverLetterSentenceRequest,
+    ) => {
+      await gateway.reviseCoverLetterSentence(letterId, sentenceId, request);
+      await refresh(letterId);
+    },
+    [gateway, refresh],
+  );
+
+  /** A question answered, or skipped without an answer, then the letter read again. */
+  const answer = useCallback(
+    async (letterId: string, questionId: string, words?: string) => {
+      await gateway.answerCoverLetterQuestion(letterId, questionId, words);
+      await refresh(letterId);
+    },
+    [gateway, refresh],
+  );
+
+  /** "Save my version", then the letter read again. */
+  const saveText = useCallback(
+    async (letterId: string, text: string) => {
+      await gateway.saveCoverLetterText(letterId, text);
+      await refresh(letterId);
+    },
+    [gateway, refresh],
+  );
+
+  /** "Restore the written letter", then the letter read again. */
+  const restoreText = useCallback(
+    async (letterId: string) => {
+      await gateway.restoreCoverLetterText(letterId);
+      await refresh(letterId);
+    },
+    [gateway, refresh],
+  );
+
   const status: CoverLettersStatus = known?.status ?? 'loading';
   return {
     status,
@@ -127,6 +182,11 @@ export const useCoverLetters = (applicationId: string) => {
     create,
     markSent,
     remove,
+    rewrite,
+    revise,
+    answer,
+    saveText,
+    restoreText,
   };
 };
 

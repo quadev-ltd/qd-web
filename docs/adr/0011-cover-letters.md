@@ -1,6 +1,6 @@
 # ADR 0011: Cover letters (D98)
 
-- Status: accepted. Slice 28 (writing and reading a letter) is built; slice 29 (changing one) is next
+- Status: accepted. Slice 28 (writing and reading a letter) and slice 29 (changing one) are built
 - Date: 2026-10-28
 
 ## Context
@@ -38,8 +38,25 @@ agreed with the design chat.
 - **"Try again"** after a letter couldn't be written asks for a new one with the same settings and removes
   the failed one, as for a CV.
 
+## Changing a letter (slice 29)
+
+- **Every change goes through its call and reads the letter again** (`revise`, `answer`, `saveText`,
+  `restoreText` in `useCoverLetters`). Writing it again (`rewrite`) makes a new letter, which opens; the
+  original stays in the list.
+- **A removed sentence stays in its place, struck through,** so it can be opened and restored, and its
+  button's label says it is removed; it is never in the text. A sentence edited is "Edited by you", with no
+  source and no mark.
+- **One way to ask for a change:** each "Change it quickly" chip opens "Write this letter again" with its
+  line added to what was asked, where the chips add or take out their lines. The questions' "Write again"
+  writes it with what was asked, as it was.
+- **"Edit the whole letter" holds the body only** (`coverLetterBody`): "Save my version" stores it in place;
+  "Improve my version" sends it as the new draft, up to the draft's 5,000 characters. A saved letter shows
+  "Your version" with "Improve my version" and "Restore the written letter", and no sources, quick changes
+  or questions.
+- **The draft beside it** ("Show my draft beside it", on by default) has "Change it and write again",
+  which sends the changed draft, polished.
+
 ## Consequences
 
-- Changing a letter (its sentences, its questions, writing it again, "Edit the whole letter", a saved
-  version) is slice 29, on the same store and page.
 - The phone's read-only tab is `qd-mobile`'s.
+- "Add it to my profile as a note" for a fact only the draft gives waits for a call (doc 22 §4.5).
