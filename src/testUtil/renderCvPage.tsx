@@ -4,6 +4,7 @@ import { createMockProfileGateway } from './mockProfileGateway';
 import { PROFILE_TEST_USER } from './renderProfilePage';
 import { renderWithProviders } from './renderWithProviders';
 
+import { type FlagValues } from '@/core/flags/registry';
 import { ApplicationsProvider } from '@/core/profile/ApplicationsProvider';
 import { CvVersionsProvider } from '@/core/profile/CvVersionsProvider';
 import { InterviewProfileProvider } from '@/core/profile/InterviewProfileProvider';
@@ -19,6 +20,8 @@ interface Options {
   /** The versions as already read; left out, the page reads them through the gateway. */
   cvVersions?: Partial<CvVersionsState>;
   route?: string;
+  /** More flags than the interview tools and the CV tool: cover letters (D98). */
+  flags?: FlagValues;
 }
 
 /**
@@ -34,6 +37,7 @@ export const renderCvPage = (
     applications,
     cvVersions,
     route = '/cv',
+    flags,
   }: Options = {},
 ) => ({
   gateway,
@@ -46,7 +50,7 @@ export const renderCvPage = (
     {
       route,
       profileGateway: gateway,
-      flags: { interviewAssistant: true, cvTool: true },
+      flags: { interviewAssistant: true, cvTool: true, ...flags },
       interviewProfile,
       applications,
       cvVersions,

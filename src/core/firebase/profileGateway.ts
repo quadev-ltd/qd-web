@@ -9,6 +9,14 @@ import {
   removeApplication,
   updateApplication,
 } from './applications';
+import {
+  createCoverLetter,
+  getApplicationLetters,
+  getCoverLetter,
+  getCoverLettersToday,
+  markCoverLetterSent,
+  removeCoverLetter,
+} from './coverLetters';
 import { getCvDetails, updateCvDetails } from './cvDetails';
 import {
   addCvNoteToProfile,
@@ -99,6 +107,12 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   removeInterview,
   writeInterviewQuestions,
   getInterviewQuestionsToday,
+  getApplicationLetters,
+  getCoverLetter,
+  createCoverLetter,
+  markCoverLetterSent,
+  removeCoverLetter,
+  getCoverLettersToday,
   getPracticeTurns,
   countApplicationPractice,
   removeApplicationPractice,

@@ -30,6 +30,7 @@ import {
   SKILL_MAP_ITEM_MAX_CHARS,
   type SkillMapItem,
 } from './contract';
+import { type CoverLetter, COVER_LETTERS_MAX } from './coverLetters';
 import {
   CV_DETAILS_FIELDS,
   CV_DETAILS_MAX_CHARS,
@@ -69,6 +70,7 @@ import {
   PRACTICE_TURNS_MAX,
   type PracticeTurn,
 } from './practice';
+import { previewLetterFor } from './previewCoverLetters';
 import { askedOf, followAsked, noteStatementsOf } from './previewCvAsked';
 import {
   checkedFields,
@@ -87,6 +89,7 @@ import {
 } from './previewProfileData';
 import {
   CV_VERSION_DAILY_LIMIT,
+  COVER_LETTER_DAILY_LIMIT,
   INTERVIEW_QUESTIONS_DAILY_LIMIT,
   effectiveLimits,
   PRACTICE_DAILY_LIMIT,
@@ -172,6 +175,15 @@ interface PreviewProfile {
   interviews?: Record<string, ApplicationInterview[]>;
   /** How many lists of likely questions were written today (D94). */
   interviewQuestionsToday?: number;
+  /** The cover letters (D98), the newest last. */
+  coverLetters?: CoverLetter[];
+  /** The letters being written: when each ends, and how. */
+  letterWriting?: Record<
+    string,
+    { settlesAt: number; failure?: CvVersionFailure }
+  >;
+  /** How many letters were written today. */
+  coverLettersToday?: number;
   /** The practice turns (D94), the newest last. */
   practiceTurns?: PracticeTurn[];
   /** How many practice calls were made today. */
@@ -236,6 +248,10 @@ export interface PreviewProfileControls {
   failNextQuestions(reason: 'model' | 'quota'): void;
   /** How many lists of likely questions were already written today. */
   setInterviewQuestionsToday(count: number): void;
+  /** The next cover letter cannot be written, for this reason. */
+  failNextLetter(reason: CvVersionFailure): void;
+  /** How many cover letters were already written today. */
+  setCoverLettersToday(count: number): void;
   /** The next practice cannot start: the model failed, or today's limit was reached. */
   failNextPractice(reason: 'model' | 'quota'): void;
   /** How many practice calls were already made today. */
@@ -512,6 +528,13 @@ const questionsDailyLimit = (profile: PreviewProfile) =>
     serviceOverride(profile.usageLimits, USAGE_SERVICES.interviewQuestions),
   ).maxCallsPerDay;
 
+/** The cover letters this account can have written today (D98). */
+const letterDailyLimit = (profile: PreviewProfile) =>
+  effectiveLimits(
+    COVER_LETTER_DAILY_LIMIT,
+    serviceOverride(profile.usageLimits, USAGE_SERVICES.coverLetter),
+  ).maxCallsPerDay;
+
 /** The practice calls this account can make today (D94). */
 const practiceDailyLimit = (profile: PreviewProfile) =>
   effectiveLimits(
@@ -646,6 +669,7 @@ export const createPreviewProfileGateway = ({
   let nextBriefFailure: 'model' | 'quota' | null = null;
   let nextQuestionsFailure: 'model' | 'quota' | null = null;
   let nextPracticeFailure: 'model' | 'quota' | null = null;
+  let nextLetterFailure: CvVersionFailure | null = null;
   let nextJobFailure: ProfileResourceFailure | null = null;
   let nextRereadOutcome: ProfileResourceFailure | 'changed' | null = null;
 
@@ -1161,12 +1185,49 @@ export const createPreviewProfileGateway = ({
     save();
   };
 
+  /** Ends the letters whose writing has come to an end, as the backend's trigger does. */
+  const settleLetters = (profile: PreviewProfile) => {
+    const time = now();
+    const writing = Object.entries(profile.letterWriting ?? {});
+    const ended = writing.filter(([, { settlesAt }]) => settlesAt <= time);
+    if (ended.length === 0) {
+      return;
+    }
+    for (const [letterId, { settlesAt, failure }] of ended) {
+      const letter = profile.coverLetters?.find(({ id }) => id === letterId);
+      if (!letter || letter.status !== 'creating') {
+        continue;
+      }
+      letter.updatedAt = settlesAt;
+      if (failure) {
+        letter.status = 'failed';
+        letter.failure = failure;
+        continue;
+      }
+      const application = applicationsOf(profile).find(
+        ({ id }) => id === letter.applicationId,
+      );
+      Object.assign(
+        letter,
+        previewLetterFor(letter, profile.items, application),
+      );
+      letter.status = 'ready';
+      letter.readyAt = settlesAt;
+      profile.coverLettersToday = (profile.coverLettersToday ?? 0) + 1;
+    }
+    profile.letterWriting = Object.fromEntries(
+      writing.filter(([, { settlesAt }]) => settlesAt > time),
+    );
+    save();
+  };
+
   const read = (uid: string): PreviewProfile => {
     lastReadUid = uid;
     const profile = profileOf(uid);
     settle(profile);
     settleJobs(profile);
     settleCvVersions(profile);
+    settleLetters(profile);
     return profile;
   };
 
@@ -1311,6 +1372,13 @@ export const createPreviewProfileGateway = ({
     },
     failNextPractice: reason => {
       nextPracticeFailure = reason;
+    },
+    failNextLetter: reason => {
+      nextLetterFailure = reason;
+    },
+    setCoverLettersToday: count => {
+      currentProfile().coverLettersToday = count;
+      save();
     },
     setPracticeToday: count => {
       currentProfile().practiceToday = count;
@@ -2351,9 +2419,12 @@ export const createPreviewProfileGateway = ({
       profile.applications = applicationsOf(profile).filter(
         ({ id }) => id !== applicationId,
       );
-      // Its interviews go with it, as removeJobApplication does; its practice stays (D94),
-      // unless the candidate asked for it to go too (D99).
+      // Its interviews and its letters go with it, as removeJobApplication does; its practice
+      // stays (D94), unless the candidate asked for it to go too (D99).
       delete profile.interviews?.[applicationId];
+      profile.coverLetters = profile.coverLetters?.filter(
+        letter => letter.applicationId !== applicationId,
+      );
       if (options?.removePractice) {
         profile.practiceTurns = profile.practiceTurns?.filter(
           turn => turn.applicationId !== applicationId,
@@ -2532,6 +2603,125 @@ export const createPreviewProfileGateway = ({
     getInterviewQuestionsToday: async uid =>
       read(uid).interviewQuestionsToday ?? 0,
 
+    getApplicationLetters: async (uid, applicationId) =>
+      structuredClone(
+        (read(uid).coverLetters ?? []).filter(
+          letter => letter.applicationId === applicationId,
+        ),
+      ),
+    getCoverLetter: async (uid, letterId) => {
+      const found = read(uid).coverLetters?.find(({ id }) => id === letterId);
+      return found ? structuredClone(found) : null;
+    },
+    createCoverLetter: async request => {
+      const profile = currentProfile();
+      const application = applicationOf(profile, request.applicationId);
+      if (isJobPending(application)) {
+        throw new ProfileError(ProfileErrorCode.Reading);
+      }
+      if (!application.jobDescription) {
+        throw new ProfileError(ProfileErrorCode.NoJobDescription);
+      }
+      if (request.cvVersionId !== undefined) {
+        const cv = profile.cvVersions?.find(
+          ({ id }) => id === request.cvVersionId,
+        );
+        if (
+          !cv ||
+          (cv.target.kind === 'job' &&
+            cv.target.applicationId !== application.id)
+        ) {
+          throw new ProfileError(ProfileErrorCode.NotFound);
+        }
+        if (cv.status !== 'ready') {
+          throw new ProfileError(ProfileErrorCode.CvNotReady);
+        }
+      }
+      const draft = request.draft?.text.trim();
+      if (!draft && !profile.items.some(({ hidden }) => !hidden)) {
+        throw new ProfileError(ProfileErrorCode.NoItems);
+      }
+      if ((profile.coverLetters ?? []).length >= COVER_LETTERS_MAX) {
+        throw new ProfileError(ProfileErrorCode.MaxLetters);
+      }
+      if ((profile.coverLettersToday ?? 0) >= letterDailyLimit(profile)) {
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+      }
+      const at = now();
+      const text = (value: string | undefined) => value?.trim() || undefined;
+      const letter: CoverLetter = {
+        id: newId('letter'),
+        applicationId: application.id,
+        ...(request.cvVersionId ? { cvVersionId: request.cvVersionId } : {}),
+        convention:
+          request.convention ??
+          defaultCvConvention({ kind: 'job' }, application),
+        length: request.length ?? { kind: 'page' },
+        ...(text(request.addressee)
+          ? { addressee: text(request.addressee) }
+          : {}),
+        job: {
+          ...(application.title ? { role: application.title } : {}),
+          ...(application.company ? { company: application.company } : {}),
+          ...(application.jobReference
+            ? { reference: application.jobReference }
+            : {}),
+        },
+        ...(text(request.why) ? { why: text(request.why) } : {}),
+        ...(text(request.asked) ? { asked: text(request.asked) } : {}),
+        ...(draft
+          ? { draft: { text: draft, mode: request.draft?.mode ?? 'polish' } }
+          : {}),
+        status: 'creating',
+        notes: [],
+        outcomes: [],
+        questions: [],
+        statements: [],
+        createdAt: at,
+        updatedAt: at,
+      };
+      profile.coverLetters = [...(profile.coverLetters ?? []), letter];
+      profile.letterWriting = {
+        ...profile.letterWriting,
+        [letter.id]: {
+          settlesAt: at + PREVIEW_CV_MS,
+          ...(nextLetterFailure ? { failure: nextLetterFailure } : {}),
+        },
+      };
+      nextLetterFailure = null;
+      save();
+      return { letterId: letter.id };
+    },
+    markCoverLetterSent: async (letterId, sent) => {
+      const profile = currentProfile();
+      const letter = profile.coverLetters?.find(({ id }) => id === letterId);
+      if (!letter) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      if (letter.status !== 'ready') {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      for (const other of profile.coverLetters ?? []) {
+        if (other.applicationId === letter.applicationId) {
+          delete other.sentAt;
+        }
+      }
+      if (sent) {
+        letter.sentAt = now();
+      }
+      save();
+    },
+    removeCoverLetter: async letterId => {
+      const profile = currentProfile();
+      if (!profile.coverLetters?.some(({ id }) => id === letterId)) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      profile.coverLetters = profile.coverLetters.filter(
+        ({ id }) => id !== letterId,
+      );
+      save();
+    },
+    getCoverLettersToday: async uid => read(uid).coverLettersToday ?? 0,
     getPracticeTurns: async uid =>
       structuredClone(read(uid).practiceTurns ?? []).sort(
         (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),

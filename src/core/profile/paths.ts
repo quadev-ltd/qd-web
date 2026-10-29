@@ -111,6 +111,15 @@ export const applicationCvVersionPath = (
 ) =>
   `${applicationCvPath(applicationId)}/versions/${encodeURIComponent(versionId)}`;
 
+/** A cover letter of an application (D98): under its "CV and letter" tab (D96). */
+export const APPLICATION_LETTER_PATH = `${APPLICATION_CV_PATH}/letters/:letterId`;
+
+export const applicationLetterPath = (
+  applicationId: string,
+  letterId: string,
+) =>
+  `${applicationCvPath(applicationId)}/letters/${encodeURIComponent(letterId)}`;
+
 /** Two versions compared, from an application's CV tab (D96). */
 export const APPLICATION_CV_COMPARE_PATH = `${APPLICATION_CV_PATH}/compare`;
 

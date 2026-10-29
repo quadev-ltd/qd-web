@@ -23,6 +23,12 @@ export const withStarter = (value: string, prefix: string) => {
   return kept ? `${kept}\n${prefix}` : prefix;
 };
 
+/** A starter, its words already translated. */
+export interface AskedStarter {
+  label: string;
+  prefix: string;
+}
+
 export interface AskedFieldProps {
   value: string;
   onChange: (value: string) => void;
@@ -30,6 +36,10 @@ export interface AskedFieldProps {
   carried?: string;
   onClear: () => void;
   disabled?: boolean;
+  /** The box's label, placeholder and hint, translated; a CV's by default. A letter has its own (D98). */
+  words?: { label: string; placeholder: string; hint: string };
+  /** The ways to start, translated; a CV's by default. */
+  starters?: readonly AskedStarter[];
 }
 
 export const AskedField: React.FC<AskedFieldProps> = ({
@@ -38,8 +48,16 @@ export const AskedField: React.FC<AskedFieldProps> = ({
   carried,
   onClear,
   disabled = false,
+  words,
+  starters,
 }) => {
   const { t } = useTranslation();
+  const shownStarters =
+    starters ??
+    STARTERS.map(({ label, prefix }) => ({
+      label: t(label),
+      prefix: t(prefix),
+    }));
   const box = useRef<HTMLTextAreaElement>(null);
   const length = value.trim().length;
 
@@ -74,9 +92,9 @@ export const AskedField: React.FC<AskedFieldProps> = ({
       <FormTextArea
         ref={box}
         rows={value ? 6 : 3}
-        label={t('cv.askedField')}
-        placeholder={t('cv.askedPlaceholder')}
-        hint={t('cv.askedHint')}
+        label={words?.label ?? t('cv.askedField')}
+        placeholder={words?.placeholder ?? t('cv.askedPlaceholder')}
+        hint={words?.hint ?? t('cv.askedHint')}
         value={value}
         onChange={event => onChange(event.target.value)}
         disabled={disabled}
@@ -88,15 +106,15 @@ export const AskedField: React.FC<AskedFieldProps> = ({
             {t('cv.askedStartWith')}
           </p>
           <div className="flex flex-wrap gap-2">
-            {STARTERS.map(({ label, prefix }) => (
+            {shownStarters.map(({ label, prefix }) => (
               <button
                 key={label}
                 type="button"
                 disabled={disabled}
-                onClick={() => start(t(prefix))}
+                onClick={() => start(prefix)}
                 className="flex h-11 cursor-pointer items-center gap-1.5 rounded-full border border-border-strong bg-surface px-3.5 text-[15px] leading-natural font-medium text-text hover:bg-tint disabled:cursor-not-allowed disabled:opacity-60">
                 <Icon name="plus" size={16} />
-                {t(label)}
+                {label}
               </button>
             ))}
           </div>

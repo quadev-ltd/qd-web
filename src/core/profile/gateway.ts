@@ -11,6 +11,10 @@ import {
   type SkillMapItem,
 } from './contract';
 import {
+  type CoverLetter,
+  type CreateCoverLetterRequest,
+} from './coverLetters';
+import {
   type CvDetails,
   type CvDetailsField,
   type UpdateCvDetailsRequest,
@@ -218,6 +222,29 @@ export interface ProfileGateway {
   ): Promise<{ questions: number }>;
   /** How many lists of likely questions were written for this user today (UTC), for the limit. */
   getInterviewQuestionsToday(uid: string): Promise<number>;
+
+  // ---------- Cover letters (D98) ----------
+
+  /** The letters of one application, in no order. */
+  getApplicationLetters(
+    uid: string,
+    applicationId: string,
+  ): Promise<CoverLetter[]>;
+  /** One letter; `null` when it does not exist (any more). */
+  getCoverLetter(uid: string, letterId: string): Promise<CoverLetter | null>;
+  /**
+   * Asks for a letter: stored as `creating` at once, then written by the model in the background
+   * (under a minute) and `ready` or `failed`. Resolves its id.
+   */
+  createCoverLetter(
+    request: CreateCoverLetterRequest,
+  ): Promise<{ letterId: string }>;
+  /** Marks a ready letter as the one sent with its application, or not; one per application. */
+  markCoverLetterSent(letterId: string, sent: boolean): Promise<void>;
+  /** Removes a letter, in any state. */
+  removeCoverLetter(letterId: string): Promise<void>;
+  /** How many letters were written for this user today (UTC), for the limit. */
+  getCoverLettersToday(uid: string): Promise<number>;
 
   // ---------- Text practice (D94) ----------
 

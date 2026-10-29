@@ -55,6 +55,8 @@ describe('selectProfileGateway', () => {
       failNextQuestions: expect.any(Function),
       setInterviewQuestionsToday: expect.any(Function),
       failNextPractice: expect.any(Function),
+      failNextLetter: expect.any(Function),
+      setCoverLettersToday: expect.any(Function),
       setPracticeToday: expect.any(Function),
       createEditVersion: expect.any(Function),
       setUsageLimits: expect.any(Function),

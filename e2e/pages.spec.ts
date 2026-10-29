@@ -406,6 +406,83 @@ test('Sessions and removing kept practice (D99): the remove dialog with its box,
   await expectAccessibleAndNotTooWide(page);
 });
 
+test('cover letters (D98): the tab, the panel in each mode, being written, the letter with a sentence open, a form’s box, failed and the remove dialog: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openApplications(page);
+  await page.evaluate(() => {
+    window.qdPreview?.setFlag('cvTool', true);
+    window.qdPreview?.setFlag('coverLetters', true);
+  });
+  await seedApplications(page);
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Senior Backend Engineer' })
+    .getByRole('link')
+    .click();
+  await page.getByRole('link', { name: 'CV and letter' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Cover letter', exact: true }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // The panel: written for me, from a draft, for a form's box
+  await page.getByRole('button', { name: 'Write a cover letter' }).click();
+  const panel = page.getByRole('dialog', { name: 'New cover letter' });
+  await expect(panel).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await panel.getByText('Improve my draft', { exact: true }).click();
+  await expect(panel.getByLabel('Your draft')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await panel
+    .getByLabel('Your draft')
+    .fill('saw the role. my notice is 4 weeks');
+  await panel.getByText('A form’s box', { exact: true }).click();
+  await expect(panel.getByLabel('Most characters the box takes')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // Being written, then the letter, a sentence open
+  await panel.getByRole('button', { name: 'Improve my draft' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Writing your letter' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  const letter = page.getByRole('article', { name: 'Your cover letter' });
+  await expect(letter).toBeVisible({ timeout: 10_000 });
+  await expectAccessibleAndNotTooWide(page);
+  await letter.getByRole('button').first().click();
+  await expect(page.getByText('Where it says this')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  if (test.info().project.name === 'phone') {
+    await page.getByRole('button', { name: 'Close' }).click();
+  }
+  await page.getByRole('button', { name: 'Remove this letter' }).click();
+  const remove = page.getByRole('dialog', { name: 'Remove this letter?' });
+  await expectInsideViewport(page, remove);
+  await expectAccessibleAndNotTooWide(page);
+  await remove.getByRole('button', { name: 'Cancel' }).click();
+
+  // A one-page letter, and one that couldn't be written
+  await page.getByRole('link', { name: /CV and letter$/ }).click();
+  await page.evaluate(() => window.qdPreviewProfile?.failNextLetter('model'));
+  await page.getByRole('button', { name: 'Write a cover letter' }).click();
+  await panel.getByRole('button', { name: 'Write my letter' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'We couldn’t write this letter' }),
+  ).toBeVisible({ timeout: 10_000 });
+  await expectAccessibleAndNotTooWide(page);
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect(letter).toBeVisible({ timeout: 10_000 });
+  await expectAccessibleAndNotTooWide(page);
+
+  // The tab with its letters
+  await page.getByRole('link', { name: /CV and letter$/ }).click();
+  await expect(
+    page.getByRole('region', { name: 'Letters for this job' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+});
+
 test('the brief, not prepared, ready with a requirement and a question open, out of date and failed: accessible and no horizontal scroll', async ({
   page,
 }) => {
