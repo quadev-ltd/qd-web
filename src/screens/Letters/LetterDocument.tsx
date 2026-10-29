@@ -106,10 +106,10 @@ export const LetterDocument: React.FC<LetterDocumentProps> = ({
       ? letterHeading(letter, details, date)
       : undefined;
   const name = details?.name?.replaceAll(/\s+/g, ' ').trim();
+  // A removed sentence stays in its place, struck through, so it can be opened and restored; it is
+  // never in the text.
   const paragraphs = (letter.paragraphs ?? [])
-    .map(({ sentences }) =>
-      sentences.filter(({ state }) => state !== 'removed'),
-    )
+    .map(({ sentences }) => sentences)
     .filter(sentences => sentences.length > 0);
 
   return (
@@ -141,10 +141,14 @@ export const LetterDocument: React.FC<LetterDocumentProps> = ({
       )}
       <p>{coverLetterGreeting(letter.addressee)}</p>
       {paragraphs.map((sentences, index) => {
-        const sources = sourcesOf(sentences);
-        const marked = sentences.flatMap(sentence =>
-          marksOf(sentence).map(mark => ({ sentence, mark })),
+        const sources = sourcesOf(
+          sentences.filter(({ state }) => state !== 'removed'),
         );
+        const marked = sentences
+          .filter(({ state }) => state !== 'removed')
+          .flatMap(sentence =>
+            marksOf(sentence).map(mark => ({ sentence, mark })),
+          );
         return (
           <div key={sentences[0].id} className="flex flex-col gap-1">
             <p className="wrap-anywhere">
@@ -154,19 +158,24 @@ export const LetterDocument: React.FC<LetterDocumentProps> = ({
                   <button
                     type="button"
                     aria-pressed={selected === sentence.id}
-                    aria-label={t('letters.sentenceLabel', {
-                      paragraph: index + 1,
-                      text: sentence.text,
-                    })}
+                    // The label is what a screen reader says: a removed sentence says so.
+                    aria-label={t(
+                      sentence.state === 'removed'
+                        ? 'letters.sentenceLabelRemoved'
+                        : 'letters.sentenceLabel',
+                      { paragraph: index + 1, text: sentence.text },
+                    )}
                     onClick={() => onSelect(sentence.id)}
-                    className={`inline cursor-pointer rounded-[6px] border-0 bg-transparent p-0 text-left font-[inherit] leading-[inherit] text-inherit hover:bg-tint ${
+                    className={`inline cursor-pointer rounded-[6px] border-0 bg-transparent p-0 text-left font-[inherit] leading-[inherit] hover:bg-tint ${
                       selected === sentence.id
                         ? 'bg-tint outline-2 outline-offset-1 outline-primary'
                         : ''
-                    }`}>
+                    } ${sentence.state === 'removed' ? 'text-muted line-through' : 'text-inherit'}`}>
                     <MarkedText
                       text={sentence.text}
-                      marks={marksOf(sentence)}
+                      marks={
+                        sentence.state === 'removed' ? [] : marksOf(sentence)
+                      }
                     />
                   </button>
                 </span>

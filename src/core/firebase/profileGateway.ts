@@ -10,12 +10,17 @@ import {
   updateApplication,
 } from './applications';
 import {
+  answerCoverLetterQuestion,
   createCoverLetter,
   getApplicationLetters,
   getCoverLetter,
   getCoverLettersToday,
   markCoverLetterSent,
   removeCoverLetter,
+  restoreCoverLetterText,
+  reviseCoverLetterSentence,
+  rewriteCoverLetter,
+  saveCoverLetterText,
 } from './coverLetters';
 import { getCvDetails, updateCvDetails } from './cvDetails';
 import {
@@ -113,6 +118,11 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   markCoverLetterSent,
   removeCoverLetter,
   getCoverLettersToday,
+  rewriteCoverLetter,
+  reviseCoverLetterSentence,
+  answerCoverLetterQuestion,
+  saveCoverLetterText,
+  restoreCoverLetterText,
   getPracticeTurns,
   countApplicationPractice,
   removeApplicationPractice,

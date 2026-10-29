@@ -30,7 +30,13 @@ import {
   SKILL_MAP_ITEM_MAX_CHARS,
   type SkillMapItem,
 } from './contract';
-import { type CoverLetter, COVER_LETTERS_MAX } from './coverLetters';
+import {
+  type CoverLetter,
+  type CoverLetterParagraph,
+  type CoverLetterStatement,
+  COVER_LETTERS_MAX,
+  isLetterSaved,
+} from './coverLetters';
 import {
   CV_DETAILS_FIELDS,
   CV_DETAILS_MAX_CHARS,
@@ -184,6 +190,8 @@ interface PreviewProfile {
   >;
   /** How many letters were written today. */
   coverLettersToday?: number;
+  /** What a letter written again carries from the one before: answers and edited sentences. */
+  letterRewrites?: Record<string, CoverLetterStatement[]>;
   /** The practice turns (D94), the newest last. */
   practiceTurns?: PracticeTurn[];
   /** How many practice calls were made today. */
@@ -670,6 +678,18 @@ export const createPreviewProfileGateway = ({
   let nextQuestionsFailure: 'model' | 'quota' | null = null;
   let nextPracticeFailure: 'model' | 'quota' | null = null;
   let nextLetterFailure: CvVersionFailure | null = null;
+
+  /** A letter that can change: there, and written (`not-ready` otherwise, read as Invalid). */
+  const readyLetter = (profile: PreviewProfile, letterId: string) => {
+    const letter = profile.coverLetters?.find(({ id }) => id === letterId);
+    if (!letter) {
+      throw new ProfileError(ProfileErrorCode.NotFound);
+    }
+    if (letter.status !== 'ready') {
+      throw new ProfileError(ProfileErrorCode.Invalid);
+    }
+    return letter;
+  };
   let nextJobFailure: ProfileResourceFailure | null = null;
   let nextRereadOutcome: ProfileResourceFailure | 'changed' | null = null;
 
@@ -1211,6 +1231,28 @@ export const createPreviewProfileGateway = ({
         letter,
         previewLetterFor(letter, profile.items, application),
       );
+      // Written again: the answers and the edited sentences come back, each citing itself.
+      const carried = profile.letterRewrites?.[letterId] ?? [];
+      if (carried.length > 0) {
+        const paragraphs = letter.paragraphs ?? [];
+        letter.statements = [...letter.statements, ...carried];
+        letter.paragraphs = [
+          ...paragraphs.slice(0, -1),
+          {
+            sentences: carried.map((statement, index) => ({
+              id: `s${100 + index}`,
+              text: statement.text,
+              kind: 'fact' as const,
+              sources: [{ kind: 'statement' as const, id: statement.id }],
+              state: 'written' as const,
+              proposed: statement.text,
+            })),
+          },
+          ...paragraphs.slice(-1),
+        ];
+        const { [letterId]: _done, ...rest } = profile.letterRewrites ?? {};
+        profile.letterRewrites = rest;
+      }
       letter.status = 'ready';
       letter.readyAt = settlesAt;
       profile.coverLettersToday = (profile.coverLettersToday ?? 0) + 1;
@@ -2722,6 +2764,169 @@ export const createPreviewProfileGateway = ({
       save();
     },
     getCoverLettersToday: async uid => read(uid).coverLettersToday ?? 0,
+    rewriteCoverLetter: async (letterId, request) => {
+      const profile = currentProfile();
+      const from = readyLetter(profile, letterId);
+      if ((profile.coverLetters ?? []).length >= COVER_LETTERS_MAX) {
+        throw new ProfileError(ProfileErrorCode.MaxLetters);
+      }
+      if ((profile.coverLettersToday ?? 0) >= letterDailyLimit(profile)) {
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+      }
+      const at = now();
+      const asked = request.asked?.trim();
+      const draft = request.draft?.trim();
+      const {
+        asked: _asked,
+        paragraphs: _paragraphs,
+        writtenParagraphs: _written,
+        sentAt: _sent,
+        readyAt: _ready,
+        savedAt: _saved,
+        ...kept
+      } = structuredClone(from);
+      const letter: CoverLetter = {
+        ...kept,
+        id: newId('letter'),
+        ...(asked ? { asked } : {}),
+        ...(draft ? { draft: { text: draft, mode: 'polish' as const } } : {}),
+        status: 'creating',
+        notes: [],
+        outcomes: [],
+        questions: [],
+        statements: [],
+        rewrittenFrom: letterId,
+        createdAt: at,
+        updatedAt: at,
+      };
+      // The answers and, unless the candidate's version is the draft, their edited sentences.
+      const answers = from.questions.flatMap(question =>
+        question.status === 'answered' && question.answer
+          ? [{ question: question.text, text: question.answer }]
+          : [],
+      );
+      const edits = draft
+        ? []
+        : (from.paragraphs ?? [])
+            .flatMap(({ sentences }) => sentences)
+            .filter(({ state }) => state === 'edited')
+            .map(({ text }) => ({ text }));
+      profile.letterRewrites = {
+        ...profile.letterRewrites,
+        [letter.id]: [
+          ...answers.map((answer, index) => ({
+            id: `A${index + 1}`,
+            kind: 'answer' as const,
+            ...answer,
+          })),
+          ...edits.map((edit, index) => ({
+            id: `A${answers.length + index + 1}`,
+            kind: 'edit' as const,
+            ...edit,
+          })),
+        ],
+      };
+      profile.coverLetters = [...(profile.coverLetters ?? []), letter];
+      profile.letterWriting = {
+        ...profile.letterWriting,
+        [letter.id]: {
+          settlesAt: at + PREVIEW_CV_MS,
+          ...(nextLetterFailure ? { failure: nextLetterFailure } : {}),
+        },
+      };
+      nextLetterFailure = null;
+      save();
+      return { letterId: letter.id };
+    },
+    reviseCoverLetterSentence: async (letterId, sentenceId, request) => {
+      const profile = currentProfile();
+      const letter = readyLetter(profile, letterId);
+      const sentence = (letter.paragraphs ?? [])
+        .flatMap(({ sentences }) => sentences)
+        .find(({ id }) => id === sentenceId);
+      if (!sentence) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      if (request.action === 'edit') {
+        sentence.text = request.text.trim();
+        sentence.state = 'edited';
+        delete sentence.draftOnly;
+      } else if (request.action === 'remove') {
+        sentence.state = 'removed';
+      } else {
+        // A saved letter's sentence restores to its own text, still the candidate's.
+        sentence.text = sentence.proposed;
+        sentence.state = isLetterSaved(letter) ? 'edited' : 'written';
+        if (sentence.proposedDraftOnly && !isLetterSaved(letter)) {
+          sentence.draftOnly = sentence.proposedDraftOnly;
+        }
+      }
+      letter.updatedAt = now();
+      save();
+    },
+    answerCoverLetterQuestion: async (letterId, questionId, answer) => {
+      const profile = currentProfile();
+      const letter = readyLetter(profile, letterId);
+      const question = letter.questions.find(({ id }) => id === questionId);
+      if (!question) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      const words = answer?.trim();
+      question.status = words ? 'answered' : 'skipped';
+      if (words) {
+        question.answer = words;
+      } else {
+        delete question.answer;
+      }
+      save();
+      return {
+        open: letter.questions.filter(({ status }) => status === 'open').length,
+      };
+    },
+    saveCoverLetterText: async (letterId, text) => {
+      const profile = currentProfile();
+      const letter = readyLetter(profile, letterId);
+      letter.writtenParagraphs ??= structuredClone(letter.paragraphs ?? []);
+      let next = 0;
+      // Paragraphs by a blank line, sentences after . ! ?, a line break inside one a space.
+      letter.paragraphs = text
+        .trim()
+        .split(/\n\s*\n/)
+        .map(paragraph => paragraph.replaceAll(/\s*\n\s*/g, ' ').trim())
+        .filter(Boolean)
+        .map((paragraph): CoverLetterParagraph => ({
+          sentences: paragraph
+            .split(/(?<=[.!?])\s+/)
+            .filter(Boolean)
+            .map(sentence => {
+              next += 1;
+              return {
+                id: `s${next}`,
+                text: sentence,
+                kind: 'fact' as const,
+                sources: [],
+                state: 'edited' as const,
+                proposed: sentence,
+              };
+            }),
+        }));
+      letter.savedAt = now();
+      letter.updatedAt = letter.savedAt;
+      save();
+    },
+    restoreCoverLetterText: async letterId => {
+      const profile = currentProfile();
+      const letter = readyLetter(profile, letterId);
+      if (!letter.writtenParagraphs) {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      letter.paragraphs = letter.writtenParagraphs;
+      delete letter.writtenParagraphs;
+      delete letter.savedAt;
+      letter.updatedAt = now();
+      save();
+    },
+
     getPracticeTurns: async uid =>
       structuredClone(read(uid).practiceTurns ?? []).sort(
         (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),

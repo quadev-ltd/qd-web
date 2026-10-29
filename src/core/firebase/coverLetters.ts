@@ -24,9 +24,17 @@ import {
   coverLettersPath,
   CREATE_COVER_LETTER,
   type CreateCoverLetterRequest,
+  ANSWER_COVER_LETTER_QUESTION,
+  AnswerCoverLetterQuestionResponseSchema,
   MARK_COVER_LETTER_SENT,
   MarkCoverLetterSentResponseSchema,
   REMOVE_COVER_LETTER,
+  RESTORE_COVER_LETTER_TEXT,
+  REVISE_COVER_LETTER_SENTENCE,
+  type ReviseCoverLetterSentenceRequest,
+  REWRITE_COVER_LETTER,
+  type RewriteCoverLetterRequest,
+  SAVE_COVER_LETTER_TEXT,
 } from '@/core/profile/coverLetters';
 import { USAGE_SERVICES } from '@/core/profile/usageLimits';
 
@@ -114,6 +122,69 @@ export const markCoverLetterSent = async (
 
 export const removeCoverLetter = async (letterId: string): Promise<void> => {
   await call(REMOVE_COVER_LETTER, CoverLetterResponseSchema, { letterId });
+};
+
+/**
+ * "Write this letter again": a new letter written in the background from a ready one, with what is
+ * asked now, or from the candidate's own version ("Improve my version"). Resolves the new one's id.
+ */
+export const rewriteCoverLetter = async (
+  letterId: string,
+  request: RewriteCoverLetterRequest,
+): Promise<{ letterId: string }> => {
+  const { letterId: written } = await call(
+    REWRITE_COVER_LETTER,
+    CoverLetterCreatingResponseSchema,
+    { letterId, ...request },
+  );
+  return { letterId: written };
+};
+
+/** Edits one sentence in the candidate's words, removes it, or restores what was written. */
+export const reviseCoverLetterSentence = async (
+  letterId: string,
+  sentenceId: string,
+  request: ReviseCoverLetterSentenceRequest,
+): Promise<void> => {
+  await call(REVISE_COVER_LETTER_SENTENCE, CoverLetterResponseSchema, {
+    letterId,
+    sentenceId,
+    ...request,
+  });
+};
+
+/** Answers a question in the candidate's words, or skips it (no answer). Resolves how many are open. */
+export const answerCoverLetterQuestion = async (
+  letterId: string,
+  questionId: string,
+  answer?: string,
+): Promise<{ open: number }> => {
+  const { open } = await call(
+    ANSWER_COVER_LETTER_QUESTION,
+    AnswerCoverLetterQuestionResponseSchema,
+    { letterId, questionId, ...(answer ? { answer } : {}) },
+  );
+  return { open };
+};
+
+/** "Save my version": the body as the candidate wrote it, every sentence theirs. No model call. */
+export const saveCoverLetterText = async (
+  letterId: string,
+  text: string,
+): Promise<void> => {
+  await call(SAVE_COVER_LETTER_TEXT, CoverLetterResponseSchema, {
+    letterId,
+    text,
+  });
+};
+
+/** "Restore the written letter": the letter as it was before it was first saved. */
+export const restoreCoverLetterText = async (
+  letterId: string,
+): Promise<void> => {
+  await call(RESTORE_COVER_LETTER_TEXT, CoverLetterResponseSchema, {
+    letterId,
+  });
 };
 
 /** How many letters the backend wrote for this user today (UTC). */

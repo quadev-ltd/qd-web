@@ -2601,4 +2601,114 @@ describe('previewProfileGateway, cover letters (D98)', () => {
     await gateway.removeApplication(applicationId);
     await expect(gateway.getCoverLetter(UID, two.letterId)).resolves.toBeNull();
   });
+
+  it('changes a ready letter: a sentence edited, removed and restored, a question answered', async () => {
+    const { gateway, applicationId, pass } = await withJob();
+    const { letterId } = await gateway.createCoverLetter({ applicationId });
+    pass(PREVIEW_CV_MS);
+    const written = await gateway.getCoverLetter(UID, letterId);
+    const [first] = written?.paragraphs?.[0].sentences ?? [];
+
+    await gateway.reviseCoverLetterSentence(letterId, first.id, {
+      action: 'edit',
+      text: '  My words.  ',
+    });
+    let letter = await gateway.getCoverLetter(UID, letterId);
+    expect(letter?.paragraphs?.[0].sentences[0]).toMatchObject({
+      text: 'My words.',
+      state: 'edited',
+    });
+    await gateway.reviseCoverLetterSentence(letterId, first.id, {
+      action: 'remove',
+    });
+    await gateway.reviseCoverLetterSentence(letterId, first.id, {
+      action: 'restore',
+    });
+    letter = await gateway.getCoverLetter(UID, letterId);
+    expect(letter?.paragraphs?.[0].sentences[0]).toMatchObject({
+      text: first.text,
+      state: 'written',
+    });
+
+    await expect(
+      gateway.answerCoverLetterQuestion(letterId, 'q1', 'Priya Shah'),
+    ).resolves.toEqual({ open: 0 });
+    letter = await gateway.getCoverLetter(UID, letterId);
+    expect(letter?.questions[0]).toMatchObject({
+      status: 'answered',
+      answer: 'Priya Shah',
+    });
+  });
+
+  it('writes it again with what is asked, carrying the answers and the edited sentences', async () => {
+    const { gateway, applicationId, pass } = await withJob();
+    const { letterId } = await gateway.createCoverLetter({ applicationId });
+    pass(PREVIEW_CV_MS);
+    const written = await gateway.getCoverLetter(UID, letterId);
+    const [first] = written?.paragraphs?.[0].sentences ?? [];
+    await gateway.reviseCoverLetterSentence(letterId, first.id, {
+      action: 'edit',
+      text: 'I want this role.',
+    });
+    await gateway.answerCoverLetterQuestion(letterId, 'q1', 'Priya Shah');
+
+    const again = await gateway.rewriteCoverLetter(letterId, {
+      asked: 'Make it shorter.',
+    });
+    pass(PREVIEW_CV_MS);
+
+    const letter = await gateway.getCoverLetter(UID, again.letterId);
+    expect(letter).toMatchObject({
+      status: 'ready',
+      asked: 'Make it shorter.',
+      rewrittenFrom: letterId,
+    });
+    expect(letter?.statements.filter(({ id }) => id.startsWith('A'))).toEqual([
+      {
+        id: 'A1',
+        kind: 'answer',
+        question: 'Do you know who will read it?',
+        text: 'Priya Shah',
+      },
+      { id: 'A2', kind: 'edit', text: 'I want this role.' },
+    ]);
+    // The original doesn't change.
+    const original = await gateway.getCoverLetter(UID, letterId);
+    expect(original?.status).toBe('ready');
+    expect(original?.asked).toBeUndefined();
+  });
+
+  it('saves the candidate’s version in place, and restores the written letter', async () => {
+    const { gateway, applicationId, pass } = await withJob();
+    const { letterId } = await gateway.createCoverLetter({ applicationId });
+    pass(PREVIEW_CV_MS);
+    const written = await gateway.getCoverLetter(UID, letterId);
+    await expect(
+      codeOf(gateway.restoreCoverLetterText(letterId)),
+    ).resolves.toBe(ProfileErrorCode.Invalid);
+
+    await gateway.saveCoverLetterText(
+      letterId,
+      'I want this role. Truly!\n\nI led the\nledger move.',
+    );
+
+    const saved = await gateway.getCoverLetter(UID, letterId);
+    expect(
+      saved?.paragraphs?.map(({ sentences }) =>
+        sentences.map(({ text, state, sources }) => [text, state, sources]),
+      ),
+    ).toEqual([
+      [
+        ['I want this role.', 'edited', []],
+        ['Truly!', 'edited', []],
+      ],
+      [['I led the ledger move.', 'edited', []]],
+    ]);
+    expect(saved?.writtenParagraphs).toEqual(written?.paragraphs);
+
+    await gateway.restoreCoverLetterText(letterId);
+    const restored = await gateway.getCoverLetter(UID, letterId);
+    expect(restored?.paragraphs).toEqual(written?.paragraphs);
+    expect(restored?.writtenParagraphs).toBeUndefined();
+  });
 });

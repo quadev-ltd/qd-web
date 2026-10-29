@@ -9,6 +9,7 @@ import {
   coverLetterLength,
   coverLetterText,
   coverLetterWords,
+  isLetterSaved,
 } from '@/core/profile/coverLetters';
 import { type CvVersion } from '@/core/profile/cvVersions';
 import { formatDay } from '@/screens/Profile/Resource/resourceMeta';
@@ -106,13 +107,15 @@ export const letterSubtitle = (
       : letter.draft
         ? t('letters.writtenFromDraftOn', { date: letterDay(letter) })
         : t('letters.writtenForJobOn', { date: letterDay(letter) }),
-    letter.draft
-      ? t(
-          letter.draft.mode === 'rewrite'
-            ? 'letters.draftRewritten'
-            : 'letters.draftPolished',
-        )
-      : null,
+    isLetterSaved(letter)
+      ? t('letters.yourVersionMeta')
+      : letter.draft
+        ? t(
+            letter.draft.mode === 'rewrite'
+              ? 'letters.draftRewritten'
+              : 'letters.draftPolished',
+          )
+        : null,
     lengthText(t, letter.length),
     goesWithText(t, letter, versions, true),
   ]

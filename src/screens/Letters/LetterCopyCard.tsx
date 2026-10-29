@@ -69,6 +69,8 @@ export interface LetterCopyCardProps {
   /** What the file is called, without its extension. */
   fileTitle: string;
   onMarkSent: (sent: boolean) => Promise<void>;
+  /** The candidate's own version: it copies as it is, with no sources to turn off. */
+  saved?: boolean;
 }
 
 export const LetterCopyCard: React.FC<LetterCopyCardProps> = ({
@@ -78,6 +80,7 @@ export const LetterCopyCard: React.FC<LetterCopyCardProps> = ({
   cvDay,
   fileTitle,
   onMarkSent,
+  saved = false,
 }) => {
   const { t } = useTranslation();
   const uid = useSessionUser()?.uid;
@@ -151,7 +154,11 @@ export const LetterCopyCard: React.FC<LetterCopyCardProps> = ({
         </div>
       </div>
       <p className="text-sm leading-normal text-muted">
-        {box ? t('letters.copyBoxText') : t('letters.copyText')}
+        {box
+          ? t('letters.copyBoxText')
+          : saved
+            ? t('letters.copySavedText')
+            : t('letters.copyText')}
       </p>
       <div className="flex flex-wrap items-start gap-2.5">
         <Button onClick={copy} className="gap-2" aria-live="polite">
