@@ -43,8 +43,9 @@ agreed with the design chat.
 - **Every change goes through its call and reads the letter again** (`revise`, `answer`, `saveText`,
   `restoreText` in `useCoverLetters`). Writing it again (`rewrite`) makes a new letter, which opens; the
   original stays in the list.
-- **A removed sentence stays in its place, struck through,** so it can be opened and restored, and its
-  button's label says it is removed; it is never in the text. A sentence edited is "Edited by you", with no
+- **A removed sentence stays in its place, struck through, while sources are shown,** so it can be opened
+  and restored, and its button's label says it is removed. With sources off the letter reads as it copies
+  and downloads, so a removed sentence is hidden (doc 22 §11.7). It is never in the text. A sentence edited is "Edited by you", with no
   source and no mark.
 - **One way to ask for a change:** each "Change it quickly" chip opens "Write this letter again" with its
   line added to what was asked, where the chips add or take out their lines. The questions' "Write again"
