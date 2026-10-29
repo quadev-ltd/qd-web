@@ -144,6 +144,16 @@ describe('changing a letter (D98, slice 29)', () => {
       's2',
       { action: 'restore' },
     );
+
+    // Sources off: the letter reads as it copies, without it
+    await user.click(
+      screen.getByRole('switch', { name: 'letters.showSources' }),
+    );
+    expect(
+      within(
+        screen.getByRole('article', { name: 'letters.documentLabel' }),
+      ).queryByRole('button', { name: 'letters.sentenceLabelRemoved' }),
+    ).not.toBeInTheDocument();
   });
 
   it('answers a question, skips one, and writes the letter again with the answers', async () => {

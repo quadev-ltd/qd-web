@@ -106,10 +106,15 @@ export const LetterDocument: React.FC<LetterDocumentProps> = ({
       ? letterHeading(letter, details, date)
       : undefined;
   const name = details?.name?.replaceAll(/\s+/g, ' ').trim();
-  // A removed sentence stays in its place, struck through, so it can be opened and restored; it is
-  // never in the text.
+  // A removed sentence is never in the text. With sources shown it stays in its place, struck
+  // through, so it can be opened and restored; with them off the letter reads as it copies and
+  // downloads, so it goes (doc 22 §11.7).
   const paragraphs = (letter.paragraphs ?? [])
-    .map(({ sentences }) => sentences)
+    .map(({ sentences }) =>
+      showSources
+        ? sentences
+        : sentences.filter(({ state }) => state !== 'removed'),
+    )
     .filter(sentences => sentences.length > 0);
 
   return (
