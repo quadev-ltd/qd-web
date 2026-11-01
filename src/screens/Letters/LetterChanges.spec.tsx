@@ -335,12 +335,45 @@ describe('changing a letter (D98, slice 29)', () => {
       name: 'letters.draftField',
     });
     await user.type(box, ' and it fits me.');
+    // "How much to change" starts as the letter was written, polished here
+    expect(
+      within(panel).getByRole('radio', { name: /letters.modePolish/ }),
+    ).toBeChecked();
     await user.click(
       within(panel).getByRole('button', { name: 'letters.writeAgainButton' }),
     );
 
     expect(gateway.rewriteCoverLetter).toHaveBeenCalledWith('letter-1', {
       draft: 'hi, saw the role and it fits me.',
+      draftMode: 'polish',
+    });
+  });
+
+  it('writes a draft rewritten from its points again the same way, unless changed', async () => {
+    const user = userEvent.setup();
+    const { gateway } = setUp(
+      coverLetterFixture({
+        draft: { text: 'hi, saw the role', mode: 'rewrite' },
+      }),
+    );
+
+    await user.click(
+      within(
+        await screen.findByRole('region', { name: 'letters.draftTitle' }),
+      ).getByRole('button', { name: 'letters.changeDraftButton' }),
+    );
+    const panel = screen.getByRole('dialog', {
+      name: 'letters.draftAgainTitle',
+    });
+    expect(
+      within(panel).getByRole('radio', { name: /letters.modeRewrite/ }),
+    ).toBeChecked();
+    await user.click(
+      within(panel).getByRole('button', { name: 'letters.writeAgainButton' }),
+    );
+    expect(gateway.rewriteCoverLetter).toHaveBeenLastCalledWith('letter-1', {
+      draft: 'hi, saw the role',
+      draftMode: 'rewrite',
     });
   });
 });

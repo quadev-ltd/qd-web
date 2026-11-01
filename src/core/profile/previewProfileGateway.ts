@@ -2789,7 +2789,9 @@ export const createPreviewProfileGateway = ({
         ...kept,
         id: newId('letter'),
         ...(asked ? { asked } : {}),
-        ...(draft ? { draft: { text: draft, mode: 'polish' as const } } : {}),
+        ...(draft
+          ? { draft: { text: draft, mode: request.draftMode ?? 'polish' } }
+          : {}),
         status: 'creating',
         notes: [],
         outcomes: [],

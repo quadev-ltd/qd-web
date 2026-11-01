@@ -85,8 +85,20 @@ test('a letter written by the backend’s fake: read back with its sources, copi
   await expect(
     page.getByRole('region', { name: 'This sentence' }),
   ).toContainText('Parcels are the same problem as payments.');
+
+  // The posting's own words, kept by the backend as a passage of the job's text (#61)
+  await letter(page)
+    .getByRole('button', { name: /fake-job/ })
+    .click();
+  const job = page.getByRole('region', { name: 'This sentence' });
+  await expect(job).toContainText('The job posting');
+  await expect(job.getByRole('blockquote')).toHaveText(
+    'Northwind Logistics moves two million parcels a day.',
+  );
+  await expect(job).not.toContainText('Open Details');
+  await expect(letter(page)).toContainText('· the job posting');
   if (test.info().project.name === 'phone') {
-    await page.getByRole('button', { name: 'Close' }).click();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
   }
 
   await page.getByRole('button', { name: 'Copy the text' }).click();
@@ -113,7 +125,7 @@ test('a letter written by the backend’s fake: read back with its sources, copi
   await expect(page.getByText('9 of 10 left today')).toBeHidden();
 });
 
-test('a letter from a draft, with nothing in the profile: its sentence cites the draft', async ({
+test('a letter from a draft, with nothing in the profile: its sentence cites the draft; written again from its points as it was (draftMode)', async ({
   page,
 }) => {
   const account = await createAccount({
@@ -129,6 +141,7 @@ test('a letter from a draft, with nothing in the profile: its sentence cites the
   await panel
     .getByLabel('Your draft')
     .fill('saw the senior backend role and it fits me.');
+  await panel.getByRole('radio', { name: /Rewrite it from my points/ }).check();
   await panel.getByRole('button', { name: 'Improve my draft' }).click();
 
   await expect(letter(page)).toBeVisible({ timeout: 45_000 });
@@ -136,9 +149,28 @@ test('a letter from a draft, with nothing in the profile: its sentence cites the
     'fake-draft: saw the senior backend role and it fits me.',
   );
   await expect(letter(page)).toContainText('From your draft');
+  const outcomes = page.getByRole('region', {
+    name: 'What we did with your draft',
+  });
+  await expect(outcomes).toContainText('fake-outcome: rewrite.');
+
+  // "Change it and write again" keeps "Rewrite it from my points"
+  await page
+    .getByRole('region', { name: 'Your draft', exact: true })
+    .getByRole('button', { name: 'Change it and write again' })
+    .click();
+  const again = page.getByRole('dialog', {
+    name: 'Write it again from your draft',
+  });
   await expect(
-    page.getByRole('region', { name: 'What we did with your draft' }),
-  ).toContainText('fake-outcome: polish.');
+    again.getByRole('radio', { name: /Rewrite it from my points/ }),
+  ).toBeChecked();
+  await again.getByLabel('Your draft').fill('saw the role. it fits me well.');
+  await again.getByRole('button', { name: 'Write again' }).click();
+  await expect(letter(page)).toContainText('fake-draft: saw the role.', {
+    timeout: 45_000,
+  });
+  await expect(outcomes).toContainText('fake-outcome: rewrite.');
 });
 
 test('the backend refuses over the day’s limit, and the panel says so', async ({

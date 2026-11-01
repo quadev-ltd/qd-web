@@ -258,6 +258,16 @@ describe('changing a letter (D98, slice 29)', () => {
       letterId: 'l1',
       draft: 'My version.',
     });
+
+    await rewriteCoverLetter('l1', {
+      draft: 'My points.',
+      draftMode: 'rewrite',
+    });
+    expect(callable).toHaveBeenLastCalledWith({
+      letterId: 'l1',
+      draft: 'My points.',
+      draftMode: 'rewrite',
+    });
   });
 
   it('edits, removes and restores a sentence', async () => {

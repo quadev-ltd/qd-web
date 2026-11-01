@@ -55,7 +55,10 @@ agreed with the design chat.
   "Your version" with "Improve my version" and "Restore the written letter", and no sources, quick changes
   or questions.
 - **The draft beside it** ("Show my draft beside it", on by default) has "Change it and write again",
-  which sends the changed draft, polished.
+  which sends the changed draft with "How much to change", set to the letter's own mode (`draftMode`,
+  quadev-backend #61). "Improve my version" stays polished.
+- **The posting quoted:** a job source's `quote` (#61), found word for word in the job's text, is quoted in
+  "Where it says this"; without one, "The job posting" with "Open Details".
 
 ## Consequences
 
