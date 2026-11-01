@@ -377,11 +377,13 @@ export type ReviseCoverLetterSentenceRequest =
 
 /**
  * "Write this letter again": `asked` is what the panel shows (empty: nothing); `draft` is "Improve
- * my version", the candidate's text polished in place of the letter's draft.
+ * my version" or the draft changed, in place of the letter's draft, polished unless `draftMode`
+ * says `rewrite` (only with `draft`; quadev-backend #61).
  */
 export interface RewriteCoverLetterRequest {
   asked?: string;
   draft?: string;
+  draftMode?: CoverLetterDraftMode;
 }
 
 const documentId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);

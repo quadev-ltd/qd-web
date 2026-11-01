@@ -16,6 +16,7 @@ import {
   COVER_LETTER_DRAFT_MAX_CHARS,
   COVER_LETTERS_MAX,
   type CoverLetter,
+  type CoverLetterDraftMode,
 } from '@/core/profile/coverLetters';
 import {
   getProfileErrorCode,
@@ -30,6 +31,7 @@ import {
 } from '@/core/profile/useCoverLetters';
 import { useSessionUser } from '@/core/session/hooks';
 import SubmitFooter from '@/screens/Applications/SubmitFooter';
+import ChoiceGroup from '@/screens/Cv/ChoiceGroup';
 
 /** A quick change: its chip, and the line it adds to what is asked. */
 export interface QuickChange {
@@ -97,6 +99,10 @@ export const RewriteLetterPanel: React.FC<RewriteLetterPanelProps> = ({
         ? withLine(letter.asked ?? '', chosen.line)
         : (letter.asked ?? ''),
   );
+  // From the draft card: how much to change it, as the letter was first written (doc 22 §11.7).
+  const [mode, setMode] = useState<CoverLetterDraftMode>(
+    letter.draft?.mode ?? 'polish',
+  );
   const [isBusy, setIsBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
   const [limitRefused, setLimitRefused] = useState(false);
@@ -117,7 +123,9 @@ export const RewriteLetterPanel: React.FC<RewriteLetterPanelProps> = ({
     try {
       const written = await rewrite(
         letter.id,
-        draft ? { draft: text.trim() } : { asked: text.trim() },
+        draft
+          ? { draft: text.trim(), draftMode: mode }
+          : { asked: text.trim() },
       );
       navigate(applicationLetterPath(letter.applicationId, written));
     } catch (error) {
@@ -173,6 +181,26 @@ export const RewriteLetterPanel: React.FC<RewriteLetterPanelProps> = ({
           disabled={isBusy}
           counter={{ length, max }}
         />
+        {draft && (
+          <ChoiceGroup
+            label={t('letters.modeLabel')}
+            value={mode}
+            onChange={setMode}
+            disabled={isBusy}
+            choices={[
+              {
+                value: 'polish',
+                title: t('letters.modePolish'),
+                meta: t('letters.modePolishMeta'),
+              },
+              {
+                value: 'rewrite',
+                title: t('letters.modeRewrite'),
+                meta: t('letters.modeRewriteMeta'),
+              },
+            ]}
+          />
+        )}
         {!draft && (
           <div className="flex flex-wrap gap-2">
             {changes.map(change => {
