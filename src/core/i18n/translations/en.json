@@ -1578,6 +1578,7 @@
     "sendFailedNote": "If you leave this page, the answer is lost: we ask first.",
     "actionFailedMessage": "That didn’t go through. Check your connection and try again.",
     "micLostMessage": "Your microphone stopped: it was unplugged, or another app took it. What you said so far is kept.",
+    "micLostNote": "“Try again” reconnects the microphone and starts the answer again.",
     "sendKeptButton": "Send what I said",
     "pausedTitle": "Paused",
     "pausedTabText": "You left the page, so the interview paused and the clock stopped. {{kept}}It ends by itself after 30 minutes paused.",

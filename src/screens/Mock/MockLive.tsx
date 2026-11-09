@@ -403,6 +403,9 @@ export const AnswerCard: React.FC<{
             {t('mock.sendKeptButton')}
           </Button>
         )}
+        <p className="text-sm leading-normal text-muted">
+          {t('mock.micLostNote')}
+        </p>
       </>
     );
   } else if (view.phase === 'paused' && view.pausedDuring === 'answering') {
