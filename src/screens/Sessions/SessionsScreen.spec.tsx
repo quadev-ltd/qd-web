@@ -6,7 +6,10 @@ import { groupsOf, SessionsScreen } from './SessionsScreen';
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import { applicationFixture } from '@/testUtil/applicationFixtures';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
-import { practiceTurnFixture } from '@/testUtil/practiceFixtures';
+import {
+  practiceAttemptFixture,
+  practiceTurnFixture,
+} from '@/testUtil/practiceFixtures';
 import { renderProfilePage } from '@/testUtil/renderProfilePage';
 
 vi.mock('@/core/logger', () => ({
@@ -35,7 +38,7 @@ const turns = [
     applicationRemoved: true,
     interviewRemoved: true,
     updatedAt: AT - 7 * DAY,
-    attempts: [{}],
+    attempts: [practiceAttemptFixture()],
     question: {
       text: 'How have you kept a data pipeline correct?',
       kind: 'technical',

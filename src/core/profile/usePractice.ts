@@ -1,7 +1,8 @@
 // Text practice (D94) for the pages: starting a practice (the key points take 5 to 15 seconds),
-// removing one, the marks of practised questions, and the practice calls left today. What is
-// being started, and a count of changes, are in the `practice` slice, so the marks are read again
-// on every page after a change, and a page opened meanwhile says a practice is being started.
+// answering it (the feedback takes as long), removing one, the marks of practised questions, and
+// the practice calls left today. What is being started or answered, and a count of changes, are in
+// the `practice` slice, so the marks are read again on every page after a change, and a page
+// opened meanwhile says a practice is being started or an answer read.
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -24,6 +25,8 @@ import { useSessionUser } from '@/core/session/hooks';
 import { useAppDispatch, useAppSelector } from '@/core/state/hooks';
 import { selectPractice } from '@/core/state/selectors/practice';
 import {
+  practiceAnswerBegan,
+  practiceAnswerEnded,
   practiceChanged,
   practiceStartBegan,
   practiceStartEnded,
@@ -79,6 +82,50 @@ export const usePractice = () => {
 };
 
 /**
+ * Feedback on a typed answer to one turn: the answer being read, if it is, and an answer whose
+ * feedback failed, kept to be sent again.
+ */
+export const usePracticeAnswer = (turnId: string) => {
+  const gateway = useProfileGateway();
+  const dispatch = useAppDispatch();
+  const uid = useSessionUser()?.uid ?? null;
+  const state = useAppSelector(selectPractice);
+  const mine = uid !== null && state.uid === uid;
+
+  /**
+   * Resolves the turn's number of tries once the feedback is stored; rejects with the backend's
+   * refusal, keeping the answer.
+   */
+  const answer = useCallback(
+    async (text: string): Promise<{ attempts: number }> => {
+      if (!uid) {
+        throw new Error('Not signed in');
+      }
+      dispatch(practiceAnswerBegan({ uid, turnId, answer: text }));
+      let result: { attempts: number };
+      try {
+        result = await gateway.answerPracticeTurn({ turnId, answer: text });
+      } catch (error) {
+        dispatch(practiceAnswerEnded({ turnId, kept: text }));
+        throw error;
+      }
+      dispatch(practiceAnswerEnded({ turnId }));
+      dispatch(practiceChanged());
+      return result;
+    },
+    [dispatch, gateway, turnId, uid],
+  );
+
+  return {
+    /** The answer being read, while it is. */
+    answering: mine ? state.answering[turnId] : undefined,
+    /** The answer whose feedback failed last. */
+    draft: mine ? state.drafts[turnId] : undefined,
+    answer,
+  };
+};
+
+/**
  * The newest turn of each question a page lists, read when it opens and after every change; `null`
  * until read, or when there is nothing to read (`read` is `null`). A failed read marks nothing.
  */
@@ -125,7 +172,7 @@ export const usePracticeLeft = () => {
     limits: StoredUsageLimits | null;
   } | null>(null);
 
-  // Read again after each practice started: the backend counted it, or refused it.
+  // Read again after each practice started or answered: the backend counted it, or refused it.
   const [failures, setFailures] = useState(0);
   useEffect(() => {
     if (!uid) {

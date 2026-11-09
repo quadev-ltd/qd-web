@@ -20,6 +20,7 @@ import {
   removeApplicationPractice,
   removePracticeTurn,
   startPracticeTurn,
+  answerPracticeTurn,
 } from './practice';
 
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
@@ -137,6 +138,38 @@ describe('reading practice turns (D94)', () => {
 
     vi.mocked(getDoc).mockResolvedValueOnce(document('t2') as never);
     await expect(getPracticeTurn('uid-1', 't2')).resolves.toBeNull();
+  });
+
+  it('reads its tries with their feedback, each try’s time in milliseconds', async () => {
+    const feedback = {
+      covered: ['You opened the incident.'],
+      missing: [],
+      structure: 'In order.',
+      clarity: 'Short.',
+      suggestions: ['Say what was at stake.'],
+      example: 'I led the incident.',
+    };
+    vi.mocked(getDoc).mockResolvedValueOnce(
+      document(
+        't1',
+        stored({
+          attempts: [
+            {
+              answer: 'I led it.',
+              feedback,
+              skill: { id: 'answer-feedback', version: '1.0.0' },
+              at: at(150),
+            },
+          ],
+        }),
+      ) as never,
+    );
+
+    const turn = await getPracticeTurn('uid-1', 't1');
+
+    expect(turn?.attempts).toEqual([
+      { answer: 'I led it.', feedback, at: 150 },
+    ]);
   });
 
   it('reads a removed application’s turn by its snapshot, and leaves out a key point it can’t read', async () => {
@@ -286,6 +319,41 @@ describe('starting and removing a practice (D94)', () => {
         applicationId: 'a1',
         question: { source: 'typed', text: 'Why us?' },
       }),
+    ).rejects.toEqual(new ProfileError(expected));
+  });
+
+  it('gets feedback on an answer with answerPracticeTurn, and resolves the tries', async () => {
+    callable.mockResolvedValue({ data: { turnId: 't1', attempts: 2 } });
+
+    await expect(
+      answerPracticeTurn({ turnId: 't1', answer: 'I led it.' }),
+    ).resolves.toEqual({ attempts: 2 });
+    expect(httpsCallable).toHaveBeenCalledWith(
+      { name: 'functions' },
+      'answerPracticeTurn',
+    );
+    expect(callable).toHaveBeenCalledWith({
+      turnId: 't1',
+      answer: 'I led it.',
+    });
+  });
+
+  it.each([
+    [
+      'functions/failed-precondition',
+      'attempt-limit',
+      ProfileErrorCode.MaxPracticeAttempts,
+    ],
+    ['functions/resource-exhausted', 'quota', ProfileErrorCode.DailyLimit],
+    ['functions/not-found', 'no-turn', ProfileErrorCode.NotFound],
+    ['functions/unavailable', undefined, ProfileErrorCode.Network],
+  ])('turns an answer’s %s (%s) into %s', async (code, reason, expected) => {
+    callable.mockRejectedValue(
+      Object.assign(new Error('refused'), { code, details: { reason } }),
+    );
+
+    await expect(
+      answerPracticeTurn({ turnId: 't1', answer: 'I led it.' }),
     ).rejects.toEqual(new ProfileError(expected));
   });
 

@@ -21,6 +21,9 @@ import { call, mapped, millis } from './interviewProfile';
 import logger from '@/core/logger';
 import { usageDayPath } from '@/core/profile/contract';
 import {
+  ANSWER_PRACTICE_TURN,
+  type AnswerPracticeTurnRequest,
+  AnswerPracticeTurnResponseSchema,
   type PracticeTurn,
   PracticeTurnSchema,
   practiceTurnsPath,
@@ -46,6 +49,13 @@ const parse = (
       id: document.id,
       createdAt: millis(data.createdAt),
       updatedAt: millis(data.updatedAt),
+      attempts: Array.isArray(data.attempts)
+        ? data.attempts.map((attempt: unknown) =>
+            attempt && typeof attempt === 'object'
+              ? { ...attempt, at: millis((attempt as { at?: unknown }).at) }
+              : attempt,
+          )
+        : data.attempts,
     });
   });
   const rejected = parsed.filter(result => !result.success).length;
@@ -141,6 +151,21 @@ export const startPracticeTurn = async (
     request,
   );
   return { turnId };
+};
+
+/**
+ * Gets feedback on a typed answer: the backend stores it as the turn's last attempt (one model
+ * call, 5 to 15 seconds, a minute at most). A failed attempt stores nothing.
+ */
+export const answerPracticeTurn = async (
+  request: AnswerPracticeTurnRequest,
+): Promise<{ attempts: number }> => {
+  const { attempts } = await call(
+    ANSWER_PRACTICE_TURN,
+    AnswerPracticeTurnResponseSchema,
+    request,
+  );
+  return { attempts };
 };
 
 export const removePracticeTurn = async (turnId: string): Promise<void> => {

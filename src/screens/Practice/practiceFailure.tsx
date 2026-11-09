@@ -1,5 +1,6 @@
-// What a refused or failed start of a practice says (D94, doc 15 §25.4), wherever a question can
-// be practised: an interview's list, its own question, the brief.
+// What a refused or failed practice call says (D94, doc 15 §25.4): starting one, wherever a
+// question can be practised (an interview's list, its own question, the brief), or getting
+// feedback on an answer.
 import { useTranslation } from 'react-i18next';
 
 import Banner from '@/components/ui/Banner';
@@ -38,7 +39,9 @@ export const PracticeFailureBanner: React.FC<{
   max?: number;
   onRetry?: () => void;
   retryDisabled?: boolean;
-}> = ({ failure, max, onRetry, retryDisabled }) => {
+  /** What failed: writing the key points (the default), or the feedback on an answer. */
+  of?: 'start' | 'answer';
+}> = ({ failure, max, onRetry, retryDisabled, of = 'start' }) => {
   const { t } = useTranslation();
   switch (failure) {
     case 'limit':
@@ -96,7 +99,9 @@ export const PracticeFailureBanner: React.FC<{
               </Button>
             )
           }>
-          {t('practice.failedMessage')}
+          {of === 'answer'
+            ? t('practice.answerFailedMessage')
+            : t('practice.failedMessage')}
         </Banner>
       );
   }

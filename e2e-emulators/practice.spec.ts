@@ -1,7 +1,9 @@
-// Practising a question (D94 slice 2) against the real backend code: startPracticeTurn through
-// App Check and the flags, the turn the site reads back under the rules, its key points from the
-// backend's offline `answer-guide` fake ("fake-advice: …" with an empty profile), the marks read
-// by the interview's list and by the brief, the day's count from `usage`, and removePracticeTurn.
+// Practising a question (D94 slices 2 and 3) against the real backend code: startPracticeTurn
+// through App Check and the flags, the turn the site reads back under the rules, its key points
+// from the backend's offline `answer-guide` fake ("fake-advice: …" with an empty profile), the
+// marks read by the interview's list and by the brief, the day's count from `usage`,
+// removePracticeTurn, and answerPracticeTurn with the offline `answer-feedback` fake's feedback as
+// stored after the backend's checks.
 import { expect, type Page, test } from '@playwright/test';
 
 import { createAccount, setUsageToday, signIn } from './support';
@@ -260,4 +262,56 @@ test('Sessions (D99): an application removed with its practice, by removeJobAppl
   await expect(
     page.getByRole('heading', { name: 'Nothing practised yet' }),
   ).toBeVisible();
+});
+
+test('feedback (D94 slice 3): an answer sent by answerPracticeTurn, its feedback read back after the backend’s checks, the try counted', async ({
+  page,
+}) => {
+  const account = await createAccount({
+    interviewAssistant: true,
+    textPractice: true,
+  });
+  await signIn(page, account);
+  const questions = await openWrittenList(page);
+  await questions
+    .getByRole('button', { name: 'Practise', exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/interviews\/[^/]+\/practice\/[^/]+$/, {
+    timeout: 30_000,
+  });
+
+  await page.getByRole('textbox', { name: 'Your answer' }).fill('I did it.');
+  await page.getByRole('button', { name: 'Get feedback' }).click();
+  const feedback = page.getByRole('region', { name: 'Feedback', exact: true });
+  await expect(feedback).toContainText('Try 1 of 5', { timeout: 30_000 });
+
+  // The fake quotes the first and last key points, so they reached the model
+  await expect(feedback).toContainText('fake-covered: fake-advice');
+  await expect(feedback).toContainText('fake-missing: fake-advice');
+  await expect(feedback).toContainText(
+    'fake-structure: situation, task, action, result.',
+  );
+  await expect(feedback).toContainText('fake-clarity: 3 words.');
+  await expect(feedback).toContainText('fake-suggestion: say what came of it.');
+  // Dropped by the backend's checks: a line on manner, a number from nowhere
+  await expect(feedback).not.toContainText('sound more confident');
+  await expect(feedback).not.toContainText('999 hours');
+  await expect(page.getByRole('region', { name: 'Your answer' })).toContainText(
+    'I did it.',
+  );
+  // The start and the answer, both counted under `practice`
+  await expect(feedback).toContainText('38 of 40 practice calls left today');
+
+  // Read back from the turn after a reload, under the rules
+  await page.reload();
+  await expect(feedback).toContainText(
+    'fake-structure: situation, task, action, result.',
+  );
+
+  await page
+    .getByRole('link', { name: 'Technical interview', exact: true })
+    .click();
+  await expect(questions.getByRole('listitem')).toContainText(
+    'Practised · 1 try',
+  );
 });

@@ -117,10 +117,13 @@ describe('a question practised (X7, D94 slice 2)', () => {
     expect(
       within(points[2]).getByText('applications.adviceChip'),
     ).toBeVisible();
-    // Answering comes with the backend's slice 3.
+    // Nothing answered yet: the answer, with how to practise it
     expect(
-      screen.getByRole('region', { name: 'practice.answerTitle' }),
-    ).toHaveTextContent('home.comingSoonChip');
+      screen.getByRole('textbox', { name: 'practice.answerField' }),
+    ).toHaveValue('');
+    expect(
+      screen.getByRole('radio', { name: 'practice.modeShow' }),
+    ).toBeChecked();
   });
 
   it('opened from the brief, leads back to the brief', async () => {

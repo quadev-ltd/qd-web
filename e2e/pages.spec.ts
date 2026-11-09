@@ -344,6 +344,68 @@ test('practising a question (D94 slice 2): the list with "Practise", being start
   await expectAccessibleAndNotTooWide(page);
 });
 
+test('feedback on a typed answer (D94 slice 3): try first, getting feedback, the feedback, answering again, two tries and a failure: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  await openApplications(page);
+  await page.evaluate(() => window.qdPreview?.setFlag('textPractice', true));
+  await seedApplications(page);
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Senior Backend Engineer' })
+    .getByRole('link')
+    .click();
+  await page.getByRole('link', { name: 'Interviews' }).click();
+  await page.getByRole('link', { name: 'Technical interview' }).click();
+  const questions = page.getByRole('region', {
+    name: 'Likely questions for this interview',
+  });
+  await questions
+    .getByRole('button', { name: 'Write likely questions' })
+    .click();
+  await questions
+    .getByRole('listitem')
+    .first()
+    .getByRole('button', { name: 'Practise' })
+    .click();
+  const field = page.getByRole('textbox', { name: 'Your answer' });
+  await expect(field).toBeVisible();
+
+  // Try first, the key points hidden
+  await page.getByText('Try first', { exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Show them now' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  // Getting feedback, then the feedback
+  await field.fill(
+    'Last March card payments failed for 8% of our customers. I was on call, so I opened an incident. Afterwards I said what we changed.',
+  );
+  await page.getByRole('button', { name: 'Get feedback' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Getting feedback…' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  const feedback = page.getByRole('region', { name: 'Feedback', exact: true });
+  await expect(feedback).toContainText('Try 1 of 5', { timeout: 10_000 });
+  await expectAccessibleAndNotTooWide(page);
+
+  // Answering again, failed, then two tries to pick from
+  await feedback.getByRole('button', { name: 'Answer again' }).click();
+  await field.fill('I fixed it.');
+  await page.evaluate(() => window.qdPreviewProfile?.failNextPractice('model'));
+  await page.getByRole('button', { name: 'Get feedback' }).click();
+  await expect(page.getByRole('alert')).toContainText(
+    'We couldn’t get feedback this time.',
+  );
+  await expectAccessibleAndNotTooWide(page);
+  await page.getByRole('button', { name: 'Get feedback' }).click();
+  await expect(feedback).toContainText('Try 2 of 5', { timeout: 10_000 });
+  await expect(page.getByRole('group', { name: 'Your tries' })).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+});
+
 test('Sessions and removing kept practice (D99): the remove dialog with its box, Sessions with a removed job, "Remove all" and nothing kept: accessible and no horizontal scroll', async ({
   page,
 }) => {

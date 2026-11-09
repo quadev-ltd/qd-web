@@ -253,6 +253,30 @@ whose names it shows.
   ticked, so the call is unchanged otherwise. The new `practiceRemoved` and `practiceKept` of the
   response are not read: Sessions reads the turns again.
 
+## Feedback on a typed answer (D94, text practice slice 3, 9 Nov 2026)
+
+Built against the backend's contract for `answerPracticeTurn` (slice 3, sent 9 Nov 2026), from
+`Web-X7-Practise`, `-TryFirst` and `-Feedback`, with the states not drawn agreed with the design chat
+(research doc 13 §30).
+
+- **The tries are read from the turn,** as the key points are: the call answers `{ turnId, attempts }`
+  once the feedback is stored, and the page reads the turn again (the `practice` slice's count of
+  changes). The turn already shown stays while it is read again, so nothing flashes. An attempt or a
+  line that can't be read is left out, not the whole turn.
+- **The answer being read and an answer whose feedback failed are kept in the store,** by turn
+  (`answering`, `drafts`), so the page says "Getting feedback…" again when the candidate comes back,
+  and what they typed is never lost.
+- **Empty sections are left out:** "What you covered" and "What you left out" with no lines, and "An
+  answer built from your profile" when the backend dropped every sentence of it.
+- **"How you practise" is a choice of the page, not stored:** it shows only before the first try.
+  After the first feedback the key points are always shown.
+- **"Start again with new key points"** after 5 tries asks for the same question again
+  (`practiceRestartRequest`): from the list it came from, the brief, or as typed. It is offered only
+  while the application and the interview are there and, for a list's question, while the store's list
+  is the same one. A `question-changed` refusal hides it.
+- **A new error code, `profile/max-practice-attempts`,** for `attempt-limit`: the page reads the turn
+  again, which then shows its 5 tries.
+
 ## Consequences
 
 - When research doc 17 is merged on the backend, "New application" loses its title field, offers

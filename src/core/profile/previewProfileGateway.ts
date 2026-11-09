@@ -72,6 +72,8 @@ import { type ProfileGateway } from './gateway';
 import { type ApplicationInterview, INTERVIEWS_MAX } from './interviews';
 import { browserTimeZone } from './interviewTime';
 import {
+  PRACTICE_ANSWER_MAX_CHARS,
+  PRACTICE_ATTEMPTS_MAX,
   PRACTICE_QUESTION_MAX_CHARS,
   PRACTICE_TURNS_MAX,
   type PracticeTurn,
@@ -85,7 +87,7 @@ import {
   seedInterviews,
   timesOf,
 } from './previewInterviews';
-import { previewKeyPointsFor } from './previewPractice';
+import { previewFeedbackFor, previewKeyPointsFor } from './previewPractice';
 import {
   PREVIEW_CV_DETAILS,
   PREVIEW_FACTS,
@@ -260,7 +262,10 @@ export interface PreviewProfileControls {
   failNextLetter(reason: CvVersionFailure): void;
   /** How many cover letters were already written today. */
   setCoverLettersToday(count: number): void;
-  /** The next practice cannot start: the model failed, or today's limit was reached. */
+  /**
+   * The next practice call (a start or an answer) fails: the model failed, or today's limit was
+   * reached.
+   */
   failNextPractice(reason: 'model' | 'quota'): void;
   /** How many practice calls were already made today. */
   setPracticeToday(count: number): void;
@@ -3060,6 +3065,41 @@ export const createPreviewProfileGateway = ({
       profile.practiceTurns = [...turns, turn];
       save();
       return { turnId: turn.id };
+    },
+    answerPracticeTurn: async ({ turnId, answer }) => {
+      const profile = currentProfile();
+      const turn = profile.practiceTurns?.find(({ id }) => id === turnId);
+      if (!turn) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      const text = answer.trim();
+      if (!text || text.length > PRACTICE_ANSWER_MAX_CHARS) {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      if (turn.attempts.length >= PRACTICE_ATTEMPTS_MAX) {
+        throw new ProfileError(ProfileErrorCode.MaxPracticeAttempts);
+      }
+      const failure = nextPracticeFailure;
+      nextPracticeFailure = null;
+      const today = profile.practiceToday ?? 0;
+      if (failure === 'quota' || today >= practiceDailyLimit(profile)) {
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+      }
+      await wait(PREVIEW_BRIEF_MS);
+      profile.practiceToday = today + 1;
+      if (failure === 'model') {
+        // Nothing is stored, as the backend does.
+        save();
+        throw new ProfileError(ProfileErrorCode.Unknown);
+      }
+      const at = now();
+      turn.attempts = [
+        ...turn.attempts,
+        { answer: text, feedback: previewFeedbackFor(turn, text), at },
+      ];
+      turn.updatedAt = at;
+      save();
+      return { attempts: turn.attempts.length };
     },
     removePracticeTurn: async turnId => {
       const profile = currentProfile();

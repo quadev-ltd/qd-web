@@ -30,6 +30,8 @@ export const ProfileErrorCode = {
   CvNotReady: 'profile/cv-not-ready',
   /** The account already holds as many practice turns as it can (D94). */
   MaxPracticeTurns: 'profile/max-practice-turns',
+  /** The practice turn has its 5 answers: a new one starts with new key points (D94). */
+  MaxPracticeAttempts: 'profile/max-practice-attempts',
   /** The question to practise changed since the page read it: read the page again. */
   QuestionChanged: 'profile/question-changed',
   /** The application has no job description, so nothing can be written from it. */
@@ -81,6 +83,7 @@ const EXPECTED_CODES: ReadonlySet<string> = new Set([
   ProfileErrorCode.AlreadyAdded,
   ProfileErrorCode.MaxCvVersions,
   ProfileErrorCode.MaxPracticeTurns,
+  ProfileErrorCode.MaxPracticeAttempts,
   ProfileErrorCode.MaxLetters,
   ProfileErrorCode.CvNotReady,
   ProfileErrorCode.QuestionChanged,

@@ -33,7 +33,11 @@ import {
   type CreateInterviewRequest,
   type UpdateInterviewRequest,
 } from './interviews';
-import { type PracticeTurn, type StartPracticeTurnRequest } from './practice';
+import {
+  type AnswerPracticeTurnRequest,
+  type PracticeTurn,
+  type StartPracticeTurnRequest,
+} from './practice';
 import { type StoredUsageLimits } from './usageLimits';
 
 /** Where a file goes, as `createResource` answers for a file. */
@@ -303,6 +307,13 @@ export interface ProfileGateway {
   startPracticeTurn(
     request: StartPracticeTurnRequest,
   ): Promise<{ turnId: string }>;
+  /**
+   * Gets feedback on a typed answer (one model call, 5 to 15 seconds, a minute at most), stored
+   * as the turn's last attempt: read the turn again after. A failed attempt stores nothing.
+   */
+  answerPracticeTurn(
+    request: AnswerPracticeTurnRequest,
+  ): Promise<{ attempts: number }>;
   removePracticeTurn(turnId: string): Promise<void>;
   /** How many practice calls were made for this user today (UTC), for the limit. */
   getPracticeToday(uid: string): Promise<number>;

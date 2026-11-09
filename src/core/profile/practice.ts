@@ -1,10 +1,10 @@
 // Text practice (D94, research doc 21 §3): the candidate practises one question at a time. A turn
 // holds the question and the 3 to 5 key points the profile gives for it and, from the backend's
-// slice 3, the candidate's typed answers with their feedback. Turns are under the user, not the
-// application: removing an application or an interview keeps them, marked as removed, until the
-// candidate removes them (D99) or they are 12 months old (D24). The names, limits and checks are
-// quadev-backend's packages/shared/src/practiceTurn.ts (as of 4ae7328); the backend applies them
-// again and refuses what fails.
+// slice 3, the candidate's typed answers with their feedback (up to 5 tries). Turns are under the
+// user, not the application: removing an application or an interview keeps them, marked as
+// removed, until the candidate removes them (D99) or they are 12 months old (D24). The names,
+// limits and checks are quadev-backend's packages/shared/src/practiceTurn.ts (slice 3's contract,
+// 9 Nov 2026); the backend applies them again and refuses what fails.
 import { z } from 'zod';
 
 import { INTERVIEW_QUESTION_KINDS, INTERVIEW_TYPES } from './interviews';
@@ -17,6 +17,10 @@ export const PRACTICE_TURNS_MAX = 500;
 export const PRACTICE_QUESTION_MAX_CHARS = 300;
 /** How long a turn is kept after it was last practised (D24). */
 export const PRACTICE_RETENTION_MONTHS = 12;
+/** A typed answer, trimmed: 1 to 5,000 characters. */
+export const PRACTICE_ANSWER_MAX_CHARS = 5_000;
+/** Answers to one turn (`attempt-limit`): then a new turn starts with new key points. */
+export const PRACTICE_ATTEMPTS_MAX = 5;
 
 export const PRACTICE_QUESTION_SOURCES = [
   'typed',
@@ -31,6 +35,8 @@ export const PracticeRefusal = {
   QuestionChanged: 'question-changed',
   /** The account holds PRACTICE_TURNS_MAX turns. */
   TurnLimit: 'turn-limit',
+  /** The turn has PRACTICE_ATTEMPTS_MAX answers. */
+  AttemptLimit: 'attempt-limit',
 } as const;
 
 // ---------- Firestore (the owner reads, only the backend writes) ----------
@@ -50,6 +56,43 @@ export const PracticeKeyPointSchema = z.object({
   itemId: optionalText,
 });
 export type PracticeKeyPoint = z.infer<typeof PracticeKeyPointSchema>;
+
+/** Lines that can't be read are left out, rather than the whole feedback. */
+const lines = z
+  .array(z.unknown())
+  .catch([])
+  .transform(items =>
+    items.filter(
+      (item): item is string => typeof item === 'string' && item.length > 0,
+    ),
+  );
+
+/**
+ * Feedback on what was written: content, structure and clarity, never tone or confidence (FR-14).
+ * Lines about tone are dropped by the backend, and so are the sentences of the example with a
+ * number or a name that the answer, the profile, the question and the job don't give.
+ */
+export const PracticeFeedbackSchema = z.object({
+  /** 0 to 5: "What you covered". */
+  covered: lines,
+  /** 0 to 5: "What you left out". */
+  missing: lines,
+  structure: z.string().catch(''),
+  clarity: z.string().catch(''),
+  /** 1 to 3: "Try this next time". */
+  suggestions: lines,
+  /** "An answer built from your profile"; absent when nothing of it was kept. */
+  example: optionalText,
+});
+export type PracticeFeedback = z.infer<typeof PracticeFeedbackSchema>;
+
+/** One try: the answer as sent and its feedback. Its number is its place in `attempts`, from 1. */
+export const PracticeAttemptSchema = z.object({
+  answer: z.string(),
+  feedback: PracticeFeedbackSchema,
+  at: timestamp,
+});
+export type PracticeAttempt = z.infer<typeof PracticeAttemptSchema>;
 
 /** `users/{uid}/practiceTurns/{turnId}`. */
 export const PracticeTurnSchema = z.object({
@@ -90,8 +133,16 @@ export const PracticeTurnSchema = z.object({
         return parsed.success ? [parsed.data] : [];
       }),
     ),
-  /** The answers with their feedback: from the backend's slice 3. Only counted until then. */
-  attempts: z.array(z.unknown()).catch([]),
+  /** The answers with their feedback, the first first: up to PRACTICE_ATTEMPTS_MAX. */
+  attempts: z
+    .array(z.unknown())
+    .catch([])
+    .transform(attempts =>
+      attempts.flatMap(attempt => {
+        const parsed = PracticeAttemptSchema.safeParse(attempt);
+        return parsed.success ? [parsed.data] : [];
+      }),
+    ),
   createdAt: timestamp,
   /** Moves with each answer: the newest is the turn "Practise again" opens. */
   updatedAt: timestamp,
@@ -101,6 +152,7 @@ export type PracticeTurn = z.infer<typeof PracticeTurnSchema>;
 // ---------- Callables of the `interview-profile` codebase ----------
 
 export const START_PRACTICE_TURN = 'startPracticeTurn';
+export const ANSWER_PRACTICE_TURN = 'answerPracticeTurn';
 export const REMOVE_PRACTICE_TURN = 'removePracticeTurn';
 /** Every turn of one application (D99), whether the application is still there or not. */
 export const REMOVE_APPLICATION_PRACTICE = 'removeApplicationPractice';
@@ -111,6 +163,13 @@ export type PracticeQuestionRequest =
   /** `listId` is left out only for a list that has none: the call then gives it one. */
   | { source: 'interview'; listId?: string; questionId: string }
   | { source: 'brief'; text: string };
+
+/** A typed answer to a turn: one model call, 5 to 15 seconds, a minute at most. */
+export interface AnswerPracticeTurnRequest {
+  turnId: string;
+  /** Trimmed, 1 to PRACTICE_ANSWER_MAX_CHARS characters. */
+  answer: string;
+}
 
 export interface StartPracticeTurnRequest {
   applicationId: string;
@@ -127,6 +186,11 @@ export const StartPracticeTurnResponseSchema = z.object({
   turnId: documentId,
   keyPoints: z.number().int().nonnegative(),
 });
+/** The feedback is on the turn's document, as the last of its `attempts`. */
+export const AnswerPracticeTurnResponseSchema = z.object({
+  turnId: documentId,
+  attempts: z.number().int().positive(),
+});
 export const RemovePracticeTurnResponseSchema = z.object({
   turnId: documentId,
 });
@@ -141,7 +205,7 @@ export const RemoveApplicationPracticeResponseSchema = z.object({
 /** Where a question's turn stands on a page: the newest turn, which "Practise again" opens. */
 export interface PracticeMark {
   turnId: string;
-  /** Answers given: 0 until the backend's slice 3. */
+  /** Answers given. */
   tries: number;
 }
 
@@ -185,5 +249,41 @@ export const practiceStartKey = ({
       return `brief/${applicationId}/${question.text}`;
     case 'typed':
       return `typed/${applicationId}/${interviewId ?? ''}`;
+  }
+};
+
+/**
+ * The same question asked again, for "Start again with new key points" once a turn has its 5
+ * tries; `null` when it can't be asked from what the turn holds (an interview's question with no
+ * list or interview to name).
+ */
+export const practiceRestartRequest = (
+  turn: PracticeTurn,
+): StartPracticeTurnRequest | null => {
+  const { applicationId, interviewId, question } = turn;
+  switch (question.source) {
+    case 'interview':
+      return interviewId && question.questionId
+        ? {
+            applicationId,
+            interviewId,
+            question: {
+              source: 'interview',
+              listId: question.listId,
+              questionId: question.questionId,
+            },
+          }
+        : null;
+    case 'brief':
+      return {
+        applicationId,
+        question: { source: 'brief', text: question.text },
+      };
+    case 'typed':
+      return {
+        applicationId,
+        ...(interviewId ? { interviewId } : {}),
+        question: { source: 'typed', text: question.text },
+      };
   }
 };
