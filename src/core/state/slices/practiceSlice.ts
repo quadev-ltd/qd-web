@@ -1,6 +1,7 @@
-// Text practice (D94) as the pages share it: the questions whose practice is being started, and
-// a count of the changes made to the turns, so a page that marks practised questions reads them
-// again. The turns themselves are read by the page that shows them. Web only.
+// Text practice (D94) as the pages share it: the questions whose practice is being started, the
+// answers being read for feedback, an answer whose feedback failed, and a count of the changes made
+// to the turns, so a page that marks practised questions reads them again. The turns themselves
+// are read by the page that shows them. Web only.
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import { authStateChanged } from './sessionSlice';
@@ -13,14 +14,33 @@ export interface PracticeState {
    * seconds, and the page says so again when the candidate comes back to it meanwhile.
    */
   starting: Record<string, true>;
-  /** Goes up with every turn started or removed. */
+  /**
+   * The answers being read for feedback, by turn (5 to 15 seconds): the page shows the answer
+   * and "Getting feedback…" again when the candidate comes back to it meanwhile.
+   */
+  answering: Record<string, string>;
+  /** An answer whose feedback failed, by turn, so what was typed is never lost. */
+  drafts: Record<string, string>;
+  /** Goes up with every turn started, answered or removed. */
   changes: number;
 }
 
 export const initialPracticeState: PracticeState = {
   uid: null,
   starting: {},
+  answering: {},
+  drafts: {},
   changes: 0,
+};
+
+/** New objects for another user, not the initial state's, which are frozen. */
+const forUser = (state: PracticeState, uid: string) => {
+  if (state.uid !== uid) {
+    state.uid = uid;
+    state.starting = {};
+    state.answering = {};
+    state.drafts = {};
+  }
 };
 
 export const practiceSlice = createSlice({
@@ -31,17 +51,36 @@ export const practiceSlice = createSlice({
       state,
       { payload: { uid, key } }: PayloadAction<{ uid: string; key: string }>,
     ) => {
-      // New objects, not the initial state's, which is frozen.
-      if (state.uid !== uid) {
-        state.uid = uid;
-        state.starting = {};
-      }
+      forUser(state, uid);
       state.starting[key] = true;
     },
     practiceStartEnded: (state, { payload: key }: PayloadAction<string>) => {
       delete state.starting[key];
     },
-    /** A turn was started or removed: the marks are read again. */
+    practiceAnswerBegan: (
+      state,
+      {
+        payload: { uid, turnId, answer },
+      }: PayloadAction<{ uid: string; turnId: string; answer: string }>,
+    ) => {
+      forUser(state, uid);
+      state.answering[turnId] = answer;
+    },
+    /** Its feedback is stored (`kept` absent), or failed and the answer is kept. */
+    practiceAnswerEnded: (
+      state,
+      {
+        payload: { turnId, kept },
+      }: PayloadAction<{ turnId: string; kept?: string }>,
+    ) => {
+      delete state.answering[turnId];
+      if (kept === undefined) {
+        delete state.drafts[turnId];
+      } else {
+        state.drafts[turnId] = kept;
+      }
+    },
+    /** A turn was started, answered or removed: the marks are read again. */
     practiceChanged: state => {
       state.changes += 1;
     },
@@ -56,7 +95,12 @@ export const practiceSlice = createSlice({
   },
 });
 
-export const { practiceStartBegan, practiceStartEnded, practiceChanged } =
-  practiceSlice.actions;
+export const {
+  practiceStartBegan,
+  practiceStartEnded,
+  practiceAnswerBegan,
+  practiceAnswerEnded,
+  practiceChanged,
+} = practiceSlice.actions;
 
 export default practiceSlice.reducer;

@@ -56,6 +56,7 @@ export const unavailableProfileGateway: ProfileGateway = {
   getListPracticeTurns: unavailable,
   getBriefPracticeTurns: unavailable,
   startPracticeTurn: unavailable,
+  answerPracticeTurn: unavailable,
   removePracticeTurn: unavailable,
   getPracticeToday: unavailable,
   getCvVersions: unavailable,

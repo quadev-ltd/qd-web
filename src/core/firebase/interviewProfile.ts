@@ -102,6 +102,7 @@ const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
   // Text practice (D94): read the page again, or remove some practice first.
   [PracticeRefusal.QuestionChanged]: ProfileErrorCode.QuestionChanged,
   [PracticeRefusal.TurnLimit]: ProfileErrorCode.MaxPracticeTurns,
+  [PracticeRefusal.AttemptLimit]: ProfileErrorCode.MaxPracticeAttempts,
   // Cover letters (D98). `not-ready` and `no-items` are the CV's own reasons, read as above. The
   // pages only offer to restore a saved letter.
   [CoverLetterRefusal.MaxLetters]: ProfileErrorCode.MaxLetters,

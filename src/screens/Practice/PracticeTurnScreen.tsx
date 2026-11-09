@@ -1,7 +1,8 @@
 // A question practised (X7, D94, research doc 21 §3): the way there (D96), the question with its
 // kind and where it came from, and its 3 to 5 key points, each with its profile item and the
-// resource it came from, or "Advice". Answering it and the feedback come with the backend's slice
-// 3: until then, a card says so (doc 15 §25.4 choice 1). Then "Remove this practice".
+// resource it came from, or "Advice". Before the first try, "How you practise": the key points
+// shown, or hidden until the feedback ("Try first"). The typed answer, its feedback and the tries
+// (slice 3, research doc 13 §30) are in PracticeAnswer. Then "Remove this practice".
 //
 // The same page opens under an interview (its likely questions, or its own question), under an
 // application (its brief's questions) and from Sessions, so the way back leads where the candidate
@@ -21,28 +22,52 @@ import Button from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/ButtonLink';
 import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import { useApplications } from '@/core/profile/ApplicationsProvider';
 import { type ProfileResource } from '@/core/profile/contract';
 import { logProfileError } from '@/core/profile/errors';
 import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
 import {
   applicationInterviewPath,
+  applicationInterviewPracticePath,
   applicationInterviewsPath,
   applicationPath,
+  applicationPracticePath,
   APPLICATIONS_PATH,
+  sessionPracticePath,
   SESSIONS_PATH,
 } from '@/core/profile/paths';
-import { type PracticeTurn } from '@/core/profile/practice';
+import {
+  type PracticeTurn,
+  practiceRestartRequest,
+} from '@/core/profile/practice';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
+import {
+  usePractice,
+  usePracticeAnswer,
+  usePracticeLeft,
+} from '@/core/profile/usePractice';
 import { useSessionUser } from '@/core/session/hooks';
 import { useAppSelector } from '@/core/state/hooks';
 import { selectInterviews } from '@/core/state/selectors/interviews';
+import { selectPractice } from '@/core/state/selectors/practice';
 import {
   ITEM_KIND_KEYS,
   QUESTION_KIND_KEYS,
 } from '@/screens/Applications/BriefCards';
 import { interviewTitle } from '@/screens/Applications/interviews/interviewText';
 import useItems from '@/screens/Cv/review/useItems';
+import {
+  AnswerCard,
+  answerFailureOf,
+  FeedbackCard,
+  TriesPicker,
+  YourAnswerCard,
+} from '@/screens/Practice/PracticeAnswer';
+import {
+  type PracticeFailure,
+  practiceFailureOf,
+} from '@/screens/Practice/practiceFailure';
 import RemovePracticeDialog from '@/screens/Practice/RemovePracticeDialog';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 
@@ -57,15 +82,21 @@ type Loaded =
   | { status: 'error' }
   | { status: 'loaded'; turn: PracticeTurn | null };
 
-/** The turn, read when the page opens and again after "Try again". */
+/**
+ * The turn, read when the page opens, after "Try again", and after each change to the practice (an
+ * answer's feedback stored). Read again, the turn already shown stays until the new read is in.
+ */
 const usePracticeTurn = (turnId: string) => {
   const gateway = useProfileGateway();
   const uid = useSessionUser()?.uid;
+  const { changes } = useAppSelector(selectPractice);
   const [attempt, setAttempt] = useState(0);
-  const [loaded, setLoaded] = useState<{ key: string; state: Loaded } | null>(
-    null,
-  );
-  const key = `${turnId}/${attempt}`;
+  const [loaded, setLoaded] = useState<{
+    turnId: string;
+    key: string;
+    state: Loaded;
+  } | null>(null);
+  const key = `${turnId}/${attempt}/${changes}`;
 
   useEffect(() => {
     if (!uid) {
@@ -73,11 +104,12 @@ const usePracticeTurn = (turnId: string) => {
     }
     let live = true;
     gateway.getPracticeTurn(uid, turnId).then(
-      turn => live && setLoaded({ key, state: { status: 'loaded', turn } }),
+      turn =>
+        live && setLoaded({ turnId, key, state: { status: 'loaded', turn } }),
       error => {
         logProfileError('getPracticeTurn', error, uid);
         if (live) {
-          setLoaded({ key, state: { status: 'error' } });
+          setLoaded({ turnId, key, state: { status: 'error' } });
         }
       },
     );
@@ -86,18 +118,49 @@ const usePracticeTurn = (turnId: string) => {
     };
   }, [gateway, key, turnId, uid]);
 
-  return {
-    state: loaded?.key === key ? loaded.state : { status: 'loading' as const },
-    reload: () => setAttempt(count => count + 1),
-  };
+  let state: Loaded = { status: 'loading' };
+  if (loaded?.key === key) {
+    state = loaded.state;
+  } else if (loaded?.turnId === turnId && loaded.state.status === 'loaded') {
+    state = loaded.state;
+  }
+  return { state, reload: () => setAttempt(count => count + 1) };
 };
 
 const KeyPointsCard: React.FC<{
   turn: PracticeTurn;
   resources: ProfileResource[];
-}> = ({ turn, resources }) => {
+  /** "Try first": hidden until the feedback, with "Show them now". */
+  onShow?: () => void;
+}> = ({ turn, resources, onShow }) => {
   const { t } = useTranslation();
   const items = useItems(turn.keyPoints.some(({ itemId }) => itemId));
+  if (onShow) {
+    return (
+      <Card
+        as="section"
+        elevation="raised"
+        aria-labelledby="practice-key-points"
+        className="items-start gap-3 p-5">
+        <div className="flex items-baseline gap-2 self-stretch">
+          <h2
+            id="practice-key-points"
+            className="min-w-0 flex-1 font-display text-[18px] leading-tight font-semibold">
+            {t('practice.keyPointsTitle')}
+          </h2>
+          <p className="text-sm leading-normal text-muted">
+            {t('practice.keyPointsFrom')}
+          </p>
+        </div>
+        <p className="text-[15px] leading-normal text-muted">
+          {t('practice.keyPointsHidden')}
+        </p>
+        <Button variant="quiet" size="small" onClick={onShow}>
+          {t('practice.showKeyPointsButton')}
+        </Button>
+      </Card>
+    );
+  }
   return (
     <Card
       as="section"
@@ -153,27 +216,187 @@ const KeyPointsCard: React.FC<{
   );
 };
 
-/** Until the backend's slice 3: what answering will be. */
-const AnswerSoonCard: React.FC = () => {
+type PractiseMode = 'show' | 'tryFirst';
+
+/** Where a new turn opens: under the same page as this one. */
+const turnPath = (
+  from: PracticeFrom,
+  turn: Pick<PracticeTurn, 'applicationId' | 'interviewId'>,
+  turnId: string,
+) => {
+  if (from === 'sessions') {
+    return sessionPracticePath(turnId);
+  }
+  return from === 'interview' && turn.interviewId
+    ? applicationInterviewPracticePath(
+        turn.applicationId,
+        turn.interviewId,
+        turnId,
+      )
+    : applicationPracticePath(turn.applicationId, turnId);
+};
+
+/**
+ * The answer and its feedback, beside the key points: the first answer, then each try's answer
+ * and feedback, "Answer again" up to 5 tries, then "Start again with new key points".
+ */
+const PractiseTurn: React.FC<{
+  turn: PracticeTurn;
+  from: PracticeFrom;
+  resources: ProfileResource[];
+  /** The interview's list now, when the store has it: a list written again can't restart. */
+  listId?: string;
+  reload: () => void;
+}> = ({ turn, from, resources, listId, reload }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const uid = useSessionUser()?.uid;
+  const { answering, draft, answer } = usePracticeAnswer(turn.id);
+  const { start, isStarting, anyStarting } = usePractice();
+  const { left, counted } = usePracticeLeft();
+  const [mode, setMode] = useState<PractiseMode>('show');
+  const [revealed, setRevealed] = useState(false);
+  const [again, setAgain] = useState(false);
+  // The try shown (0-based); the newest when none was picked.
+  const [picked, setPicked] = useState<number | null>(null);
+  // The tries the turn has once the feedback just given is read back.
+  const [expected, setExpected] = useState<number | null>(null);
+  const [failure, setFailure] = useState<PracticeFailure | null>(null);
+  const [restartFailure, setRestartFailure] = useState<PracticeFailure | null>(
+    null,
+  );
+
+  const tries = turn.attempts.length;
+  const busy =
+    answering !== undefined || (expected !== null && tries < expected);
+  const answeringNow = tries === 0 || again || busy;
+  const shown = Math.min(picked ?? tries - 1, tries - 1);
+  const attempt = tries > 0 ? turn.attempts[shown] : undefined;
+
+  const submit = async (text: string) => {
+    setFailure(null);
+    try {
+      const { attempts } = await answer(text);
+      setExpected(attempts);
+      setAgain(false);
+      setPicked(null);
+    } catch (error) {
+      logProfileError('answerPracticeTurn', error, uid);
+      const reason = answerFailureOf(error);
+      counted();
+      if (reason === 'gone' || reason === 'tries') {
+        // Removed, or answered in another tab: the page shows the turn as it is now.
+        setAgain(false);
+        reload();
+        return;
+      }
+      setFailure(reason);
+    }
+  };
+
+  const request = practiceRestartRequest(turn);
+  const canRestart =
+    request !== null &&
+    !turn.applicationRemoved &&
+    !turn.interviewRemoved &&
+    (turn.question.source !== 'interview' ||
+      listId === undefined ||
+      listId === turn.question.listId) &&
+    restartFailure !== 'changed';
+  const restart = async () => {
+    if (!request) {
+      return;
+    }
+    setRestartFailure(null);
+    try {
+      const turnId = await start(request);
+      navigate(turnPath(from, turn, turnId));
+    } catch (error) {
+      logProfileError('startPracticeTurn', error, uid);
+      counted();
+      setRestartFailure(practiceFailureOf(error));
+    }
+  };
+
+  const keyPointsHidden = tries === 0 && mode === 'tryFirst' && !revealed;
+
   return (
-    <Card
-      as="section"
-      elevation="raised"
-      aria-labelledby="practice-answer"
-      className="gap-3 p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2
-          id="practice-answer"
-          className="min-w-0 flex-[1_1_160px] font-display text-[18px] leading-tight font-semibold">
-          {t('practice.answerTitle')}
-        </h2>
-        <Chip tone="neutral">{t('home.comingSoonChip')}</Chip>
+    <>
+      {tries === 0 && (
+        <div className="max-w-[360px]">
+          <SegmentedControl
+            label={t('practice.modeLabel')}
+            options={[
+              { value: 'show', label: t('practice.modeShow') },
+              { value: 'tryFirst', label: t('practice.modeTryFirst') },
+            ]}
+            value={mode}
+            onChange={setMode}
+            disabled={busy}
+          />
+        </div>
+      )}
+      <div className="flex flex-wrap items-start gap-5">
+        <div className="flex min-w-0 flex-[1_1_380px] flex-col gap-5">
+          {answeringNow && (
+            <AnswerCard
+              initial={answering ?? draft ?? ''}
+              busy={busy}
+              left={left}
+              failure={failure}
+              onSubmit={submit}
+              onCancel={
+                tries > 0
+                  ? () => {
+                      setAgain(false);
+                      setFailure(null);
+                    }
+                  : undefined
+              }
+            />
+          )}
+          {attempt && (
+            <>
+              {tries > 1 && (
+                <TriesPicker count={tries} shown={shown} onShow={setPicked} />
+              )}
+              <YourAnswerCard attempt={attempt} number={shown + 1} />
+              <FeedbackCard
+                attempt={attempt}
+                number={shown + 1}
+                tries={tries}
+                left={left}
+                onAnswerAgain={
+                  answeringNow
+                    ? undefined
+                    : () => {
+                        setAgain(true);
+                        setFailure(null);
+                      }
+                }
+                restart={
+                  canRestart && request
+                    ? {
+                        starting: isStarting(request),
+                        disabled: anyStarting || left?.left === 0,
+                        failure: restartFailure,
+                        onRestart: restart,
+                      }
+                    : undefined
+                }
+              />
+            </>
+          )}
+        </div>
+        <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-5">
+          <KeyPointsCard
+            turn={turn}
+            resources={resources}
+            onShow={keyPointsHidden ? () => setRevealed(true) : undefined}
+          />
+        </div>
       </div>
-      <p className="text-[15px] leading-normal text-muted">
-        {t('practice.answerSoon')}
-      </p>
-    </Card>
+    </>
   );
 };
 
@@ -306,14 +529,14 @@ export const PracticeTurnScreen: React.FC<{ from: PracticeFrom }> = ({
             </p>
           )}
         </div>
-        <div className="flex flex-wrap items-start gap-5">
-          <div className="flex min-w-0 flex-[1_1_380px] flex-col gap-5">
-            <AnswerSoonCard />
-          </div>
-          <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-5">
-            <KeyPointsCard turn={turn} resources={resources} />
-          </div>
-        </div>
+        <PractiseTurn
+          key={turn.id}
+          turn={turn}
+          from={from}
+          resources={resources}
+          listId={interview?.questions?.listId}
+          reload={reload}
+        />
         <Button
           variant="quietDanger"
           size="small"

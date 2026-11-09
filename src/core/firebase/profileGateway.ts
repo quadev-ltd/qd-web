@@ -68,6 +68,7 @@ import {
   getPracticeTurn,
   getPracticeTurns,
   removeApplicationPractice,
+  answerPracticeTurn,
   removePracticeTurn,
   startPracticeTurn,
 } from './practice';
@@ -130,6 +131,7 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   getListPracticeTurns,
   getBriefPracticeTurns,
   startPracticeTurn,
+  answerPracticeTurn,
   removePracticeTurn,
   getPracticeToday,
   getCvVersions,

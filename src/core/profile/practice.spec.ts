@@ -1,9 +1,23 @@
 import {
   practiceMarksOf,
+  practiceRestartRequest,
   practiceStartKey,
   type PracticeTurn,
   PracticeTurnSchema,
 } from './practice';
+
+/** One try with the least the backend stores. */
+const ATTEMPT = {
+  answer: 'I led it.',
+  feedback: {
+    covered: [],
+    missing: [],
+    structure: '',
+    clarity: '',
+    suggestions: ['Say what was at stake.'],
+  },
+  at: null,
+};
 
 const turn = (
   id: string,
@@ -34,7 +48,7 @@ describe('practiceMarksOf', () => {
     const marks = practiceMarksOf(
       [
         turn('t1', 100),
-        turn('t2', 300, {}, [{}, {}]),
+        turn('t2', 300, {}, [ATTEMPT, ATTEMPT]),
         turn('t3', 200),
         turn('t4', 50, { questionId: 'q2' }),
       ],
@@ -86,5 +100,66 @@ describe('practiceStartKey', () => {
         question: { source: 'typed', text: 'Anything?' },
       }),
     ).toBe('typed/a1/i1');
+  });
+});
+
+describe('a try and its feedback', () => {
+  it('reads each try, leaving out one it can’t read and the lines that aren’t text', () => {
+    const parsed = turn('t1', 100, {}, [
+      {
+        ...ATTEMPT,
+        feedback: {
+          ...ATTEMPT.feedback,
+          covered: ['Opened the incident.', 42, ''],
+          example: '',
+        },
+      },
+      { answer: 'No feedback' },
+    ]);
+
+    expect(parsed.attempts).toEqual([
+      {
+        ...ATTEMPT,
+        feedback: {
+          ...ATTEMPT.feedback,
+          covered: ['Opened the incident.'],
+          example: undefined,
+        },
+      },
+    ]);
+  });
+});
+
+describe('practiceRestartRequest', () => {
+  it('asks the same question again: from its list, the brief, or as typed', () => {
+    const fromList = {
+      ...turn('t1', 1),
+      interviewId: 'i1',
+    };
+    expect(practiceRestartRequest(fromList)).toEqual({
+      applicationId: 'a1',
+      interviewId: 'i1',
+      question: { source: 'interview', listId: 'list-1', questionId: 'q1' },
+    });
+    expect(
+      practiceRestartRequest(
+        turn('t2', 1, { source: 'brief', text: 'Why us?' }),
+      ),
+    ).toEqual({
+      applicationId: 'a1',
+      question: { source: 'brief', text: 'Why us?' },
+    });
+    expect(
+      practiceRestartRequest(
+        turn('t3', 1, { source: 'typed', text: 'Why now?' }),
+      ),
+    ).toEqual({
+      applicationId: 'a1',
+      question: { source: 'typed', text: 'Why now?' },
+    });
+  });
+
+  it('can’t ask a question of a list without its interview', () => {
+    expect(practiceRestartRequest(turn('t1', 1))).toBeNull();
   });
 });

@@ -2338,6 +2338,89 @@ describe('previewProfileGateway, text practice (D94 slice 2)', () => {
   });
 });
 
+describe('previewProfileGateway, feedback on an answer (D94 slice 3)', () => {
+  const withTurn = async () => {
+    const context = await setUp();
+    const { applicationId } = await context.gateway.createApplication({
+      job: { source: 'text', text: 'Senior Backend Engineer. Go and Kafka.' },
+      title: 'Senior Backend Engineer',
+      company: 'Northwind Logistics',
+    });
+    context.pass(PREVIEW_READ_MS);
+    await context.gateway.getApplications(UID);
+    const { turnId } = await context.gateway.startPracticeTurn({
+      applicationId,
+      question: { source: 'typed', text: 'Tell me about an incident you led.' },
+    });
+    return { ...context, turnId };
+  };
+
+  it('stores each answer as a try with its feedback, and counts the day', async () => {
+    const { gateway, turnId } = await withTurn();
+
+    await expect(
+      gateway.answerPracticeTurn({
+        turnId,
+        answer:
+          '  Last March I was on call when payments failed, and I said what I changed afterwards.  ',
+      }),
+    ).resolves.toEqual({ attempts: 1 });
+
+    const turn = await gateway.getPracticeTurn(UID, turnId);
+    expect(turn?.attempts).toHaveLength(1);
+    expect(turn?.attempts[0]?.answer).toBe(
+      'Last March I was on call when payments failed, and I said what I changed afterwards.',
+    );
+    expect(turn?.attempts[0]?.feedback.covered.length).toBeGreaterThan(0);
+    expect(turn?.attempts[0]?.feedback.example).toBeTruthy();
+    // The start and the answer
+    await expect(gateway.getPracticeToday(UID)).resolves.toBe(2);
+  });
+
+  it('covers nothing and builds no example from a one-line answer', async () => {
+    const { gateway, turnId } = await withTurn();
+
+    await gateway.answerPracticeTurn({ turnId, answer: 'I fixed it.' });
+
+    const [attempt] =
+      (await gateway.getPracticeTurn(UID, turnId))?.attempts ?? [];
+    expect(attempt?.feedback.covered).toEqual([]);
+    expect(attempt?.feedback.example).toBeUndefined();
+  });
+
+  it('refuses a sixth try, an empty answer and a turn that is gone', async () => {
+    const { gateway, turnId } = await withTurn();
+    for (let index = 0; index < 5; index += 1) {
+      await gateway.answerPracticeTurn({ turnId, answer: `Try ${index}.` });
+    }
+
+    await expect(
+      codeOf(gateway.answerPracticeTurn({ turnId, answer: 'Once more.' })),
+    ).resolves.toBe(ProfileErrorCode.MaxPracticeAttempts);
+    await expect(
+      codeOf(gateway.answerPracticeTurn({ turnId, answer: '   ' })),
+    ).resolves.toBe(ProfileErrorCode.Invalid);
+    await expect(
+      codeOf(gateway.answerPracticeTurn({ turnId: 'gone', answer: 'Hi.' })),
+    ).resolves.toBe(ProfileErrorCode.NotFound);
+  });
+
+  it('stores nothing when the model fails, and refuses at today’s limit', async () => {
+    const { gateway, turnId } = await withTurn();
+
+    gateway.controls.failNextPractice('model');
+    await expect(
+      codeOf(gateway.answerPracticeTurn({ turnId, answer: 'I fixed it.' })),
+    ).resolves.toBe(ProfileErrorCode.Unknown);
+    expect((await gateway.getPracticeTurn(UID, turnId))?.attempts).toEqual([]);
+
+    gateway.controls.setPracticeToday(40);
+    await expect(
+      codeOf(gateway.answerPracticeTurn({ turnId, answer: 'I fixed it.' })),
+    ).resolves.toBe(ProfileErrorCode.DailyLimit);
+  });
+});
+
 describe('previewProfileGateway, what is asked of a CV (D97)', () => {
   const written = async (asked?: string) => {
     const context = await setUp();
