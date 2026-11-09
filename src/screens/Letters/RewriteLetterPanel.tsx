@@ -37,21 +37,34 @@ import ChoiceGroup from '@/screens/Cv/ChoiceGroup';
 export interface QuickChange {
   label: string;
   line: string;
+  /** On a line of its own, full width: a requirement in the job's words can be long. */
+  ownLine?: boolean;
+  /** How "Added by …" names it, when its label is long and quoted. */
+  name?: string;
 }
 
-/** The quick changes of a letter: shorter, more formal, warmer, and leading with the job's first need. */
+/** The chip of a quick change, growing with its text. */
+export const quickChipClass = (change: QuickChange) =>
+  `flex min-h-11 cursor-pointer items-center rounded-[22px] border border-border-strong bg-surface px-3.5 py-2 text-left text-[15px] leading-natural font-medium wrap-anywhere text-text hover:bg-tint disabled:cursor-not-allowed disabled:opacity-60 ${change.ownLine ? 'basis-full' : ''}`;
+
+/**
+ * The quick changes of a letter: shorter, more formal, warmer, and leading with the job's second
+ * need. The letter already leads with the first (doc 22 §11.8).
+ */
 export const useQuickChanges = (letter: CoverLetter): QuickChange[] => {
   const { t } = useTranslation();
-  const first = letter.plan?.requirements[0];
+  const next = letter.plan?.requirements[1];
   return [
     { label: t('letters.quickShorter'), line: t('letters.quickShorterLine') },
     { label: t('letters.quickFormal'), line: t('letters.quickFormalLine') },
     { label: t('letters.quickWarmer'), line: t('letters.quickWarmerLine') },
-    ...(first
+    ...(next
       ? [
           {
-            label: t('letters.quickLeadWith', { requirement: first }),
-            line: t('letters.quickLeadWithLine', { requirement: first }),
+            label: t('letters.quickLeadWith', { requirement: next }),
+            line: t('letters.quickLeadWithLine', { requirement: next }),
+            ownLine: true,
+            name: t('letters.quickLeadWithName'),
           },
         ]
       : []),
@@ -173,7 +186,9 @@ export const RewriteLetterPanel: React.FC<RewriteLetterPanelProps> = ({
             draft
               ? t('letters.draftAgainHint')
               : chosen
-                ? t('letters.againChosenHint', { change: chosen.label })
+                ? t('letters.againChosenHint', {
+                    change: chosen.name ?? chosen.label,
+                  })
                 : t('letters.againHint')
           }
           value={text}
@@ -220,7 +235,7 @@ export const RewriteLetterPanel: React.FC<RewriteLetterPanelProps> = ({
                         : withLine(text, change.line),
                     )
                   }
-                  className="flex h-11 cursor-pointer items-center gap-1.5 rounded-full border border-border-strong bg-surface px-3.5 text-[15px] leading-natural font-medium text-text hover:bg-tint disabled:cursor-not-allowed disabled:opacity-60 aria-pressed:border-primary aria-pressed:bg-tint aria-pressed:text-primary">
+                  className={`gap-1.5 aria-pressed:border-primary aria-pressed:bg-tint aria-pressed:text-primary ${quickChipClass(change)}`}>
                   {on && <Icon name="check" size={16} />}
                   {change.label}
                 </button>
