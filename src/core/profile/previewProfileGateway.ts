@@ -1451,7 +1451,11 @@ export const createPreviewProfileGateway = ({
         builtAt: number,
       ): ApplicationBrief => ({
         requirements: Array.from({ length: 6 }, (_, index) => ({
-          text: `Requirement ${index + 1}`,
+          // The second in a job's own words, as long as a sentence (a letter's "Lead with …").
+          text:
+            index === 1
+              ? 'Strong hands-on experience designing and running Go services in production, ideally at high volume'
+              : `Requirement ${index + 1}`,
           importance: index < 4 ? 'required' : 'preferred',
           itemIds:
             index < 6 - gaps && itemIds.length > 0

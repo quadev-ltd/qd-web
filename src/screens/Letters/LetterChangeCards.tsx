@@ -9,7 +9,11 @@ import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
-import { type QuickChange, useQuickChanges } from './RewriteLetterPanel';
+import {
+  type QuickChange,
+  quickChipClass,
+  useQuickChanges,
+} from './RewriteLetterPanel';
 
 import FormTextArea from '@/components/FormTextArea';
 import Icon from '@/components/Icon';
@@ -68,7 +72,7 @@ export const QuickChangesCard: React.FC<{
             type="button"
             disabled={left?.left === 0}
             onClick={() => onChoose(change)}
-            className="flex h-11 cursor-pointer items-center rounded-full border border-border-strong bg-surface px-3.5 text-[15px] leading-natural font-medium text-text hover:bg-tint disabled:cursor-not-allowed disabled:opacity-60">
+            className={quickChipClass(change)}>
             {change.label}
           </button>
         ))}

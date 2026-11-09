@@ -50,6 +50,10 @@ agreed with the design chat.
 - **One way to ask for a change:** each "Change it quickly" chip opens "Write this letter again" with its
   line added to what was asked, where the chips add or take out their lines. The questions' "Write again"
   writes it with what was asked, as it was.
+- **"Lead with …" names the plan's second requirement,** quoted in the job's words (Lead with “…”): the letter
+  already leads with the first. It is left out when the plan has fewer than two. Its chip takes a line of its own,
+  full width, and every chip grows with its text: at least 44 px, never cut short. In "Write this letter again" it
+  is "Added by “Lead with”" (doc 22 §11.8, 9 Nov 2026).
 - **"Edit the whole letter" holds the body only** (`coverLetterBody`): "Save my version" stores it in place;
   "Improve my version" sends it as the new draft, up to the draft's 5,000 characters. A saved letter shows
   "Your version" with "Improve my version" and "Restore the written letter", and no sources, quick changes

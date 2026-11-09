@@ -244,6 +244,37 @@ describe('changing a letter (D98, slice 29)', () => {
     ).toBeVisible();
   });
 
+  it('offers to lead with the job’s second requirement, as the letter leads with the first', async () => {
+    const user = userEvent.setup();
+    setUp(
+      coverLetterFixture({
+        plan: { requirements: ['Go services', 'Incident response'], story: '' },
+      }),
+    );
+    await user.click(
+      await screen.findByRole('button', { name: 'letters.quickLeadWith' }),
+    );
+    expect(
+      within(
+        screen.getByRole('dialog', { name: 'letters.againTitle' }),
+      ).getByRole('textbox', { name: 'letters.askedTitle' }),
+    ).toHaveValue('letters.quickLeadWithLine');
+  });
+
+  it('leaves "Lead with" out when the plan has one requirement', async () => {
+    setUp(
+      coverLetterFixture({
+        plan: { requirements: ['Go services'], story: '' },
+      }),
+    );
+    expect(
+      await screen.findByRole('button', { name: 'letters.quickShorter' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'letters.quickLeadWith' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('edits the whole letter: "Save my version" in place, "Improve my version" as a new letter', async () => {
     const user = userEvent.setup();
     const letter = coverLetterFixture();

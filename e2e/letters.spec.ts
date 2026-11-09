@@ -3,7 +3,7 @@
 // number only the draft gives, a sentence opened, copied, marked as sent and removed, a form's
 // box, a failure tried again and the day's limit. The preview's backend writes letters as the
 // backend's offline writer does.
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { openApplications, seedApplications } from './support';
 
@@ -281,6 +281,58 @@ test('changing a letter: a sentence edited, removed and restored; a question ans
   );
   await page.getByRole('button', { name: /What we did and why/ }).click();
   await expect(page.getByText('Followed “Make it shorter.”.')).toBeVisible();
+});
+
+test('“Lead with” the job’s second requirement, in its words: on its own line, wrapping inside its button, on the card and in the panel', async ({
+  page,
+}) => {
+  await writeOne(page);
+
+  /** The buttons whose text runs past their border, by their text. */
+  const spilling = (region: Locator) =>
+    region
+      .getByRole('button')
+      .evaluateAll(buttons =>
+        buttons
+          .filter(button => button.scrollHeight > button.clientHeight + 1)
+          .map(button => button.textContent),
+      );
+
+  /** Whether a chip takes its row's full width. */
+  const fullWidth = (chip: Locator) =>
+    chip.evaluate(
+      element =>
+        Math.abs(
+          element.getBoundingClientRect().width -
+            element.parentElement!.getBoundingClientRect().width,
+        ) < 1,
+    );
+
+  // The job's second requirement, in its words: the letter already leads with the first
+  const requirement =
+    'Strong hands-on experience designing and running Go services in production, ideally at high volume';
+  const quick = page.getByRole('region', { name: 'Change it quickly' });
+  const lead = quick.getByRole('button', {
+    name: `Lead with “${requirement}”`,
+  });
+  await expect(lead).toBeVisible();
+  expect((await lead.boundingBox())!.height).toBeGreaterThan(44);
+  expect(await fullWidth(lead)).toBe(true);
+  expect(await spilling(quick)).toEqual([]);
+
+  await lead.click();
+  const again = page.getByRole('dialog', { name: 'Write this letter again' });
+  await expect(again.getByLabel('What you asked for')).toHaveValue(
+    `Lead with “${requirement}”.`,
+  );
+  await expect(again).toContainText('Added by “Lead with”. Change it');
+  const pressed = again.getByRole('button', {
+    name: `Lead with “${requirement}”`,
+    pressed: true,
+  });
+  await expect(pressed).toBeVisible();
+  expect(await fullWidth(pressed)).toBe(true);
+  expect(await spilling(again)).toEqual([]);
 });
 
 test('the whole letter edited: saved as my version, restored; improved into a new letter', async ({
