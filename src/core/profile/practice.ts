@@ -194,10 +194,11 @@ export const AnswerPracticeTurnResponseSchema = z.object({
 export const RemovePracticeTurnResponseSchema = z.object({
   turnId: documentId,
 });
-/** How many turns were removed: 0 when it had none. */
+/** How many turns and mock interviews (D100) were removed: 0 when it had none. */
 export const RemoveApplicationPracticeResponseSchema = z.object({
   applicationId: documentId,
   removed: z.number().int().nonnegative(),
+  removedSessions: z.number().int().nonnegative().catch(0),
 });
 
 // ---------- What the pages work out ----------

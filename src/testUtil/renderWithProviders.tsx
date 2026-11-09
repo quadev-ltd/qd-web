@@ -6,6 +6,7 @@ import {
   MemoryRouter,
   parsePath,
   RouterProvider,
+  type RouteObject,
 } from 'react-router';
 
 import { createRoutes } from '@/app/routes';
@@ -40,6 +41,12 @@ import {
 import { createStore } from '@/core/state/store';
 
 interface Options {
+  /**
+   * Routes to render in a data router at `route`, for screens that use its hooks (useBlocker),
+   * inside `wrapper` (more providers); `ui` is then not rendered.
+   */
+  routes?: RouteObject[];
+  wrapper?: React.FC<{ children: ReactNode }>;
   /** The URL the component is rendered at. */
   route?: string;
   /** Router state at that URL (what a <Link state> passes). */
@@ -110,8 +117,19 @@ export const renderWithProviders = (
   ui: ReactElement,
   options: Options = {},
 ) => {
-  const { route = '/', routeState } = options;
+  const { route = '/', routeState, routes, wrapper: Wrapper } = options;
   const { store, Providers } = createProviders(options);
+  if (routes) {
+    const router = createMemoryRouter(routes, { initialEntries: [route] });
+    const routed = <RouterProvider router={router} />;
+    return {
+      store,
+      router,
+      ...render(
+        <Providers>{Wrapper ? <Wrapper>{routed}</Wrapper> : routed}</Providers>,
+      ),
+    };
+  }
   return {
     store,
     ...render(

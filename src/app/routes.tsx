@@ -29,6 +29,7 @@ import {
   APPLICATION_CV_VERSION_PATH,
   APPLICATION_DETAILS_PATH,
   APPLICATION_INTERVIEW_PATH,
+  APPLICATION_INTERVIEW_MOCK_PATH,
   APPLICATION_INTERVIEW_PRACTICE_PATH,
   APPLICATION_INTERVIEWS_PATH,
   APPLICATION_LETTER_PATH,
@@ -41,6 +42,7 @@ import {
   CV_VERSION_PATH,
   PROFILE_PATH,
   RESOURCE_PATH,
+  SESSION_MOCK_PATH,
   SESSION_PRACTICE_PATH,
   SESSIONS_PATH,
 } from '@/core/profile/paths';
@@ -188,6 +190,16 @@ const accountRoutes: RouteObject[] = [
                   ).InterviewScreen,
                 }),
               },
+              // A mock interview (D100): one route with the session's id optional, so the page
+              // and its controller stay when the address gets the id.
+              {
+                path: `${APPLICATION_INTERVIEW_MOCK_PATH}/:sessionId?`,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/screens/Mock/MockInterviewScreen')
+                  ).MockInterviewScreen,
+                }),
+              },
               // A question practised (D94): under the interview or the application it was
               // practised from, so the way back leads there (D96).
               {
@@ -212,6 +224,13 @@ const accountRoutes: RouteObject[] = [
                 lazy: async () => ({
                   Component: (await import('@/screens/Sessions/SessionsScreen'))
                     .SessionsScreen,
+                }),
+              },
+              {
+                path: SESSION_MOCK_PATH,
+                lazy: async () => ({
+                  Component: (await import('@/screens/Mock/MockSessionScreen'))
+                    .MockSessionScreen,
                 }),
               },
               {

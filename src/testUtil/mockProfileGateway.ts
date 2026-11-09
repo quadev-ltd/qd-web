@@ -50,7 +50,9 @@ export const createMockProfileGateway = (): Mocked<ProfileGateway> => ({
   restoreCoverLetterText: vi.fn(() => Promise.resolve()),
   getPracticeTurns: vi.fn(() => Promise.resolve([])),
   countApplicationPractice: vi.fn(() => Promise.resolve(0)),
-  removeApplicationPractice: vi.fn(() => Promise.resolve({ removed: 0 })),
+  removeApplicationPractice: vi.fn(() =>
+    Promise.resolve({ removed: 0, removedSessions: 0 }),
+  ),
   getPracticeTurn: vi.fn(() => Promise.resolve(null)),
   getListPracticeTurns: vi.fn(() => Promise.resolve([])),
   getBriefPracticeTurns: vi.fn(() => Promise.resolve([])),
@@ -58,6 +60,52 @@ export const createMockProfileGateway = (): Mocked<ProfileGateway> => ({
   answerPracticeTurn: vi.fn(() => Promise.resolve({ attempts: 1 })),
   removePracticeTurn: vi.fn(() => Promise.resolve()),
   getPracticeToday: vi.fn(() => Promise.resolve(0)),
+  getMockSessions: vi.fn(() => Promise.resolve([])),
+  getMockSession: vi.fn(() => Promise.resolve(null)),
+  countMockSessions: vi.fn(() => Promise.resolve(0)),
+  countApplicationMockSessions: vi.fn(() => Promise.resolve(0)),
+  startMockInterview: vi.fn(() =>
+    Promise.resolve({
+      sessionId: 'session-1',
+      lines: [],
+      status: 'active' as const,
+      timeLeftMs: 600_000,
+    }),
+  ),
+  answerMockQuestion: vi.fn(() =>
+    Promise.resolve({
+      turnId: 't1',
+      transcript: '',
+      lines: [],
+      status: 'active' as const,
+      timeLeftMs: 540_000,
+    }),
+  ),
+  rephraseMockQuestion: vi.fn(() =>
+    Promise.resolve({ lines: [], status: 'active' as const }),
+  ),
+  skipMockQuestion: vi.fn(() =>
+    Promise.resolve({
+      lines: [],
+      status: 'active' as const,
+      timeLeftMs: 540_000,
+    }),
+  ),
+  pauseMockInterview: vi.fn(() =>
+    Promise.resolve({ paused: true, timeLeftMs: 540_000 }),
+  ),
+  resumeMockInterview: vi.fn(() =>
+    Promise.resolve({
+      lines: [],
+      status: 'active' as const,
+      paused: false,
+      timeLeftMs: 540_000,
+    }),
+  ),
+  endMockInterview: vi.fn(() => Promise.resolve()),
+  sendMockFeedback: vi.fn(() => Promise.resolve()),
+  removeMockSession: vi.fn(() => Promise.resolve()),
+  getMockInterviewsToday: vi.fn(() => Promise.resolve(0)),
   getCvVersions: vi.fn(() => Promise.resolve([])),
   getCvVersion: vi.fn(() => Promise.resolve(null)),
   createCvVersion: vi.fn(() =>

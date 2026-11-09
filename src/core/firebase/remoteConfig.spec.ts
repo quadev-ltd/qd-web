@@ -53,6 +53,7 @@ describe('the flags from Remote Config', () => {
       cvTool: false,
       textPractice: false,
       coverLetters: false,
+      mockInterview: false,
       aiDiagnostics: false,
     });
   });
@@ -99,6 +100,7 @@ describe('the flags from Remote Config', () => {
       'coverLetters',
       'cvTool',
       'interviewAssistant',
+      'mockInterview',
       'smartInspection',
       'textPractice',
     ]);

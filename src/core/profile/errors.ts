@@ -32,6 +32,18 @@ export const ProfileErrorCode = {
   MaxPracticeTurns: 'profile/max-practice-turns',
   /** The practice turn has its 5 answers: a new one starts with new key points (D94). */
   MaxPracticeAttempts: 'profile/max-practice-attempts',
+  /** The account keeps as many mock interviews as it can (D100): remove some in Sessions. */
+  MaxMockSessions: 'profile/max-mock-sessions',
+  /** No words were heard in the answer sent: the question stays open (D100). */
+  MockNothingHeard: 'profile/mock-nothing-heard',
+  /** The mock interview's line no longer waits for this answer: read the session again. */
+  MockNotCurrent: 'profile/mock-not-current',
+  /** Another call is still working on the mock interview: send the same request again. */
+  MockBusy: 'profile/mock-busy',
+  /** The mock interview has ended: read it again for why. */
+  MockSessionEnded: 'profile/mock-session-ended',
+  /** The interviewer failed twice in a row, so the mock interview ended. */
+  MockSessionFailed: 'profile/mock-session-failed',
   /** The question to practise changed since the page read it: read the page again. */
   QuestionChanged: 'profile/question-changed',
   /** The application has no job description, so nothing can be written from it. */
@@ -84,6 +96,11 @@ const EXPECTED_CODES: ReadonlySet<string> = new Set([
   ProfileErrorCode.MaxCvVersions,
   ProfileErrorCode.MaxPracticeTurns,
   ProfileErrorCode.MaxPracticeAttempts,
+  ProfileErrorCode.MaxMockSessions,
+  ProfileErrorCode.MockNothingHeard,
+  ProfileErrorCode.MockNotCurrent,
+  ProfileErrorCode.MockBusy,
+  ProfileErrorCode.MockSessionEnded,
   ProfileErrorCode.MaxLetters,
   ProfileErrorCode.CvNotReady,
   ProfileErrorCode.QuestionChanged,

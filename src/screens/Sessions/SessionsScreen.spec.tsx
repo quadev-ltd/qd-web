@@ -86,6 +86,41 @@ describe('groupsOf', () => {
   });
 });
 
+describe('groupsOf, with mock interviews (D100)', () => {
+  it('puts a job’s mock interviews in its group, ordered with its turns by their last change', () => {
+    const mock = {
+      id: 'm1',
+      applicationId: 'gone',
+      application: { title: 'Data Engineer', company: 'Lumen Bank' },
+      applicationRemoved: true as const,
+      way: 'take-turns' as const,
+      lengthMinutes: 10 as const,
+      voice: 'gemini' as const,
+      status: 'ended' as const,
+      plan: { questions: [] },
+      turns: [],
+      startedAt: AT,
+      endedAt: AT,
+      pausedAt: null,
+      pausedMs: 0,
+      createdAt: AT,
+      updatedAt: AT + DAY,
+    };
+    const groups = groupsOf(turns, [applicationFixture()], 'Untitled', [mock]);
+
+    expect(
+      groups.map(({ title, sessions, turns: shown }) => [
+        title,
+        sessions.map(({ id }) => id),
+        shown.map(({ id }) => id),
+      ]),
+    ).toEqual([
+      ['Data Engineer', ['m1'], ['t3']],
+      ['Senior Backend Engineer', [], ['t1', 't2']],
+    ]);
+  });
+});
+
 describe('Sessions (R1, D94)', () => {
   it('shows the practice kept, one card per job, each question opening its practice', async () => {
     const gateway = createMockProfileGateway();
@@ -125,7 +160,10 @@ describe('Sessions (R1, D94)', () => {
     gateway.getPracticeTurns
       .mockResolvedValueOnce(turns)
       .mockResolvedValue(turns.slice(0, 2));
-    gateway.removeApplicationPractice.mockResolvedValue({ removed: 1 });
+    gateway.removeApplicationPractice.mockResolvedValue({
+      removed: 1,
+      removedSessions: 0,
+    });
     setUp(gateway);
 
     await user.click(

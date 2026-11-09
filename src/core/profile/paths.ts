@@ -55,6 +55,20 @@ export const applicationInterviewPracticePath = (
 ) =>
   `${applicationInterviewPath(applicationId, interviewId)}/practice/${encodeURIComponent(turnId)}`;
 
+/**
+ * A mock interview of an interview (X6, D100): set up in a panel on the interview's page, then
+ * ready at this address with the choices, and at the session's own once it started, so a reload
+ * comes back to it.
+ */
+export const APPLICATION_INTERVIEW_MOCK_PATH = `${APPLICATION_INTERVIEW_PATH}/mock`;
+
+export const applicationInterviewMockPath = (
+  applicationId: string,
+  interviewId: string,
+  sessionId?: string,
+) =>
+  `${applicationInterviewPath(applicationId, interviewId)}/mock${sessionId === undefined ? '' : `/${encodeURIComponent(sessionId)}`}`;
+
 /** A question of the brief practised (X7, D94): under the application, back to its brief. */
 export const APPLICATION_PRACTICE_PATH = `${APPLICATION_PATH}/practice/:turnId`;
 
@@ -65,6 +79,12 @@ export const applicationPracticePath = (
 
 /** Sessions (D85, D94): the practice kept, one card per job. Mock interviews will join it. */
 export const SESSIONS_PATH = '/sessions';
+
+/** A mock interview in Sessions (R2, D100): what was said; the way back leads to Sessions. */
+export const SESSION_MOCK_PATH = `${SESSIONS_PATH}/mock/:sessionId`;
+
+export const sessionMockPath = (sessionId: string) =>
+  `${SESSIONS_PATH}/mock/${encodeURIComponent(sessionId)}`;
 
 /** A question practised, opened from Sessions: the way back leads there (D96). */
 export const SESSION_PRACTICE_PATH = `${SESSIONS_PATH}/:turnId`;

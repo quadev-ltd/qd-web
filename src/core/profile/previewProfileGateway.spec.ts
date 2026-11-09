@@ -2302,7 +2302,7 @@ describe('previewProfileGateway, text practice (D94 slice 2)', () => {
     ).resolves.toBe(2);
     await expect(
       gateway.removeApplicationPractice(applicationId),
-    ).resolves.toEqual({ removed: 2 });
+    ).resolves.toEqual({ removed: 2, removedSessions: 0 });
     await expect(gateway.getPracticeTurns(UID)).resolves.toEqual([]);
   });
 

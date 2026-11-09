@@ -11,6 +11,7 @@ import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
 import { useSessionUser } from '@/core/session/hooks';
 import { useAppDispatch } from '@/core/state/hooks';
 import { practiceChanged } from '@/core/state/slices/practiceSlice';
+import { practiceAmount } from '@/screens/Sessions/practiceAmount';
 
 export interface RemoveAllPracticeDialogProps {
   applicationId: string;
@@ -18,6 +19,8 @@ export interface RemoveAllPracticeDialogProps {
   title: string;
   company?: string;
   questions: number;
+  /** Its mock interviews (D100), removed with its questions. */
+  mockInterviews?: number;
   onCancel: () => void;
   onRemoved: () => void;
 }
@@ -28,7 +31,15 @@ export interface RemoveAllPracticeDialogProps {
  */
 export const RemoveAllPracticeDialog: React.FC<
   RemoveAllPracticeDialogProps
-> = ({ applicationId, title, company, questions, onCancel, onRemoved }) => {
+> = ({
+  applicationId,
+  title,
+  company,
+  questions,
+  mockInterviews = 0,
+  onCancel,
+  onRemoved,
+}) => {
   const { t } = useTranslation();
   const gateway = useProfileGateway();
   const dispatch = useAppDispatch();
@@ -70,8 +81,18 @@ export const RemoveAllPracticeDialog: React.FC<
       }}>
       <p className="text-[16px] leading-normal text-muted">
         {company
-          ? t('sessions.removeAllText', { count: questions, company })
-          : t('sessions.removeAllTextNoCompany', { count: questions })}
+          ? t(
+              mockInterviews > 0
+                ? 'sessions.removeAllTextMock'
+                : 'sessions.removeAllText',
+              { what: practiceAmount(t, questions, mockInterviews), company },
+            )
+          : t(
+              mockInterviews > 0
+                ? 'sessions.removeAllTextNoCompanyMock'
+                : 'sessions.removeAllTextNoCompany',
+              { what: practiceAmount(t, questions, mockInterviews) },
+            )}
       </p>
       {failed && (
         <Banner ref={error} tone="danger" role="alert">

@@ -34,6 +34,16 @@ import {
   type UpdateInterviewRequest,
 } from './interviews';
 import {
+  type AnswerMockQuestionRequest,
+  type MockLineRequest,
+  type MockLines,
+  type MockPlayed,
+  type MockSession,
+  type PauseMockInterviewRequest,
+  type SendMockFeedbackRequest,
+  type StartMockInterviewRequest,
+} from './mockInterviews';
+import {
   type AnswerPracticeTurnRequest,
   type PracticeTurn,
   type StartPracticeTurnRequest,
@@ -282,10 +292,13 @@ export interface ProfileGateway {
   getPracticeTurns(uid: string): Promise<PracticeTurn[]>;
   /** How many practice turns one application has, there or removed (D99). */
   countApplicationPractice(uid: string, applicationId: string): Promise<number>;
-  /** Removes every practice turn of one application, there or removed (D99). */
+  /**
+   * Removes every practice turn and mock interview of one application, there or removed (D99,
+   * D100).
+   */
   removeApplicationPractice(
     applicationId: string,
-  ): Promise<{ removed: number }>;
+  ): Promise<{ removed: number; removedSessions: number }>;
   /** One practice turn; `null` when it does not exist (any more). */
   getPracticeTurn(uid: string, turnId: string): Promise<PracticeTurn | null>;
   /** The turns of one list of an interview's likely questions (its `listId`), in no order. */
@@ -317,6 +330,50 @@ export interface ProfileGateway {
   removePracticeTurn(turnId: string): Promise<void>;
   /** How many practice calls were made for this user today (UTC), for the limit. */
   getPracticeToday(uid: string): Promise<number>;
+
+  // ---------- Mock interviews (D100) ----------
+
+  /** Every mock interview (200 at most), the most recently changed first: Sessions. */
+  getMockSessions(uid: string): Promise<MockSession[]>;
+  /** One mock interview; `null` when it does not exist (any more). */
+  getMockSession(uid: string, sessionId: string): Promise<MockSession | null>;
+  /** How many mock interviews the account keeps: none yet shows "Before you start". */
+  countMockSessions(uid: string): Promise<number>;
+  /** How many mock interviews one application has, there or removed (D99). */
+  countApplicationMockSessions(
+    uid: string,
+    applicationId: string,
+  ): Promise<number>;
+  /**
+   * Starts a mock interview: its question plan is written (one model call) and its first two
+   * lines voiced, 5 to 15 seconds. Stored only when it succeeds; counts as one session today.
+   */
+  startMockInterview(
+    request: StartMockInterviewRequest,
+  ): Promise<{ sessionId: string } & MockLines>;
+  /** Sends a recorded answer; resolves the next line: a follow-up, the next question or the closing. */
+  answerMockQuestion(
+    request: AnswerMockQuestionRequest,
+  ): Promise<{ turnId: string; transcript: string } & MockLines>;
+  /** "Say it differently": the question's other wording, which becomes the line to answer. */
+  rephraseMockQuestion(request: MockLineRequest): Promise<MockLines>;
+  /** Skips the question: the next one, or the closing. */
+  skipMockQuestion(request: MockLineRequest): Promise<MockLines>;
+  /** Stops or starts the session's clock (the tab left, or back). */
+  pauseMockInterview(
+    request: PauseMockInterviewRequest,
+  ): Promise<{ paused: boolean; timeLeftMs: number }>;
+  /** After a reload or a lost connection: the line waiting for an answer, voiced again. */
+  resumeMockInterview(
+    sessionId: string,
+  ): Promise<MockLines & { paused: boolean }>;
+  /** Ends it now ("End interview"). Ending it twice is the same as once. */
+  endMockInterview(sessionId: string, played?: MockPlayed[]): Promise<void>;
+  /** "How did it go?", once it ended. Sending again replaces it. */
+  sendMockFeedback(request: SendMockFeedbackRequest): Promise<void>;
+  removeMockSession(sessionId: string): Promise<void>;
+  /** How many mock interviews were started today (UTC), for the limit. */
+  getMockInterviewsToday(uid: string): Promise<number>;
 
   // ---------- CV versions (delivery 2b) ----------
 
