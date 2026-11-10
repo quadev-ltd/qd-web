@@ -335,8 +335,9 @@ const Slow: React.FC<{ onCheckAgain: () => void }> = ({ onCheckAgain }) => {
 };
 
 /**
- * Under an answered or skipped question in what was said: "Show feedback" and "Practise this
- * question", or where its feedback stands. `state` is null for a skipped one.
+ * Under a question in what was said: "Show feedback" and "Practise this question", or where its
+ * feedback stands. `state` is null for one skipped or left unanswered, which has only "Practise
+ * this question".
  */
 export const MockAnswerFeedback: React.FC<{
   turnId: string;

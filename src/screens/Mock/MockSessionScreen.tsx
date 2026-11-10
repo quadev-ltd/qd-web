@@ -128,12 +128,14 @@ const TurnItem: React.FC<{
                 })
               : t('mock.yourAnswer')}
           </p>
-          <p className="text-[15px] leading-normal whitespace-pre-line wrap-anywhere">
+          {/* The candidate's own words, tinted as "Your words" are elsewhere. */}
+          <blockquote className="rounded-xl bg-tint px-3.5 py-3 text-[15px] leading-normal whitespace-pre-line shadow-[inset_3px_0_0_var(--color-primary)] wrap-anywhere">
             {turn.answer.transcript}
-          </p>
+          </blockquote>
         </div>
       )}
-      {ended && (state || (practise && turn.status === 'skipped')) && (
+      {/* Any question can be practised: answered, skipped, or left open when it ended. */}
+      {ended && (state || (practise && turn.status !== 'answered')) && (
         <MockAnswerFeedback
           turnId={turn.id}
           state={state}

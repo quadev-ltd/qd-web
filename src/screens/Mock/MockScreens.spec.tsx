@@ -484,6 +484,10 @@ describe('a mock interview in Sessions (Web-R2-Mock)', () => {
 
     const [first, second, skipped] = within(said).getAllByRole('listitem');
     expect(first).toHaveTextContent('mock.yourAnswerSpoken');
+    // The candidate's own words, set apart
+    expect(within(first!).getByText('I build payment systems.').tagName).toBe(
+      'BLOCKQUOTE',
+    );
     await user.click(
       within(first!).getByRole('button', { name: 'mock.showFeedbackButton' }),
     );
@@ -506,14 +510,38 @@ describe('a mock interview in Sessions (Web-R2-Mock)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('"Practise this question" with text practice: it starts from the mock interview’s turn and opens', async () => {
+  it('"Practise this question" with text practice, on any question: it starts from the mock interview’s turn and opens', async () => {
     const user = userEvent.setup();
     const gateway = createMockProfileGateway();
-    gateway.getMockSession.mockResolvedValue(session());
+    const ended = session();
+    gateway.getMockSession.mockResolvedValue({
+      ...ended,
+      turns: [
+        ...ended.turns,
+        {
+          id: 't4',
+          kind: 'planned',
+          planId: 'p2',
+          question: 'Why this role?',
+          status: 'open',
+          repeats: 0,
+          askedAt: 6,
+          answeredAt: null,
+        },
+      ],
+    });
     gateway.startPracticeTurn.mockResolvedValue({ turnId: 'turn-9' });
     renderSession(gateway, true);
 
     const said = await screen.findByRole('region', { name: 'mock.saidTitle' });
+    // Left unanswered when it ended: it can be practised as well
+    const open = within(said).getAllByRole('listitem')[3]!;
+    expect(open).toHaveTextContent('mock.notAnswered');
+    expect(
+      within(open).getByRole('button', {
+        name: 'mock.practiseQuestionButton',
+      }),
+    ).toBeVisible();
     const skipped = within(said).getAllByRole('listitem')[2]!;
     await user.click(
       within(skipped).getByRole('button', {
