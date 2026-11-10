@@ -39,7 +39,9 @@ with the design chat (§12). Real time and the voice model come with slices 4 an
 - **The progress line reads the session** after each new question: "Question n of m" from the plan, a follow-up
   keeping its question's number, and the time left from the calls, run down on the page.
 - **Mock interviews join Sessions** in their job's group, first, and the counts in "Remove all" and "Remove this
-  application?". A mock interview opens at `/sessions/mock/:sessionId` with what was said.
+  application?". A mock interview opens at `/sessions/mock/:sessionId` with what was said. A question said
+  differently shows the wording heard last, which the answer replies to, marked "Said differently", with the first
+  wording under it (canvas version 66).
 - **The voices' samples are files of the site** (`public/mock/voice-gemini.mp3`, `voice-chirp.mp3`), voiced once
   by the backend's check, behind "Hear it" in the setup.
 - **The browser tests use a stand-in microphone:** a tone played into a real audio stream, which MediaRecorder

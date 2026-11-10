@@ -77,6 +77,9 @@ const TurnItem: React.FC<{
         {number !== null && (
           <Chip tone="neutral">{t('mock.questionChip', { number })}</Chip>
         )}
+        {turn.rephrased && (
+          <Chip tone="neutral">{t('mock.saidDifferentlyChip')}</Chip>
+        )}
         {turn.kind === 'follow-up' && (
           <Chip tone="info">{t('mock.followUpChip')}</Chip>
         )}
@@ -84,9 +87,15 @@ const TurnItem: React.FC<{
           <Chip tone="neutral">{t('mock.skippedChip')}</Chip>
         )}
       </div>
+      {/* The wording heard last, which the answer replies to; the first one under it. */}
       <p className="text-[17px] leading-normal font-bold wrap-anywhere">
         {turn.rephrased ?? turn.question}
       </p>
+      {turn.rephrased && (
+        <p className="text-sm leading-normal text-muted wrap-anywhere">
+          {t('mock.firstAsked', { question: turn.question })}
+        </p>
+      )}
       {!turn.answer && turn.status === 'open' && ended && (
         <p className="text-sm leading-normal text-muted">
           {t('mock.notAnswered')}

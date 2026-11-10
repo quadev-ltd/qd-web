@@ -1648,6 +1648,8 @@
     "saidTitle": "What was said",
     "saidText": "The interviewer’s questions, and your answers as text. The audio wasn’t kept.",
     "questionChip": "Question {{number}}",
+    "saidDifferentlyChip": "Said differently",
+    "firstAsked": "First asked: “{{question}}”",
     "skippedChip": "Skipped",
     "yourAnswer": "Your answer",
     "notAnswered": "Not answered",
