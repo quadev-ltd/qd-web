@@ -1,10 +1,12 @@
 import {
   isMockFeedbackWriting,
+  isMockGoing,
   isMockIdle,
   MOCK_FEEDBACK_SETTLE_MS,
   MOCK_IDLE_MS,
   MOCK_OVERALL_KEY,
   mockAnswerFeedbackOf,
+  mockFeedbackChipOf,
   mockHintsKey,
   mockHintsOf,
   mockOverallOf,
@@ -413,5 +415,88 @@ describe('the feedback on a mock interview (D101, F1)', () => {
     expect(
       isMockFeedbackWriting(ended(), at(ENDED + MOCK_FEEDBACK_SETTLE_MS + 1)),
     ).toBe(false);
+  });
+});
+
+describe('a mock interview in a list (doc 24 §19)', () => {
+  const FEEDBACK = {
+    covered: [],
+    missing: [],
+    structure: '',
+    clarity: '',
+    suggestions: ['Say what was at stake.'],
+  };
+  const ended = (overrides: Record<string, unknown> = {}) =>
+    stored({
+      status: 'ended',
+      endReason: 'finished',
+      endedAt: 600_000,
+      turns: [
+        {
+          id: 't1',
+          kind: 'planned',
+          planId: 'p1',
+          question: 'Tell me about yourself.',
+          status: 'answered',
+          answer: { transcript: 'I build.', spokenMs: 9_000, words: 2 },
+          repeats: 0,
+          askedAt: 1,
+          answeredAt: 500_000,
+        },
+        {
+          id: 't2',
+          kind: 'planned',
+          planId: 'p2',
+          question: 'An incident?',
+          status: 'answered',
+          answer: { transcript: 'I led it.', spokenMs: 9_000, words: 3 },
+          repeats: 0,
+          askedAt: 2,
+          answeredAt: 550_000,
+        },
+      ],
+      ...overrides,
+    });
+  const LATER = 600_000 + 6 * 60_000;
+
+  it('preparing while any feedback is written; ready once one answer’s is; none otherwise', () => {
+    expect(
+      mockFeedbackChipOf(
+        ended({
+          answerFeedback: { t1: { status: 'writing', startedAt: 590_000 } },
+        }),
+        600_000,
+      ),
+    ).toBe('preparing');
+    // One ready, the other failed, the overall view failed: what is there is ready
+    expect(
+      mockFeedbackChipOf(
+        ended({
+          answerFeedback: {
+            t1: { status: 'ready', feedback: FEEDBACK },
+            t2: { status: 'failed' },
+          },
+          overall: { status: 'failed' },
+        }),
+        LATER,
+      ),
+    ).toBe('ready');
+    // Every answer failed or stopped, or none written (before F1)
+    expect(
+      mockFeedbackChipOf(
+        ended({
+          answerFeedback: { t1: { status: 'failed' }, t2: { status: 'quota' } },
+          overall: { status: 'failed' },
+        }),
+        LATER,
+      ),
+    ).toBe('none');
+    expect(mockFeedbackChipOf(ended(), LATER)).toBe('none');
+  });
+
+  it('a session still going is going; one idle for 30 minutes isn’t', () => {
+    expect(isMockGoing(stored({ updatedAt: 10 }), 20)).toBe(true);
+    expect(isMockGoing(stored({ updatedAt: 0 }), MOCK_IDLE_MS + 1)).toBe(false);
+    expect(isMockGoing(ended(), 0)).toBe(false);
   });
 });

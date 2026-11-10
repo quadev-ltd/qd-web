@@ -617,6 +617,51 @@ test('the voice model (doc 24 §16): no voice to choose, its words after it spea
   ).toBeVisible();
 });
 
+test('where the job is (doc 24 §19): the interview’s page, the Interviews tab and the application’s Sessions tab', async ({
+  page,
+}) => {
+  await openInterview(page);
+  await start(page);
+  await answerNow(page);
+  await endNow(page);
+
+  // Back on the interview: "Your mock interviews", opening its page in Sessions
+  await page.getByRole('link', { name: 'Applications', exact: true }).click();
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Senior Backend Engineer' })
+    .getByRole('link')
+    .first()
+    .click();
+  await page.getByRole('link', { name: 'Interviews' }).click();
+  await page.getByRole('link', { name: 'Technical interview' }).click();
+  const mocks = page.getByRole('region', { name: 'Your mock interviews' });
+  await expect(mocks).toContainText('Take turns · 1 minute');
+  await expect(mocks).toContainText(/1 question/);
+  await expect(
+    mocks.getByText(/Feedback ready|Preparing feedback/),
+  ).toBeVisible();
+
+  // The Interviews tab: a chip
+  // The way back: the breadcrumb at 1280, its back link on a phone.
+  await page.locator('main a[href$="/interviews"]:visible').first().click();
+  await expect(
+    page.getByRole('listitem').filter({ hasText: 'Technical interview' }),
+  ).toContainText('1 mock interview');
+
+  // The application's Sessions tab: the mock interview named by its interview
+  await page
+    .getByRole('navigation', { name: 'Application' })
+    .getByRole('link', { name: 'Sessions' })
+    .click();
+  await expect(page).toHaveURL(/\/applications\/[^/]+\/sessions$/);
+  const tab = page.getByRole('region', { name: 'Mock interviews · 1' });
+  await expect(tab).toContainText('Technical interview');
+  await expect(tab).toContainText('Take turns · 1 minute');
+  await tab.getByRole('link', { name: 'Technical interview' }).click();
+  await expect(page).toHaveURL(/\/sessions\/mock\/[^/]+$/);
+});
+
 test('none left today: the setup says so and can’t continue', async ({
   page,
 }) => {

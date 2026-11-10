@@ -121,3 +121,61 @@ export const useMockSession = (sessionId: string | undefined) => {
     read && read.sessionId === sessionId ? read.state : { status: 'loading' };
   return { state, reload };
 };
+
+export type MockSessionsRead =
+  | { status: 'loading' }
+  | { status: 'error' }
+  | { status: 'loaded'; sessions: MockSession[] };
+
+/**
+ * Mock interviews read once for a page (doc 24 §19): one interview's (`interviewId`), or every
+ * one of the account's (Sessions holds at most 200). Nothing is read while `enabled` is off.
+ */
+export const useMockSessions = ({
+  interviewId,
+  enabled,
+}: {
+  interviewId?: string;
+  enabled: boolean;
+}) => {
+  const gateway = useProfileGateway();
+  const uid = useSessionUser()?.uid ?? null;
+  const [reads, setReads] = useState(0);
+  const [read, setRead] = useState<{
+    key: string;
+    state: MockSessionsRead;
+  } | null>(null);
+  const key = `${interviewId ?? ''}`;
+
+  useEffect(() => {
+    if (!uid || !enabled) {
+      return undefined;
+    }
+    let live = true;
+    (interviewId === undefined
+      ? gateway.getMockSessions(uid)
+      : gateway.getInterviewMockSessions(uid, interviewId)
+    ).then(
+      sessions =>
+        live && setRead({ key, state: { status: 'loaded', sessions } }),
+      error => {
+        logProfileError('getMockSessions', error, uid);
+        if (live) {
+          setRead(known =>
+            known?.key === key && known.state.status === 'loaded'
+              ? known
+              : { key, state: { status: 'error' } },
+          );
+        }
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [gateway, uid, enabled, interviewId, key, reads]);
+
+  const reload = useCallback(() => setReads(count => count + 1), []);
+  const state: MockSessionsRead =
+    read && read.key === key ? read.state : { status: 'loading' };
+  return { state, reload };
+};

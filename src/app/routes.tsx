@@ -28,6 +28,7 @@ import {
   APPLICATION_CV_PATH,
   APPLICATION_CV_VERSION_PATH,
   APPLICATION_DETAILS_PATH,
+  APPLICATION_SESSIONS_PATH,
   APPLICATION_INTERVIEW_PATH,
   APPLICATION_INTERVIEW_MOCK_PATH,
   APPLICATION_INTERVIEW_PRACTICE_PATH,
@@ -239,6 +240,14 @@ const accountRoutes: RouteObject[] = [
                   Component: (
                     await import('@/screens/Practice/PracticeTurnScreen')
                   ).SessionPracticeScreen,
+                }),
+              },
+              {
+                path: APPLICATION_SESSIONS_PATH,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/screens/Applications/ApplicationScreen')
+                  ).ApplicationSessionsScreen,
                 }),
               },
               {

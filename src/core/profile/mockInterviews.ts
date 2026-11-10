@@ -735,3 +735,29 @@ export const isMockFeedbackWriting = (
   session.turns.some(
     turn => mockAnswerFeedbackOf(session, turn, reading)?.status === 'writing',
   ) || mockOverallOf(session, reading)?.status === 'writing';
+
+/** How a session's feedback stands in a list of them (doc 24 §19): its chip. */
+export type MockFeedbackChip = 'preparing' | 'ready' | 'none';
+
+/**
+ * "Preparing feedback" while any of it is being written or not yet due; otherwise "Feedback
+ * ready" once one answer's is, the overall view failed or not; otherwise "No feedback yet".
+ */
+export const mockFeedbackChipOf = (
+  session: MockSession,
+  now: number,
+): MockFeedbackChip => {
+  const reading = { now, retried: new Set<string>() };
+  if (isMockFeedbackWriting(session, reading)) {
+    return 'preparing';
+  }
+  return session.turns.some(
+    turn => mockAnswerFeedbackOf(session, turn, reading)?.status === 'ready',
+  )
+    ? 'ready'
+    : 'none';
+};
+
+/** Still going: its page is the interview itself, not Sessions' (doc 24 §19). */
+export const isMockGoing = (session: MockSession, now: number): boolean =>
+  session.status === 'active' && !isMockIdle(session, now);

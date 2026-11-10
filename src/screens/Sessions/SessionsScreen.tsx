@@ -110,7 +110,7 @@ type Loaded =
  * Every turn and, with mock interviews on, every mock interview: read when the page opens, after
  * every change, and after "Try again".
  */
-const usePracticeTurns = (withSessions: boolean) => {
+export const usePracticeTurns = (withSessions: boolean) => {
   const gateway = useProfileGateway();
   const uid = useSessionUser()?.uid;
   const { changes } = useAppSelector(selectPractice);
@@ -151,7 +151,7 @@ const usePracticeTurns = (withSessions: boolean) => {
   };
 };
 
-const TurnRow: React.FC<{ turn: PracticeTurn }> = ({ turn }) => {
+export const TurnRow: React.FC<{ turn: PracticeTurn }> = ({ turn }) => {
   const { t } = useTranslation();
   const from =
     turn.question.source === 'brief'

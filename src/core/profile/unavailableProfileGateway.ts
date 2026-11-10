@@ -59,6 +59,7 @@ export const unavailableProfileGateway: ProfileGateway = {
   answerPracticeTurn: unavailable,
   getMockSessions: unavailable,
   getMockSession: unavailable,
+  getInterviewMockSessions: unavailable,
   countMockSessions: unavailable,
   countApplicationMockSessions: unavailable,
   startMockInterview: unavailable,

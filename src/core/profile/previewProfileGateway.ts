@@ -3735,6 +3735,12 @@ export const createPreviewProfileGateway = ({
       }
       return found ? structuredClone(found) : null;
     },
+    getInterviewMockSessions: async (uid, interviewId) =>
+      structuredClone(
+        (read(uid).mockSessions ?? []).filter(
+          session => session.interviewId === interviewId,
+        ),
+      ),
     countMockSessions: async uid => (read(uid).mockSessions ?? []).length,
     countApplicationMockSessions: async (uid, applicationId) =>
       (read(uid).mockSessions ?? []).filter(

@@ -338,6 +338,11 @@ export interface ProfileGateway {
 
   /** Every mock interview (200 at most), the most recently changed first: Sessions. */
   getMockSessions(uid: string): Promise<MockSession[]>;
+  /** One interview's mock interviews (doc 24 §19), in no order. */
+  getInterviewMockSessions(
+    uid: string,
+    interviewId: string,
+  ): Promise<MockSession[]>;
   /** One mock interview; `null` when it does not exist (any more). */
   getMockSession(uid: string, sessionId: string): Promise<MockSession | null>;
   /** How many mock interviews the account keeps: none yet shows "Before you start". */

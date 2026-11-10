@@ -114,6 +114,12 @@ export const cvComparePath = (later: string, earlier?: string) =>
   }).toString()}`;
 
 /** The CV versions of one application (A6): the one sent, the others, a new one. */
+/** An application's Sessions tab (doc 24 §19): its mock interviews and the questions practised. */
+export const APPLICATION_SESSIONS_PATH = `${APPLICATION_PATH}/sessions`;
+
+export const applicationSessionsPath = (applicationId: string) =>
+  `${applicationPath(applicationId)}/sessions`;
+
 export const APPLICATION_CV_PATH = `${APPLICATION_PATH}/cv`;
 
 export const applicationCvPath = (applicationId: string) =>
