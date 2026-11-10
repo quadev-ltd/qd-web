@@ -40,6 +40,8 @@ import {
   RephraseMockQuestionResponseSchema,
   RESUME_MOCK_INTERVIEW,
   ResumeMockInterviewResponseSchema,
+  RETRY_MOCK_FEEDBACK,
+  type RetryMockFeedbackRequest,
   SEND_MOCK_FEEDBACK,
   type SendMockFeedbackRequest,
   SKIP_MOCK_QUESTION,
@@ -219,6 +221,12 @@ export const sendMockFeedback = async (
   request: SendMockFeedbackRequest,
 ): Promise<void> => {
   await call(SEND_MOCK_FEEDBACK, MockSessionIdResponseSchema, request);
+};
+
+export const retryMockFeedback = async (
+  request: RetryMockFeedbackRequest,
+): Promise<void> => {
+  await call(RETRY_MOCK_FEEDBACK, MockSessionIdResponseSchema, request);
 };
 
 export const removeMockSession = async (sessionId: string): Promise<void> => {

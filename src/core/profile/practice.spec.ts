@@ -100,6 +100,12 @@ describe('practiceStartKey', () => {
         question: { source: 'typed', text: 'Anything?' },
       }),
     ).toBe('typed/a1/i1');
+    expect(
+      practiceStartKey({
+        applicationId: 'a1',
+        question: { source: 'mock', sessionId: 's1', turnId: 't4' },
+      }),
+    ).toBe('mock/s1/t4');
   });
 });
 
@@ -161,5 +167,27 @@ describe('practiceRestartRequest', () => {
 
   it('can’t ask a question of a list without its interview', () => {
     expect(practiceRestartRequest(turn('t1', 1))).toBeNull();
+  });
+
+  it('asks a mock interview’s question as typed: its hints would be the same key points again (D101)', () => {
+    const fromMock = {
+      ...turn('t4', 1, {
+        source: 'mock',
+        text: 'Walk me through an incident.',
+        sessionId: 's1',
+        mockTurnId: 't3',
+      }),
+      interviewId: 'i1',
+    };
+    expect(fromMock.question).toMatchObject({
+      source: 'mock',
+      sessionId: 's1',
+      mockTurnId: 't3',
+    });
+    expect(practiceRestartRequest(fromMock)).toEqual({
+      applicationId: 'a1',
+      interviewId: 'i1',
+      question: { source: 'typed', text: 'Walk me through an incident.' },
+    });
   });
 });

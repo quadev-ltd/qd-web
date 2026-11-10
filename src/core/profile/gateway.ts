@@ -40,6 +40,7 @@ import {
   type MockPlayed,
   type MockSession,
   type PauseMockInterviewRequest,
+  type RetryMockFeedbackRequest,
   type SendMockFeedbackRequest,
   type StartMockInterviewRequest,
 } from './mockInterviews';
@@ -371,6 +372,11 @@ export interface ProfileGateway {
   endMockInterview(sessionId: string, played?: MockPlayed[]): Promise<void>;
   /** "How did it go?", once it ended. Sending again replaces it. */
   sendMockFeedback(request: SendMockFeedbackRequest): Promise<void>;
+  /**
+   * "Try again" on an answer's feedback or the overall view (D101): it answers at once, and the
+   * backend writes it again in the background.
+   */
+  retryMockFeedback(request: RetryMockFeedbackRequest): Promise<void>;
   removeMockSession(sessionId: string): Promise<void>;
   /** How many mock interviews were started today (UTC), for the limit. */
   getMockInterviewsToday(uid: string): Promise<number>;

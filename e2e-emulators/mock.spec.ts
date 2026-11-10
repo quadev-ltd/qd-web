@@ -6,12 +6,15 @@
 // and followed up by the `interviewer-next` fake; rephraseMockQuestion, skipMockQuestion,
 // pauseMockInterview, resumeMockInterview after a reload, endMockInterview, sendMockFeedback; the
 // session read back under the rules in Sessions, the day's count from `usage`, and
-// removeMockSession; and the hints (H1) the trigger writes, read again until in. The clock is
-// moved as the backend's own tests move it.
+// removeMockSession; the hints (H1) the trigger writes, read again until in; and the feedback on
+// the answers with the overall view (F1), written by the same trigger from the offline
+// `answer-feedback` and `mock-summary` fakes, one asked for again, and a question practised from
+// it (the `mock` source). The clock is moved as the backend's own tests move it.
 import { expect, type Page, test } from '@playwright/test';
 
 import {
   createAccount,
+  failMockAnswerFeedback,
   moveMockSessionBack,
   setUsageToday,
   signIn,
@@ -177,9 +180,15 @@ test('mock interview (D100 slice 1): started, answered, followed up, said differ
   await feedback.getByText('A bit long').click();
   await feedback.getByRole('button', { name: 'Send' }).click();
   await expect(feedback).toContainText('Thank you.');
+  // One answer: no overall view (F1)
+  await expect(page.getByRole('region', { name: 'How it went' })).toContainText(
+    'An overall view needs at least 2 answers.',
+  );
 
   // The session as stored, read under the rules
-  await page.getByRole('link', { name: 'See the transcript' }).click();
+  await page
+    .getByRole('link', { name: 'See your answers and feedback' })
+    .click();
   await expect(page).toHaveURL(/\/sessions\/mock\/[^/]+$/);
   const said = page.getByRole('region', { name: 'What was said' });
   await expect(said).toContainText(
@@ -286,6 +295,68 @@ test('hints (H1, H2): chosen at the setup and kept by the session, the trigger�
   await expect(
     hints.getByRole('button', { name: 'Show hints' }),
   ).not.toBeVisible();
+});
+
+test('feedback (F1, F2): each answer’s and how it went, written by the trigger; one asked for again; a question practised from it', async ({
+  page,
+}) => {
+  const account = await openInterview(page);
+  const sessionId = await start(page);
+  // Two answers: the warm-up, then its follow-up
+  await answerNow(page);
+  await expect(interviewer(page)).toContainText(
+    'fake-follow-up: what came of it?',
+  );
+  await expect(answer(page)).toContainText('Recording ·');
+  await answerNow(page);
+  await expect(page.getByText(/Question 2 of 4/)).toBeVisible();
+  await expect(answer(page)).toContainText('Recording ·');
+  await page.getByRole('button', { name: 'End interview' }).click();
+  await page
+    .getByRole('dialog', { name: 'End the interview?' })
+    .getByRole('button', { name: 'End the interview' })
+    .click();
+
+  // How it went, once every answer's has settled, read again until in
+  const overall = page.getByRole('region', { name: 'How it went' });
+  await expect(overall).toContainText('fake-went-well: 2 answers.', {
+    timeout: 30_000,
+  });
+  await expect(overall).toContainText('fake-work-on: say what came of it.');
+  await expect(overall).toContainText('fake-reason: it left out the result.');
+  await expect(
+    overall.getByRole('button', { name: 'Practise it' }),
+  ).toBeVisible();
+
+  // The first answer's failed after two tries: "Try again" in Sessions writes it again
+  await failMockAnswerFeedback(account.uid, sessionId, 't1');
+  await page
+    .getByRole('link', { name: 'See your answers and feedback' })
+    .click();
+  const said = page.getByRole('region', { name: 'What was said' });
+  // Each question of what was said; an answer's feedback, once open, has lists of its own
+  const first = said.locator('ol > li').nth(0);
+  const second = said.locator('ol > li').nth(1);
+  await expect(first).toContainText(/Your answer · \d:\d\d spoken/);
+  await expect(first).toContainText(
+    'We couldn’t prepare feedback on this answer.',
+  );
+  await first.getByRole('button', { name: 'Try again' }).click();
+  await first
+    .getByRole('button', { name: 'Show feedback' })
+    .click({ timeout: 30_000 });
+  await expect(first).toContainText(
+    'fake-structure: situation, task, action, result.',
+  );
+  await expect(first).toContainText('fake-suggestion: say what came of it.');
+
+  // "Practise this question": text practice with the follow-up as first asked, from the mock interview
+  await second.getByRole('button', { name: 'Practise this question' }).click();
+  await expect(page).toHaveURL(/\/sessions\/[^/]+$/, { timeout: 30_000 });
+  await expect(
+    page.getByRole('heading', { name: 'fake-follow-up: what came of it?' }),
+  ).toBeVisible();
+  await expect(page.getByText('From your mock interview')).toBeVisible();
 });
 
 test('mock interview: the backend refuses over the day’s 3, and the page says so', async ({

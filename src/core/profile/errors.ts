@@ -44,6 +44,8 @@ export const ProfileErrorCode = {
   MockSessionEnded: 'profile/mock-session-ended',
   /** The interviewer failed twice in a row, so the mock interview ended. */
   MockSessionFailed: 'profile/mock-session-failed',
+  /** The feedback asked for again is being written, or is there already: read the session again. */
+  MockFeedbackNotFailed: 'profile/mock-feedback-not-failed',
   /** The question to practise changed since the page read it: read the page again. */
   QuestionChanged: 'profile/question-changed',
   /** The application has no job description, so nothing can be written from it. */
@@ -101,6 +103,7 @@ const EXPECTED_CODES: ReadonlySet<string> = new Set([
   ProfileErrorCode.MockNotCurrent,
   ProfileErrorCode.MockBusy,
   ProfileErrorCode.MockSessionEnded,
+  ProfileErrorCode.MockFeedbackNotFailed,
   ProfileErrorCode.MaxLetters,
   ProfileErrorCode.CvNotReady,
   ProfileErrorCode.QuestionChanged,

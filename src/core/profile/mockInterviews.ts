@@ -3,13 +3,19 @@
 // played with the microphone off, the answer is recorded until "I'm done" and sent in the call
 // itself, never stored; the next line comes back with its audio. The session keeps each question
 // as asked and the answer as text, for 12 months (D24). A copy of quadev-backend's
-// packages/shared/src/mockInterview.ts at 5ab5f7e (10 Nov 2026), less what the pages don't read
+// packages/shared/src/mockInterview.ts at 197a9d2 (10 Nov 2026), less what the pages don't read
 // (`skills`, `costUsd`, the backend's own fields); the backend applies the limits again and
-// refuses what fails.
+// refuses what fails. The feedback on the answers and the overall view (D101, slice F1) are the
+// backend's contract in doc 24 §18 (10 Nov 2026).
 import { z } from 'zod';
 
 import { INTERVIEW_QUESTION_KINDS, INTERVIEW_TYPES } from './interviews';
-import { type PracticeKeyPoint, PracticeKeyPointSchema } from './practice';
+import {
+  type PracticeFeedback,
+  PracticeFeedbackSchema,
+  type PracticeKeyPoint,
+  PracticeKeyPointSchema,
+} from './practice';
 
 // ---------- Limits ----------
 
@@ -26,6 +32,13 @@ export const MOCK_FEEDBACK_COMMENT_MAX_CHARS = 1_000;
 export const MOCK_IDLE_MS = 30 * 60_000;
 /** How long the retention runs after the session last changed (D24). */
 export const MOCK_RETENTION_MONTHS = 12;
+/**
+ * The trigger's time for one feedback, two tries included (F1): an answer with no feedback
+ * this long after it was given, or an ended session with no overall view, gets none by itself.
+ */
+export const MOCK_FEEDBACK_SETTLE_MS = 5 * 60_000;
+/** An overall view needs this many answers; with fewer it is `none` (§18.1). */
+export const MOCK_OVERALL_MIN_ANSWERS = 2;
 
 export const MOCK_WAYS = ['take-turns', 'real-time', 'voice-model'] as const;
 export type MockWay = (typeof MOCK_WAYS)[number];
@@ -97,8 +110,12 @@ export const MockRefusal = {
   Busy: 'busy',
   /** No words in the recording: the question stays open. */
   NothingHeard: 'nothing-heard',
-  /** Feedback before the session ended. */
+  /** Feedback before the session ended; the overall view of a session not ended yet. */
   NotEnded: 'not-ended',
+  /** Try again on a turn skipped or still open. */
+  NotAnswered: 'not-answered',
+  /** Try again on feedback being written or there already, or on `none`. */
+  NotFailed: 'not-failed',
   AudioType: 'audio-type',
   AudioTooBig: 'audio-too-big',
   AnswerTooLong: 'answer-too-long',
@@ -195,6 +212,60 @@ export const MockHintsSchema = z.object({
 });
 export type MockHints = z.infer<typeof MockHintsSchema>;
 
+/** Lines that can't be read are left out, rather than the whole overall view. */
+const lines = z
+  .array(z.unknown())
+  .catch([])
+  .optional()
+  .transform(items =>
+    (items ?? []).filter(
+      (item): item is string => typeof item === 'string' && item.length > 0,
+    ),
+  );
+
+export const MOCK_FEEDBACK_STATUSES = [
+  'writing',
+  'ready',
+  /** After two tries. */
+  'failed',
+  /** The day's $2 of mock interviews was reached: no call was made. */
+  'quota',
+] as const;
+
+/**
+ * One answer's feedback (F1), written in the background from the moment it was given: text
+ * practice's sections as they are. A `ready` one without feedback that can be read is left out.
+ */
+export const MockAnswerFeedbackSchema = z
+  .object({
+    status: z.enum(MOCK_FEEDBACK_STATUSES),
+    feedback: PracticeFeedbackSchema.optional().catch(undefined),
+    /** When the trigger claimed it: `writing` for longer than 5 minutes can be asked again. */
+    startedAt: optionalTimestamp,
+    readyAt: optionalTimestamp,
+  })
+  .refine(entry => entry.status !== 'ready' || entry.feedback !== undefined);
+export type MockAnswerFeedback = z.infer<typeof MockAnswerFeedbackSchema>;
+
+/**
+ * "How it went" (F1): written once the session has ended and every answer's feedback has
+ * settled; `none` with fewer than 2 answers. No score, nothing on tone.
+ */
+export const MockOverallSchema = z.object({
+  status: z.enum([...MOCK_FEEDBACK_STATUSES, 'none']),
+  /** 1 to 3: "What went well". */
+  wentWell: lines,
+  /** 1 to 3: "What to work on". */
+  workOn: lines,
+  /** 0 to 3: "Worth practising again", each a turn of this session with its reason. */
+  practiseAgain: listOf(
+    z.object({ turnId: z.string().min(1), reason: z.string().catch('') }),
+  ),
+  startedAt: optionalTimestamp,
+  readyAt: optionalTimestamp,
+});
+export type MockOverall = z.infer<typeof MockOverallSchema>;
+
 export const MockFeedbackSchema = z.object({
   feel: z.number().int().min(1).max(5),
   wait: z.enum(MOCK_WAIT),
@@ -239,6 +310,21 @@ export const MockSessionSchema = z.object({
         }),
       ),
     ),
+  /** By turn id, answered turns only. No entry: not started yet. */
+  answerFeedback: z
+    .record(z.string(), z.unknown())
+    .catch({})
+    .optional()
+    .transform(entries =>
+      Object.fromEntries(
+        Object.entries(entries ?? {}).flatMap(([turnId, entry]) => {
+          const parsed = MockAnswerFeedbackSchema.safeParse(entry);
+          return parsed.success ? [[turnId, parsed.data]] : [];
+        }),
+      ),
+    ),
+  /** Absent until it starts: an ended session without it is "Preparing". */
+  overall: MockOverallSchema.optional().catch(undefined),
   status: z.enum(MOCK_SESSION_STATUSES),
   endReason: z.enum(MOCK_END_REASONS).optional().catch(undefined),
   plan: z
@@ -254,6 +340,7 @@ export const MockSessionSchema = z.object({
   endedAt: timestamp,
   pausedAt: timestamp,
   pausedMs: count,
+  /** The tester's card, "How did it go?": not the feedback on the answers. */
   feedback: MockFeedbackSchema.optional().catch(undefined),
   createdAt: timestamp,
   /** Moves with every call: Sessions orders by it, and an active session idle for 30 minutes is not finished. */
@@ -272,6 +359,7 @@ export const RESUME_MOCK_INTERVIEW = 'resumeMockInterview';
 export const END_MOCK_INTERVIEW = 'endMockInterview';
 export const SEND_MOCK_FEEDBACK = 'sendMockFeedback';
 export const REMOVE_MOCK_SESSION = 'removeMockSession';
+export const RETRY_MOCK_FEEDBACK = 'retryMockFeedback';
 
 /** What the browser measured of one line it played, sent with the next call (§13.5). */
 export interface MockPlayed {
@@ -343,6 +431,13 @@ export interface SendMockFeedbackRequest {
   cutOff?: (typeof MOCK_CUT_OFF)[number];
   comment?: string;
 }
+
+/**
+ * "Try again" on one answer's feedback or on the overall view: failed, stopped by the day's limit,
+ * or never written (a session from before F1). It answers at once; the trigger writes it again.
+ */
+export type RetryMockFeedbackRequest =
+  { sessionId: string; turnId: string } | { sessionId: string; overall: true };
 
 const documentId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 
@@ -465,3 +560,154 @@ export const mockProgress = (
     : -1;
   return of > 0 && index >= 0 ? { number: index + 1, of } : null;
 };
+
+/** How the pages read the feedback at a moment: the time, and what was asked again on the page. */
+export interface MockFeedbackReading {
+  now: number;
+  /**
+   * Asked again here (turn ids, and MOCK_OVERALL_KEY): written soon, though the read may not
+   * have it yet, since the call clears it first.
+   */
+  retried: ReadonlySet<string>;
+}
+
+export const MOCK_OVERALL_KEY = 'overall';
+
+/** One answer's feedback as the pages show it. */
+export type MockAnswerFeedbackState =
+  | { status: 'writing' }
+  | { status: 'ready'; feedback: PracticeFeedback }
+  | { status: 'failed' }
+  /** `reset`: the day whose limit stopped it is over, so it can be asked for again. */
+  | { status: 'quota'; reset: boolean }
+  /**
+   * None coming by itself: a session from before F1, or a trigger that never ran or stopped
+   * while writing it. "Get feedback" asks for it.
+   */
+  | { status: 'missing' };
+
+const utcDay = (at: number) => new Date(at).toISOString().slice(0, 10);
+
+/** Whether the limit that stopped feedback written at `at` has reset by `now` (midnight UTC). */
+const limitReset = (at: number | null, now: number) =>
+  at !== null && utcDay(at) !== utcDay(now);
+
+/** Not written, or `writing` for longer than the trigger's time, and not asked again here. */
+const notComing = (
+  key: string,
+  since: number | null | undefined,
+  { now, retried }: MockFeedbackReading,
+) =>
+  !retried.has(key) &&
+  since !== null &&
+  since !== undefined &&
+  now - since > MOCK_FEEDBACK_SETTLE_MS;
+
+/** An answered turn's feedback; null for a turn skipped or not answered. */
+export const mockAnswerFeedbackOf = (
+  session: Pick<MockSession, 'answerFeedback' | 'endedAt'>,
+  turn: Pick<MockTurn, 'id' | 'status' | 'answeredAt'>,
+  reading: MockFeedbackReading,
+): MockAnswerFeedbackState | null => {
+  if (turn.status !== 'answered') {
+    return null;
+  }
+  const entry = session.answerFeedback[turn.id];
+  const since = turn.answeredAt ?? session.endedAt;
+  switch (entry?.status) {
+    case undefined:
+      return notComing(turn.id, since, reading)
+        ? { status: 'missing' }
+        : { status: 'writing' };
+    case 'writing':
+      return notComing(turn.id, entry.startedAt, reading)
+        ? { status: 'missing' }
+        : { status: 'writing' };
+    case 'ready':
+      return entry.feedback
+        ? { status: 'ready', feedback: entry.feedback }
+        : { status: 'failed' };
+    case 'quota':
+      return { status: 'quota', reset: limitReset(since, reading.now) };
+    case 'failed':
+      return { status: 'failed' };
+  }
+};
+
+/** "How it went" as the pages show it. */
+export type MockOverallState =
+  /** "Preparing your feedback · 3 of 5 answers ready". */
+  | { status: 'writing'; ready: number; of: number }
+  | { status: 'ready'; overall: MockOverall }
+  | { status: 'failed' }
+  | { status: 'quota'; reset: boolean }
+  /** Fewer than 2 answers. */
+  | { status: 'none' }
+  /**
+   * None coming by itself: "Get feedback" asks again for the answers that have none
+   * (`turnIds`), whose overall view follows, or for the overall view alone.
+   */
+  | { status: 'missing'; turnIds: string[] };
+
+/** The overall view of an ended session with answers; null otherwise. */
+export const mockOverallOf = (
+  session: Pick<
+    MockSession,
+    'status' | 'turns' | 'answerFeedback' | 'overall' | 'endedAt'
+  >,
+  reading: MockFeedbackReading,
+): MockOverallState | null => {
+  const answered = session.turns.filter(turn => turn.status === 'answered');
+  if (session.status !== 'ended' || answered.length === 0) {
+    return null;
+  }
+  const { overall } = session;
+  if (
+    answered.length < MOCK_OVERALL_MIN_ANSWERS ||
+    overall?.status === 'none'
+  ) {
+    return { status: 'none' };
+  }
+  switch (overall?.status) {
+    case 'ready':
+      return { status: 'ready', overall };
+    case 'failed':
+      return { status: 'failed' };
+    case 'quota':
+      return {
+        status: 'quota',
+        reset: limitReset(session.endedAt, reading.now),
+      };
+  }
+  const answers = answered.map(turn => ({
+    turnId: turn.id,
+    status: mockAnswerFeedbackOf(session, turn, reading)?.status,
+  }));
+  const ready = answers.filter(({ status }) => status === 'ready').length;
+  if (!answers.some(({ status }) => status === 'writing')) {
+    const missing = answers
+      .filter(({ status }) => status === 'missing')
+      .map(({ turnId }) => turnId);
+    // It starts once every answer has settled: missing answers first, then it alone.
+    if (
+      (!overall && missing.length > 0) ||
+      notComing(
+        MOCK_OVERALL_KEY,
+        overall ? overall.startedAt : session.endedAt,
+        reading,
+      )
+    ) {
+      return { status: 'missing', turnIds: overall ? [] : missing };
+    }
+  }
+  return { status: 'writing', ready, of: answered.length };
+};
+
+/** Whether feedback is still being written, so the page reads the session again. */
+export const isMockFeedbackWriting = (
+  session: MockSession,
+  reading: MockFeedbackReading,
+): boolean =>
+  session.turns.some(
+    turn => mockAnswerFeedbackOf(session, turn, reading)?.status === 'writing',
+  ) || mockOverallOf(session, reading)?.status === 'writing';

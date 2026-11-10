@@ -77,6 +77,33 @@ points into the session's `hints`, by plan question for a planned turn and by tu
 - **An empty recording is "nothing heard",** decided in the page: "I'm done" pressed within a few milliseconds
   gave the backend an empty recording, which it refuses as invalid, and the page said the answer couldn't be sent.
 
+## Feedback on the answers (slice F2, D101, 10 Nov 2026)
+
+Against the backend's slice F1 (research doc 24 §18): the trigger writes each answer's feedback into the
+session's `answerFeedback`, by turn, as soon as it is answered, and `overall` ("How it went") once the session has
+ended and every answer's has settled; `retryMockFeedback` asks for one of them again. Drawn as `Web-X6-End`,
+`Web-R2-Mock` and `Web-R2-Mock-Feedback-States` (canvas versions 71 to 73).
+
+- **Never during the interview.** The end page shows "How it went" above the testers' card; Sessions shows it at
+  the top, and each answer's feedback behind "Show feedback". A session still going shows none.
+- **The page reads the session again every 5 seconds** while an answer's or the overall view is being written,
+  for 3 minutes, then says "This is taking longer than usual" with "Check again" (§18.7).
+- **None coming is worked out by the page:** an answer with no entry 5 minutes after it was given, or one still
+  `writing` 5 minutes after the trigger claimed it (the trigger's time), and an ended session with no overall
+  view 5 minutes on. It shows "Get feedback" rather than reading for 3 minutes. Sessions from before F1, the
+  owner's first interview among them, are the case; one call starts every answer with none, since the trigger
+  claims them all, and the overall view follows.
+- **Asked for again on the page, it is on its way** until a read shows it, since the call clears it first. A
+  `not-failed` refusal means it is on its way already, and is not shown as a failure.
+- **Today's limit:** the time it can be had is the next midnight UTC in the candidate's time; once the UTC day has
+  changed, "Get feedback" asks again.
+- **One component for the sections,** text practice's and each answer's (`FeedbackSections`); the overall view
+  uses its lists.
+- **"Practise it" and "Practise this question"** start text practice with `{ source: 'mock', sessionId, turnId }`
+  and no interview (the session's is used), with the `textPractice` flag, and open the practice under the
+  interview from the end page, under Sessions from Sessions. "Start again with new key points" on such a
+  practice asks the question as typed, since the hints would be the same key points again.
+
 ## Consequences
 
 - Real time (slice 4) adds a WebSocket and an AudioWorklet next to the recorder; the controller's view and the

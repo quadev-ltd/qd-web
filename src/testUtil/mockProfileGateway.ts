@@ -104,6 +104,7 @@ export const createMockProfileGateway = (): Mocked<ProfileGateway> => ({
   ),
   endMockInterview: vi.fn(() => Promise.resolve()),
   sendMockFeedback: vi.fn(() => Promise.resolve()),
+  retryMockFeedback: vi.fn(() => Promise.resolve()),
   removeMockSession: vi.fn(() => Promise.resolve()),
   getMockInterviewsToday: vi.fn(() => Promise.resolve(0)),
   getCvVersions: vi.fn(() => Promise.resolve([])),

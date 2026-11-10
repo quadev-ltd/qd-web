@@ -1,7 +1,9 @@
 // A mock interview in Sessions (Web-R2-Mock, D100): the way, the length used, the voice and the
-// tester's rating, then what was said, each question (follow-ups and skips marked) with the answer
-// as text. The audio was never kept. "Remove this mock interview", asked first. A session still
-// going says so, with the way back into it.
+// tester's rating, "How it went" once it has ended (D101), then what was said, each question
+// (follow-ups and skips marked) with the answer as text, how long it was spoken, its feedback
+// behind "Show feedback", and "Practise this question" (MockFeedback). The audio was never kept.
+// "Remove this mock interview", asked first. A session still going says so, with the way back into
+// it, and shows no feedback.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -23,12 +25,15 @@ import {
 } from '@/core/profile/errors';
 import {
   isMockIdle,
+  mockAnswerFeedbackOf,
+  mockOverallOf,
   type MockSession,
   type MockTurn,
 } from '@/core/profile/mockInterviews';
 import {
   applicationInterviewMockPath,
   SESSIONS_PATH,
+  sessionPracticePath,
 } from '@/core/profile/paths';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
 import { useMockSession } from '@/core/profile/useMockInterviews';
@@ -37,6 +42,15 @@ import {
   interviewTitle,
   useNow,
 } from '@/screens/Applications/interviews/interviewText';
+import {
+  MockAnswerFeedback,
+  type MockFeedbackControls,
+  MockOverallCard,
+  type MockPractise,
+  useMockFeedback,
+  useMockPractise,
+} from '@/screens/Mock/MockFeedback';
+import { clockTime } from '@/screens/Mock/MockLive';
 import { mockMinutes, mockTitle, VOICE_KEYS } from '@/screens/Mock/mockParts';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 
@@ -67,10 +81,14 @@ const numbered = (session: MockSession) =>
 const TurnItem: React.FC<{
   turn: MockTurn;
   number: number | null;
-  /** The interview is over: a question left open was never answered. */
+  /** The interview is over: a question left open was never answered, and feedback shows. */
   ended: boolean;
-}> = ({ turn, number, ended }) => {
+  session: MockSession;
+  feedback: MockFeedbackControls;
+  practise?: MockPractise;
+}> = ({ turn, number, ended, session, feedback, practise }) => {
   const { t } = useTranslation();
+  const state = mockAnswerFeedbackOf(session, turn, feedback.reading);
   return (
     <li className="flex flex-col gap-2 border-t border-border-faint py-4 first:border-t-0">
       <div className="flex flex-wrap gap-2">
@@ -104,12 +122,24 @@ const TurnItem: React.FC<{
       {turn.answer && (
         <div className="flex flex-col gap-1.5">
           <p className="text-sm leading-normal text-muted">
-            {t('mock.yourAnswer')}
+            {turn.answer.spokenMs > 0
+              ? t('mock.yourAnswerSpoken', {
+                  time: clockTime(turn.answer.spokenMs),
+                })
+              : t('mock.yourAnswer')}
           </p>
           <p className="text-[15px] leading-normal whitespace-pre-line wrap-anywhere">
             {turn.answer.transcript}
           </p>
         </div>
+      )}
+      {ended && (state || (practise && turn.status === 'skipped')) && (
+        <MockAnswerFeedback
+          turnId={turn.id}
+          state={state}
+          feedback={feedback}
+          practise={practise}
+        />
       )}
     </li>
   );
@@ -194,6 +224,13 @@ export const MockSessionScreen: React.FC = () => {
   const { state, reload } = useMockSession(sessionId);
   const now = useNow();
   const [removing, setRemoving] = useState(false);
+  const read = state.status === 'loaded' ? state.session : null;
+  const feedback = useMockFeedback({
+    session: read,
+    shown: read?.status === 'ended',
+    reload,
+  });
+  const practise = useMockPractise(read, sessionPracticePath);
 
   let body: React.ReactNode;
   if (state.status === 'loading') {
@@ -249,6 +286,7 @@ export const MockSessionScreen: React.FC = () => {
       .filter(Boolean)
       .join(' · ');
     const going = session.status === 'active' && !isMockIdle(session, now);
+    const overall = mockOverallOf(session, feedback.reading);
     const rows = [
       [t('mock.summaryWay'), t('mock.wayName')],
       [
@@ -313,6 +351,15 @@ export const MockSessionScreen: React.FC = () => {
             ))}
           </dl>
         </Card>
+        {overall && (
+          <MockOverallCard
+            session={session}
+            state={overall}
+            page="sessions"
+            feedback={feedback}
+            practise={practise}
+          />
+        )}
         <Card
           as="section"
           elevation="raised"
@@ -335,12 +382,12 @@ export const MockSessionScreen: React.FC = () => {
                 turn={turn}
                 number={number}
                 ended={!going}
+                session={session}
+                feedback={feedback}
+                practise={practise}
               />
             ))}
           </ol>
-          <p className="pt-2 text-sm leading-normal text-muted">
-            {t('mock.laterNote')}
-          </p>
         </Card>
         <Button
           variant="quietDanger"
