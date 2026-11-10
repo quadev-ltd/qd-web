@@ -362,6 +362,7 @@ describe('starting and removing a practice (D94)', () => {
 
     await expect(removeApplicationPractice('a1')).resolves.toEqual({
       removed: 2,
+      removedSessions: 0,
     });
     expect(httpsCallable).toHaveBeenCalledWith(
       { name: 'functions' },

@@ -7,6 +7,7 @@ import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import Dialog from '@/components/ui/Dialog';
+import { useFlag } from '@/core/flags/FlagsProvider';
 import {
   getProfileErrorCode,
   logProfileError,
@@ -17,6 +18,7 @@ import { useSessionUser } from '@/core/session/hooks';
 import { useAppDispatch } from '@/core/state/hooks';
 import { applicationRemoved } from '@/core/state/slices/applicationsSlice';
 import { practiceChanged } from '@/core/state/slices/practiceSlice';
+import { practiceAmount } from '@/screens/Sessions/practiceAmount';
 
 export interface RemoveApplicationDialogProps {
   applicationId: string;
@@ -40,7 +42,12 @@ export const RemoveApplicationDialog: React.FC<
   const uid = useSessionUser()?.uid;
   const [isRemoving, setIsRemoving] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [practice, setPractice] = useState<number | null>(null);
+  // Its questions practised and, with mock interviews on, its mock interviews (D100).
+  const [practice, setPractice] = useState<{
+    questions: number;
+    mockInterviews: number;
+  } | null>(null);
+  const mockInterview = useFlag('mockInterview');
   const [removePractice, setRemovePractice] = useState(false);
   const error = useRef<HTMLDivElement>(null);
   const hintId = useId();
@@ -50,19 +57,25 @@ export const RemoveApplicationDialog: React.FC<
       return undefined;
     }
     let live = true;
-    gateway.countApplicationPractice(uid, applicationId).then(
-      count => live && setPractice(count),
+    Promise.all([
+      gateway.countApplicationPractice(uid, applicationId),
+      mockInterview
+        ? gateway.countApplicationMockSessions(uid, applicationId)
+        : Promise.resolve(0),
+    ]).then(
+      ([questions, mockInterviews]) =>
+        live && setPractice({ questions, mockInterviews }),
       reason => {
         logProfileError('countApplicationPractice', reason, uid);
         if (live) {
-          setPractice(0);
+          setPractice({ questions: 0, mockInterviews: 0 });
         }
       },
     );
     return () => {
       live = false;
     };
-  }, [applicationId, gateway, uid]);
+  }, [applicationId, gateway, uid, mockInterview]);
 
   useEffect(() => {
     if (failed) {
@@ -104,22 +117,30 @@ export const RemoveApplicationDialog: React.FC<
       <p className="text-[16px] leading-normal text-muted">
         {t('applications.removeDialogText')}
       </p>
-      {practice !== null && practice > 0 && (
-        <div className="flex flex-col gap-1 rounded-[14px] bg-background px-3.5 py-2.5">
-          <Checkbox
-            checked={removePractice}
-            onChange={event => setRemovePractice(event.target.checked)}
-            disabled={isRemoving}
-            aria-describedby={hintId}>
-            {t('applications.removePracticeLabel', { count: practice })}
-          </Checkbox>
-          <p
-            id={hintId}
-            className="pl-[34px] text-sm leading-normal text-muted">
-            {t('applications.removePracticeHint')}
-          </p>
-        </div>
-      )}
+      {practice !== null &&
+        practice.questions + practice.mockInterviews > 0 && (
+          <div className="flex flex-col gap-1 rounded-[14px] bg-background px-3.5 py-2.5">
+            <Checkbox
+              checked={removePractice}
+              onChange={event => setRemovePractice(event.target.checked)}
+              disabled={isRemoving}
+              aria-describedby={hintId}>
+              {t('applications.removePracticeLabel', {
+                what: practiceAmount(
+                  t,
+                  practice.questions,
+                  practice.mockInterviews,
+                  'questions-first',
+                ),
+              })}
+            </Checkbox>
+            <p
+              id={hintId}
+              className="pl-[34px] text-sm leading-normal text-muted">
+              {t('applications.removePracticeHint')}
+            </p>
+          </div>
+        )}
       {failed && (
         <Banner ref={error} tone="danger" role="alert">
           {t('applications.removeFailedMessage')}

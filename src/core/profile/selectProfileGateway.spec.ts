@@ -54,10 +54,12 @@ describe('selectProfileGateway', () => {
       setCvVersionsToday: expect.any(Function),
       failNextQuestions: expect.any(Function),
       setInterviewQuestionsToday: expect.any(Function),
+      failNextMock: expect.any(Function),
       failNextPractice: expect.any(Function),
       failNextLetter: expect.any(Function),
       setCoverLettersToday: expect.any(Function),
       setPracticeToday: expect.any(Function),
+      setMockToday: expect.any(Function),
       createEditVersion: expect.any(Function),
       setUsageLimits: expect.any(Function),
     });

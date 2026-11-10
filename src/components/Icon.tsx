@@ -40,6 +40,12 @@ const PATHS = {
       <path d="M12 7v5l3 2" />
     </>
   ),
+  copy: (
+    <>
+      <rect x="8" y="8" width="12" height="12" rx="2" />
+      <path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" />
+    </>
+  ),
   down: <path d="M6 9l6 6 6-6" />,
   download: (
     <>
@@ -105,6 +111,16 @@ const PATHS = {
       <path d="M12 18v3" />
     </>
   ),
+  micOff: (
+    <>
+      <path d="M3 3l18 18" />
+      <path d="M9 9v2a3 3 0 0 0 5 2.2" />
+      <path d="M15 9.5V6a3 3 0 0 0-5.7-1.3" />
+      <path d="M5 11a7 7 0 0 0 11.5 5.4" />
+      <path d="M19 11a7 7 0 0 1-.5 2.6" />
+      <path d="M12 18v3" />
+    </>
+  ),
   more: (
     <>
       <circle cx="5" cy="12" r="1.2" />
@@ -112,6 +128,13 @@ const PATHS = {
       <circle cx="19" cy="12" r="1.2" />
     </>
   ),
+  pause: (
+    <>
+      <path d="M9 5v14" />
+      <path d="M15 5v14" />
+    </>
+  ),
+  play: <path d="M8 5l11 7-11 7z" />,
   plus: (
     <>
       <path d="M12 5v14" />
@@ -127,6 +150,13 @@ const PATHS = {
     </>
   ),
   right: <path d="M9 6l6 6-6 6" />,
+  skip: (
+    <>
+      <path d="M6 5l9 7-9 7z" />
+      <path d="M18 5v14" />
+    </>
+  ),
+  stop: <rect x="6" y="6" width="12" height="12" rx="2" />,
   star: (
     <path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8-4.2-4.1 5.9-.9z" />
   ),
@@ -158,6 +188,14 @@ const PATHS = {
     <>
       <circle cx="12" cy="8" r="4" />
       <path d="M4 21a8 8 0 0 1 16 0" />
+    </>
+  ),
+  wave: (
+    <>
+      <path d="M4 12h2" />
+      <path d="M9 7v10" />
+      <path d="M14 4v16" />
+      <path d="M19 9v6" />
     </>
   ),
   x: (

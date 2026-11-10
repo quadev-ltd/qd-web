@@ -1,7 +1,9 @@
-// Sessions (R1, D85, D94): the practice kept, one card per job, the most recently practised first.
-// Each question shows its kind, where it came from and when it was last practised, and opens its
-// practice. A removed application's practice stays under its name (from the turn's snapshot) with
-// "Application removed" and "Remove all", asked first (D99). Mock interviews will join this page.
+// Sessions (R1, D85, D94, D100): the practice kept, one card per job, the most recently practised
+// first. A job's mock interviews come first (with `mockInterview`), each with its way, questions,
+// minutes and day, opening what was said; then each question with its kind, where it came from
+// and when it was last practised, opening its practice. A removed application's practice stays
+// under its name (from the snapshot) with "Application removed" and "Remove all", asked first
+// (D99).
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
@@ -16,58 +18,80 @@ import Button from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/ButtonLink';
 import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
+import { useFlag } from '@/core/flags/FlagsProvider';
 import { type JobApplication } from '@/core/profile/applications';
 import { useApplications } from '@/core/profile/ApplicationsProvider';
 import { logProfileError } from '@/core/profile/errors';
-import { APPLICATIONS_PATH, sessionPracticePath } from '@/core/profile/paths';
+import { isMockIdle, type MockSession } from '@/core/profile/mockInterviews';
+import {
+  APPLICATIONS_PATH,
+  sessionMockPath,
+  sessionPracticePath,
+} from '@/core/profile/paths';
 import { type PracticeTurn } from '@/core/profile/practice';
 import { useProfileGateway } from '@/core/profile/ProfileGatewayProvider';
 import { useSessionUser } from '@/core/session/hooks';
 import { useAppSelector } from '@/core/state/hooks';
 import { selectPractice } from '@/core/state/selectors/practice';
 import { QUESTION_KIND_KEYS } from '@/screens/Applications/BriefCards';
-import { interviewTitle } from '@/screens/Applications/interviews/interviewText';
+import {
+  interviewTitle,
+  useNow,
+} from '@/screens/Applications/interviews/interviewText';
+import { mockCounts, mockMinutes, mockTitle } from '@/screens/Mock/mockParts';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 import { formatDay } from '@/screens/Profile/Resource/resourceMeta';
 
-/** One job's practice: its turns, the most recently practised first. */
+/** One job's practice: its mock interviews and its turns, the most recently changed first. */
 interface Group {
   applicationId: string;
   title: string;
   company?: string;
   removed: boolean;
+  sessions: MockSession[];
   turns: PracticeTurn[];
 }
 
+/** What a group is made from: a turn or a mock interview, with the job's snapshot. */
+type Practised =
+  { kind: 'turn'; item: PracticeTurn } | { kind: 'session'; item: MockSession };
+
 /**
- * The turns by application, in the order of their latest practice. A job is named as it is now,
- * or as it was when its practice started once it is removed.
+ * The turns and mock interviews by application, in the order of their latest change. A job is
+ * named as it is now, or as it was when its practice started once it is removed.
  */
 export const groupsOf = (
   turns: PracticeTurn[],
   applications: JobApplication[],
   untitled: string,
+  sessions: MockSession[] = [],
 ): Group[] => {
   const groups = new Map<string, Group>();
-  const newestFirst = [...turns].sort(
-    (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
-  );
-  for (const turn of newestFirst) {
-    let group = groups.get(turn.applicationId);
+  const all: Practised[] = [
+    ...turns.map(item => ({ kind: 'turn' as const, item })),
+    ...sessions.map(item => ({ kind: 'session' as const, item })),
+  ].sort((a, b) => (b.item.updatedAt ?? 0) - (a.item.updatedAt ?? 0));
+  for (const { kind, item } of all) {
+    let group = groups.get(item.applicationId);
     if (!group) {
-      const application = turn.applicationRemoved
+      const application = item.applicationRemoved
         ? undefined
-        : applications.find(({ id }) => id === turn.applicationId);
+        : applications.find(({ id }) => id === item.applicationId);
       group = {
-        applicationId: turn.applicationId,
-        title: application?.title || turn.application.title || untitled,
-        company: application?.company || turn.application.company,
-        removed: Boolean(turn.applicationRemoved),
+        applicationId: item.applicationId,
+        title: application?.title || item.application.title || untitled,
+        company: application?.company || item.application.company,
+        removed: Boolean(item.applicationRemoved),
+        sessions: [],
         turns: [],
       };
-      groups.set(turn.applicationId, group);
+      groups.set(item.applicationId, group);
     }
-    group.turns.push(turn);
+    if (kind === 'turn') {
+      group.turns.push(item);
+    } else {
+      group.sessions.push(item);
+    }
   }
   return [...groups.values()];
 };
@@ -75,10 +99,13 @@ export const groupsOf = (
 type Loaded =
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'loaded'; turns: PracticeTurn[] };
+  | { status: 'loaded'; turns: PracticeTurn[]; sessions: MockSession[] };
 
-/** Every turn, read when the page opens, after every change, and after "Try again". */
-const usePracticeTurns = () => {
+/**
+ * Every turn and, with mock interviews on, every mock interview: read when the page opens, after
+ * every change, and after "Try again".
+ */
+const usePracticeTurns = (withSessions: boolean) => {
   const gateway = useProfileGateway();
   const uid = useSessionUser()?.uid;
   const { changes } = useAppSelector(selectPractice);
@@ -86,15 +113,20 @@ const usePracticeTurns = () => {
   const [loaded, setLoaded] = useState<{ key: string; state: Loaded } | null>(
     null,
   );
-  const key = `${changes}/${attempt}`;
+  const key = `${changes}/${attempt}/${withSessions}`;
 
   useEffect(() => {
     if (!uid) {
       return undefined;
     }
     let live = true;
-    gateway.getPracticeTurns(uid).then(
-      turns => live && setLoaded({ key, state: { status: 'loaded', turns } }),
+    Promise.all([
+      gateway.getPracticeTurns(uid),
+      withSessions ? gateway.getMockSessions(uid) : Promise.resolve([]),
+    ]).then(
+      ([turns, sessions]) =>
+        live &&
+        setLoaded({ key, state: { status: 'loaded', turns, sessions } }),
       error => {
         logProfileError('getPracticeTurns', error, uid);
         if (live) {
@@ -105,7 +137,7 @@ const usePracticeTurns = () => {
     return () => {
       live = false;
     };
-  }, [gateway, key, uid]);
+  }, [gateway, key, uid, withSessions]);
 
   // What was read stays on screen while it is read again.
   return {
@@ -157,6 +189,53 @@ const TurnRow: React.FC<{ turn: PracticeTurn }> = ({ turn }) => {
   );
 };
 
+/** A mock interview: its way, questions asked, minutes and day; one still going says so. */
+const MockRow: React.FC<{ session: MockSession }> = ({ session }) => {
+  const { t } = useTranslation();
+  const now = useNow();
+  const { questions } = mockCounts(session);
+  const going = session.status === 'active';
+  const meta = [
+    t('mock.wayName'),
+    t('sessions.questions', { count: questions }),
+    going
+      ? isMockIdle(session, now)
+        ? t('sessions.mockNotFinished')
+        : t('sessions.mockGoing')
+      : t('sessions.mockMinutes', { count: mockMinutes(session) }),
+    session.startedAt !== null ? formatDay(session.startedAt) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return (
+    <li className="relative flex items-center gap-3 border-t border-border-faint py-3.5 first:border-t-0">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <span className="flex">
+          <Chip tone="brand" icon="wave">
+            {t('sessions.mockChip')}
+          </Chip>
+        </span>
+        <Link
+          to={sessionMockPath(session.id)}
+          className="text-[16px] leading-normal font-bold text-text no-underline wrap-anywhere after:absolute after:inset-0 hover:text-text hover:underline">
+          {mockTitle(
+            t,
+            session.interview
+              ? interviewTitle(t, session.interview)
+              : undefined,
+          )}
+        </Link>
+        <p className="text-sm leading-normal text-muted wrap-anywhere">
+          {meta}
+        </p>
+      </div>
+      <span aria-hidden="true" className="flex text-muted">
+        <Icon name="right" size={18} />
+      </span>
+    </li>
+  );
+};
+
 const GroupCard: React.FC<{ group: Group; onRemoveAll: () => void }> = ({
   group,
   onRemoveAll,
@@ -164,7 +243,12 @@ const GroupCard: React.FC<{ group: Group; onRemoveAll: () => void }> = ({
   const { t } = useTranslation();
   const subtitle = [
     group.company,
-    t('sessions.questions', { count: group.turns.length }),
+    group.sessions.length > 0
+      ? t('sessions.mockInterviews', { count: group.sessions.length })
+      : null,
+    group.turns.length > 0
+      ? t('sessions.questions', { count: group.turns.length })
+      : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -191,6 +275,9 @@ const GroupCard: React.FC<{ group: Group; onRemoveAll: () => void }> = ({
         </p>
       </div>
       <ul className="flex flex-col">
+        {group.sessions.map(session => (
+          <MockRow key={session.id} session={session} />
+        ))}
         {group.turns.map(turn => (
           <TurnRow key={turn.id} turn={turn} />
         ))}
@@ -214,7 +301,8 @@ const GroupCard: React.FC<{ group: Group; onRemoveAll: () => void }> = ({
 export const SessionsScreen: React.FC = () => {
   const { t } = useTranslation();
   const { applications } = useApplications();
-  const { state, reload } = usePracticeTurns();
+  const mockInterview = useFlag('mockInterview');
+  const { state, reload } = usePracticeTurns(mockInterview);
   const [removing, setRemoving] = useState<Group | null>(null);
 
   let body: React.ReactNode;
@@ -237,7 +325,7 @@ export const SessionsScreen: React.FC = () => {
         {t('sessions.loadErrorMessage')}
       </Banner>
     );
-  } else if (state.turns.length === 0) {
+  } else if (state.turns.length === 0 && state.sessions.length === 0) {
     body = (
       <Card
         elevation="raised"
@@ -261,6 +349,7 @@ export const SessionsScreen: React.FC = () => {
       state.turns,
       applications,
       t('applications.untitled'),
+      state.sessions,
     );
     body = (
       <>
@@ -289,7 +378,9 @@ export const SessionsScreen: React.FC = () => {
               {t('sessions.title')}
             </h1>
             <p className="text-[16px] leading-normal text-muted">
-              {t('sessions.description')}
+              {mockInterview
+                ? t('sessions.descriptionWithMock')
+                : t('sessions.description')}
             </p>
           </div>
           {body}
@@ -301,6 +392,7 @@ export const SessionsScreen: React.FC = () => {
           title={removing.title}
           company={removing.company}
           questions={removing.turns.length}
+          mockInterviews={removing.sessions.length}
           onCancel={() => setRemoving(null)}
           onRemoved={() => setRemoving(null)}
         />

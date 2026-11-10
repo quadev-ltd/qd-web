@@ -5,7 +5,7 @@
 // interview".
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import DateTile from './DateTile';
 import InterviewPanel from './InterviewPanel';
@@ -49,6 +49,7 @@ import {
   APPLICATIONS_PATH,
 } from '@/core/profile/paths';
 import { useInterviews } from '@/core/profile/useInterviews';
+import MockSetupPanel, { mockChoicesOf } from '@/screens/Mock/MockSetupPanel';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 
 const Row: React.FC<{ label: string; children: React.ReactNode }> = ({
@@ -224,6 +225,13 @@ const InterviewPage: React.FC<{
   const [removing, setRemoving] = useState(false);
   // D94: the likely questions, with text practice; until then, what will come.
   const textPractice = useFlag('textPractice');
+  // D100: "Practise for this interview" opens the mock interview's setup; "Start a new one" at
+  // the end of one comes back here with `?mock=setup` and its choices.
+  const mockInterview = useFlag('mockInterview');
+  const [search, setSearch] = useSearchParams();
+  const [settingUp, setSettingUp] = useState(
+    () => search.get('mock') === 'setup',
+  );
   const interview = interviews.find(({ id }) => id === interviewId);
   const tabPath = applicationInterviewsPath(application.id);
 
@@ -265,14 +273,22 @@ const InterviewPage: React.FC<{
     .join(' · ');
   return (
     <>
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-[clamp(26px,4vw,28px)] leading-tight font-semibold wrap-anywhere">
-          {title}
-        </h1>
-        {subtitle && (
-          <p className="text-[16px] leading-normal text-muted wrap-anywhere">
-            {subtitle}
-          </p>
+      <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
+        <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-1">
+          <h1 className="font-display text-[clamp(26px,4vw,28px)] leading-tight font-semibold wrap-anywhere">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="text-[16px] leading-normal text-muted wrap-anywhere">
+              {subtitle}
+            </p>
+          )}
+        </div>
+        {mockInterview && (
+          <Button onClick={() => setSettingUp(true)} className="gap-2">
+            <Icon name="mic" size={20} />
+            {t('mock.practiseButton')}
+          </Button>
         )}
       </div>
       <DetailsCard
@@ -298,6 +314,20 @@ const InterviewPage: React.FC<{
         {t('interviews.removeLink')}
       </Button>
 
+      {mockInterview && settingUp && (
+        <MockSetupPanel
+          applicationId={application.id}
+          interviewId={interview.id}
+          description={[title, subtitle].filter(Boolean).join(' · ')}
+          initial={mockChoicesOf(search)}
+          onClose={() => {
+            setSettingUp(false);
+            if (search.has('mock')) {
+              setSearch({}, { replace: true });
+            }
+          }}
+        />
+      )}
       {editing && (
         <InterviewPanel
           application={application}

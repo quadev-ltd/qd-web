@@ -69,6 +69,29 @@ describe('RemoveApplicationDialog, its practice (D99)', () => {
     expect(gateway.removeApplication).toHaveBeenCalledWith('a1');
   });
 
+  it('counts its mock interviews with its questions when mock interviews are on (D100)', async () => {
+    const gateway = createMockProfileGateway();
+    gateway.countApplicationMockSessions.mockResolvedValue(1);
+    renderProfilePage(
+      <RemoveApplicationDialog
+        applicationId="a1"
+        onCancel={vi.fn()}
+        onRemoved={vi.fn()}
+      />,
+      { gateway, flags: { mockInterview: true } },
+    );
+
+    expect(
+      await screen.findByRole('checkbox', {
+        name: 'applications.removePracticeLabel',
+      }),
+    ).not.toBeChecked();
+    expect(gateway.countApplicationMockSessions).toHaveBeenCalledWith(
+      'uid-1',
+      'a1',
+    );
+  });
+
   it('removes the practice with the application when ticked', async () => {
     const user = userEvent.setup();
     const gateway = createMockProfileGateway();

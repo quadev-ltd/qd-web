@@ -14,6 +14,7 @@ export const USAGE_SERVICES = {
   interviewQuestions: 'interviewQuestions',
   practice: 'practice',
   coverLetter: 'coverLetter',
+  mockInterview: 'mockInterview',
   aiDiagnostics: 'aiDiagnostics',
 } as const;
 export type UsageService = (typeof USAGE_SERVICES)[keyof typeof USAGE_SERVICES];
@@ -46,6 +47,15 @@ export const INTERVIEW_QUESTIONS_DAILY_LIMIT: DailyLimits = {
 export const PRACTICE_DAILY_LIMIT: DailyLimits = {
   maxCallsPerDay: 40,
   maxCostUsdPerDay: 1,
+};
+
+/**
+ * Mock interviews (D100, doc 24 §8): for this service `calls` counts the sessions started, and every
+ * call of a session adds its cost.
+ */
+export const MOCK_INTERVIEW_DAILY_LIMIT: DailyLimits = {
+  maxCallsPerDay: 3,
+  maxCostUsdPerDay: 2,
 };
 
 /** Cover letters (D98, doc 22): letters written or written again per user and day. */

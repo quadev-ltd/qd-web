@@ -174,16 +174,19 @@ export const removePracticeTurn = async (turnId: string): Promise<void> => {
   });
 };
 
-/** Removes every turn of one application (D99), there or removed. Resolves how many. */
+/**
+ * Removes every turn and mock interview of one application (D99, D100), there or removed.
+ * Resolves how many of each.
+ */
 export const removeApplicationPractice = async (
   applicationId: string,
-): Promise<{ removed: number }> => {
-  const { removed } = await call(
+): Promise<{ removed: number; removedSessions: number }> => {
+  const { removed, removedSessions } = await call(
     REMOVE_APPLICATION_PRACTICE,
     RemoveApplicationPracticeResponseSchema,
     { applicationId },
   );
-  return { removed };
+  return { removed, removedSessions };
 };
 
 /** How many practice calls the backend made for this user today (UTC). */

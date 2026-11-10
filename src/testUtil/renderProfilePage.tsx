@@ -1,4 +1,5 @@
-import { type ReactElement } from 'react';
+import { type ReactElement, type ReactNode } from 'react';
+import { type RouteObject } from 'react-router';
 
 import { createMockProfileGateway } from './mockProfileGateway';
 import { renderWithProviders } from './renderWithProviders';
@@ -30,7 +31,16 @@ interface Options {
   routeState?: unknown;
   /** Flags on top of the interview tools' (`cvTool`). */
   flags?: FlagValues;
+  /** Routes in a data router instead of `ui`, for pages that use its hooks (useBlocker). */
+  routes?: RouteObject[];
 }
+
+/** The providers ProfileRoutes and ApplicationRoutes put around their pages. */
+const ProfileProviders: React.FC<{ children: ReactNode }> = ({ children }) => (
+  <InterviewProfileProvider>
+    <ApplicationsProvider>{children}</ApplicationsProvider>
+  </InterviewProfileProvider>
+);
 
 /**
  * Renders a profile or application page as ProfileRoutes and ApplicationRoutes do for a
@@ -46,6 +56,7 @@ export const renderProfilePage = (
     route = '/profile',
     routeState,
     flags,
+    routes,
   }: Options = {},
 ) => ({
   gateway,
@@ -56,6 +67,8 @@ export const renderProfilePage = (
     {
       route,
       routeState,
+      routes,
+      wrapper: ProfileProviders,
       profileGateway: gateway,
       flags: { interviewAssistant: true, ...flags },
       interviewProfile,

@@ -56,6 +56,7 @@ import {
   type UploadTarget,
 } from '@/core/profile/gateway';
 import { INTERVIEW_LIMIT_REASON } from '@/core/profile/interviews';
+import { MockRefusal } from '@/core/profile/mockInterviews';
 import { PracticeRefusal } from '@/core/profile/practice';
 
 // ---------- Errors ----------
@@ -108,6 +109,15 @@ const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
   [CoverLetterRefusal.MaxLetters]: ProfileErrorCode.MaxLetters,
   [CoverLetterRefusal.CvNotReady]: ProfileErrorCode.CvNotReady,
   [CoverLetterRefusal.NotSaved]: ProfileErrorCode.Invalid,
+  // Mock interviews (D100). The page offers neither an unbuilt way nor feedback before the end.
+  [MockRefusal.SessionLimit]: ProfileErrorCode.MaxMockSessions,
+  [MockRefusal.NothingHeard]: ProfileErrorCode.MockNothingHeard,
+  [MockRefusal.NotCurrent]: ProfileErrorCode.MockNotCurrent,
+  [MockRefusal.Busy]: ProfileErrorCode.MockBusy,
+  [MockRefusal.SessionEnded]: ProfileErrorCode.MockSessionEnded,
+  [MockRefusal.SessionFailed]: ProfileErrorCode.MockSessionFailed,
+  [MockRefusal.WayNotBuilt]: ProfileErrorCode.Invalid,
+  [MockRefusal.NotEnded]: ProfileErrorCode.Invalid,
 };
 
 /**

@@ -39,6 +39,11 @@ export const FLAGS = {
     description:
       'Cover letters (doc 22, D98): a letter for one application, from the profile, the job and its CV.',
   },
+  mockInterview: {
+    default: false,
+    description:
+      'Mock interviews (doc 24, D100): an AI interviewer by voice, in the ways built so far, for testers.',
+  },
   aiDiagnostics: {
     default: false,
     description:

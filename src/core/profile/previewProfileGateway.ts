@@ -72,6 +72,13 @@ import { type ProfileGateway } from './gateway';
 import { type ApplicationInterview, INTERVIEWS_MAX } from './interviews';
 import { browserTimeZone } from './interviewTime';
 import {
+  MOCK_SESSIONS_MAX,
+  type MockLine,
+  type MockLines,
+  type MockSession,
+  type MockTurn,
+} from './mockInterviews';
+import {
   PRACTICE_ANSWER_MAX_CHARS,
   PRACTICE_ATTEMPTS_MAX,
   PRACTICE_QUESTION_MAX_CHARS,
@@ -87,6 +94,14 @@ import {
   seedInterviews,
   timesOf,
 } from './previewInterviews';
+import {
+  PREVIEW_FOLLOW_UP,
+  previewClosing,
+  previewLine,
+  previewMockPlan,
+  previewNextStep,
+  previewOpening,
+} from './previewMockInterviews';
 import { previewFeedbackFor, previewKeyPointsFor } from './previewPractice';
 import {
   PREVIEW_CV_DETAILS,
@@ -100,6 +115,7 @@ import {
   COVER_LETTER_DAILY_LIMIT,
   INTERVIEW_QUESTIONS_DAILY_LIMIT,
   effectiveLimits,
+  MOCK_INTERVIEW_DAILY_LIMIT,
   PRACTICE_DAILY_LIMIT,
   serviceOverride,
   type StoredUsageLimits,
@@ -198,6 +214,10 @@ interface PreviewProfile {
   practiceTurns?: PracticeTurn[];
   /** How many practice calls were made today. */
   practiceToday?: number;
+  /** The mock interviews (D100), the newest last. */
+  mockSessions?: MockSession[];
+  /** How many mock interviews were started today. */
+  mockToday?: number;
 }
 
 /** How the fake reads a page again: when it ends, and how. */
@@ -269,6 +289,16 @@ export interface PreviewProfileControls {
   failNextPractice(reason: 'model' | 'quota'): void;
   /** How many practice calls were already made today. */
   setPracticeToday(count: number): void;
+  /**
+   * The next mock interview call fails: the model (try again), busy (send the same again),
+   * nothing heard in the answer, the model twice (the session ends as failed), or today's limit
+   * (a start is refused; mid-session, the session ends).
+   */
+  failNextMock(
+    reason: 'model' | 'busy' | 'nothing-heard' | 'failed' | 'quota',
+  ): void;
+  /** How many mock interviews were already started today. */
+  setMockToday(count: number): void;
   /**
    * A version as they were made before D83: edits to the profile's CV (doc 18), made in the
    * background like any other. The pages no longer ask for one; their review stays. Resolves its id.
@@ -555,6 +585,13 @@ const practiceDailyLimit = (profile: PreviewProfile) =>
     serviceOverride(profile.usageLimits, USAGE_SERVICES.practice),
   ).maxCallsPerDay;
 
+/** The mock interviews this account can start today (D100). */
+const mockDailyLimit = (profile: PreviewProfile) =>
+  effectiveLimits(
+    MOCK_INTERVIEW_DAILY_LIMIT,
+    serviceOverride(profile.usageLimits, USAGE_SERVICES.mockInterview),
+  ).maxCallsPerDay;
+
 /** The CV versions this account can have made today: its override on top of the default. */
 const cvDailyLimit = (profile: PreviewProfile) =>
   effectiveLimits(
@@ -683,6 +720,142 @@ export const createPreviewProfileGateway = ({
   let nextQuestionsFailure: 'model' | 'quota' | null = null;
   let nextPracticeFailure: 'model' | 'quota' | null = null;
   let nextLetterFailure: CvVersionFailure | null = null;
+  let nextMockFailure:
+    'model' | 'busy' | 'nothing-heard' | 'failed' | 'quota' | null = null;
+  /** What each mock request already gave, so a request sent again gives the same (§13.4). */
+  const mockDone = new Map<string, unknown>();
+  /** The lines each mock interview has said: their ids are `l1`, `l2`, … */
+  const mockLineCounts = new Map<string, number>();
+
+  const takeMockFailure = () => {
+    const failure = nextMockFailure;
+    nextMockFailure = null;
+    return failure;
+  };
+
+  const mockSessionOf = (sessionId: string): MockSession => {
+    const session = currentProfile().mockSessions?.find(
+      ({ id }) => id === sessionId,
+    );
+    if (!session) {
+      throw new ProfileError(ProfileErrorCode.NotFound);
+    }
+    return session;
+  };
+
+  /** The session, active, with this line waiting for an answer. */
+  const activeMockSession = (sessionId: string, lineId: string) => {
+    const session = mockSessionOf(sessionId);
+    if (session.status === 'ended') {
+      throw new ProfileError(ProfileErrorCode.MockSessionEnded);
+    }
+    if (session.current?.lineId !== lineId) {
+      throw new ProfileError(ProfileErrorCode.MockNotCurrent);
+    }
+    return session;
+  };
+
+  const mockTimeLeft = (session: MockSession) => {
+    const at = now();
+    const paused =
+      session.pausedMs +
+      (session.pausedAt === null ? 0 : at - session.pausedAt);
+    return Math.max(
+      0,
+      session.lengthMinutes * 60_000 -
+        (at - (session.startedAt ?? at) - paused),
+    );
+  };
+
+  const mockEnd = (session: MockSession, reason: MockSession['endReason']) => {
+    session.status = 'ended';
+    session.endReason = reason;
+    session.endedAt = now();
+    session.updatedAt = session.endedAt;
+    delete session.current;
+  };
+
+  /** A refusal the next call was set to give; the model's second failure ends the session. */
+  const mockFailed = (
+    session: MockSession,
+    failure: ReturnType<typeof takeMockFailure>,
+  ) => {
+    switch (failure) {
+      case null:
+        return;
+      case 'model':
+        throw new ProfileError(ProfileErrorCode.Network);
+      case 'busy':
+        throw new ProfileError(ProfileErrorCode.MockBusy);
+      case 'nothing-heard':
+        throw new ProfileError(ProfileErrorCode.MockNothingHeard);
+      case 'failed':
+        mockEnd(session, 'failed');
+        save();
+        throw new ProfileError(ProfileErrorCode.MockSessionFailed);
+      case 'quota':
+        mockEnd(session, 'quota');
+        save();
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+    }
+  };
+
+  /** A new line of the session: its id, and the line waiting for an answer when it asks. */
+  const mockSay = (
+    session: MockSession,
+    kind: MockLine['kind'],
+    text: string,
+    turnId?: string,
+  ): MockLine => {
+    const number = (mockLineCounts.get(session.id) ?? 0) + 1;
+    mockLineCounts.set(session.id, number);
+    const lineId = `l${number}`;
+    if (turnId) {
+      session.current = { turnId, lineId };
+    }
+    return previewLine(lineId, kind, text, turnId);
+  };
+
+  /** After an answer or a skip: a follow-up, the next question, or the closing. */
+  const mockNext = (
+    session: MockSession,
+    turn: MockTurn,
+    answered: boolean,
+  ): MockLines => {
+    const at = now();
+    const left = mockTimeLeft(session);
+    const step =
+      left < 90_000
+        ? { kind: 'closing' as const }
+        : previewNextStep(session, turn, answered);
+    let line: MockLine;
+    if (step.kind === 'closing') {
+      line = mockSay(session, 'closing', previewClosing(left < 90_000));
+      mockEnd(session, 'finished');
+    } else {
+      const next: MockTurn = {
+        id: `t${session.turns.length + 1}`,
+        kind: step.kind === 'follow-up' ? 'follow-up' : 'planned',
+        planId: step.kind === 'follow-up' ? step.planId : step.question.id,
+        question:
+          step.kind === 'follow-up' ? PREVIEW_FOLLOW_UP : step.question.text,
+        status: 'open',
+        repeats: 0,
+        askedAt: at,
+        answeredAt: null,
+      };
+      session.turns = [...session.turns, next];
+      line = mockSay(
+        session,
+        step.kind === 'follow-up' ? 'follow-up' : 'question',
+        next.question,
+        next.id,
+      );
+    }
+    session.updatedAt = at;
+    save();
+    return { lines: [line], status: session.status, timeLeftMs: left };
+  };
 
   /** A letter that can change: there, and written (`not-ready` otherwise, read as Invalid). */
   const readyLetter = (profile: PreviewProfile, letterId: string) => {
@@ -1429,6 +1602,13 @@ export const createPreviewProfileGateway = ({
     },
     setPracticeToday: count => {
       currentProfile().practiceToday = count;
+      save();
+    },
+    failNextMock: reason => {
+      nextMockFailure = reason;
+    },
+    setMockToday: count => {
+      currentProfile().mockToday = count;
       save();
     },
     // Set once the gateway exists, below: it asks the gateway for the version.
@@ -2480,6 +2660,17 @@ export const createPreviewProfileGateway = ({
         profile.practiceTurns = profile.practiceTurns?.filter(
           turn => turn.applicationId !== applicationId,
         );
+        profile.mockSessions = profile.mockSessions?.filter(
+          session => session.applicationId !== applicationId,
+        );
+      }
+      for (const session of profile.mockSessions ?? []) {
+        if (session.applicationId === applicationId) {
+          session.applicationRemoved = true;
+          if (session.interviewId !== undefined) {
+            session.interviewRemoved = true;
+          }
+        }
       }
       for (const turn of profile.practiceTurns ?? []) {
         if (turn.applicationId === applicationId) {
@@ -2602,10 +2793,15 @@ export const createPreviewProfileGateway = ({
       const kept = interviews.filter(({ id }) => id !== interviewId);
       (profile.interviews ??= {})[applicationId] = kept;
       application.interviewTimes = timesOf(kept);
-      // Its practice stays, marked (FR-1f).
+      // Its practice and its mock interviews stay, marked (FR-1f).
       for (const turn of profile.practiceTurns ?? []) {
         if (turn.interviewId === interviewId) {
           turn.interviewRemoved = true;
+        }
+      }
+      for (const session of profile.mockSessions ?? []) {
+        if (session.interviewId === interviewId) {
+          session.interviewRemoved = true;
         }
       }
       save();
@@ -2951,8 +3147,16 @@ export const createPreviewProfileGateway = ({
       const turns = profile.practiceTurns ?? [];
       const kept = turns.filter(turn => turn.applicationId !== applicationId);
       profile.practiceTurns = kept;
+      const sessions = profile.mockSessions ?? [];
+      const keptSessions = sessions.filter(
+        session => session.applicationId !== applicationId,
+      );
+      profile.mockSessions = keptSessions;
       save();
-      return { removed: turns.length - kept.length };
+      return {
+        removed: turns.length - kept.length,
+        removedSessions: sessions.length - keptSessions.length,
+      };
     },
     getPracticeTurn: async (uid, turnId) => {
       const found = read(uid).practiceTurns?.find(({ id }) => id === turnId);
@@ -3111,6 +3315,259 @@ export const createPreviewProfileGateway = ({
       save();
     },
     getPracticeToday: async uid => read(uid).practiceToday ?? 0,
+
+    // ---------- Mock interviews (D100): the fake interviewer of previewMockInterviews ----------
+
+    getMockSessions: async uid =>
+      structuredClone(read(uid).mockSessions ?? []).sort(
+        (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
+      ),
+    getMockSession: async (uid, sessionId) => {
+      const found = read(uid).mockSessions?.find(({ id }) => id === sessionId);
+      return found ? structuredClone(found) : null;
+    },
+    countMockSessions: async uid => (read(uid).mockSessions ?? []).length,
+    countApplicationMockSessions: async (uid, applicationId) =>
+      (read(uid).mockSessions ?? []).filter(
+        session => session.applicationId === applicationId,
+      ).length,
+    startMockInterview: async request => {
+      const done = mockDone.get(request.requestId);
+      if (done) {
+        return structuredClone(done) as { sessionId: string } & MockLines;
+      }
+      const profile = currentProfile();
+      const application = applicationOf(profile, request.applicationId);
+      const interview =
+        request.interviewId === undefined
+          ? undefined
+          : interviewsOf(profile, request.applicationId).find(
+              ({ id }) => id === request.interviewId,
+            );
+      if (request.interviewId !== undefined && !interview) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      if (isJobPending(application)) {
+        throw new ProfileError(ProfileErrorCode.Reading);
+      }
+      if ((profile.mockSessions ?? []).length >= MOCK_SESSIONS_MAX) {
+        throw new ProfileError(ProfileErrorCode.MaxMockSessions);
+      }
+      const failure = takeMockFailure();
+      const today = profile.mockToday ?? 0;
+      if (failure === 'quota' || today >= mockDailyLimit(profile)) {
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+      }
+      await wait(PREVIEW_BRIEF_MS);
+      if (failure) {
+        throw new ProfileError(ProfileErrorCode.Network);
+      }
+      profile.mockToday = today + 1;
+      const plan = previewMockPlan(
+        interview?.questions?.items.map(({ text, kind }) => ({ text, kind })) ??
+          [],
+        request.lengthMinutes,
+      );
+      const at = now();
+      const sessionId = newId('mock');
+      const first: MockTurn = {
+        id: 't1',
+        kind: 'planned',
+        planId: plan[0]!.id,
+        question: plan[0]!.text,
+        status: 'open',
+        repeats: 0,
+        askedAt: at,
+        answeredAt: null,
+      };
+      const session: MockSession = {
+        id: sessionId,
+        applicationId: request.applicationId,
+        application: {
+          title: application.title || undefined,
+          company: application.company || undefined,
+        },
+        ...(interview
+          ? {
+              interviewId: interview.id,
+              interview: { name: interview.name, type: interview.type },
+            }
+          : {}),
+        way: request.way,
+        lengthMinutes: request.lengthMinutes,
+        voice: request.voice,
+        status: 'active',
+        plan: { questions: plan },
+        turns: [first],
+        current: { turnId: 't1', lineId: 'l2' },
+        startedAt: at,
+        endedAt: null,
+        pausedAt: null,
+        pausedMs: 0,
+        createdAt: at,
+        updatedAt: at,
+      };
+      mockLineCounts.set(sessionId, 2);
+      profile.mockSessions = [...(profile.mockSessions ?? []), session];
+      save();
+      const result = {
+        sessionId,
+        lines: [
+          previewLine(
+            'l1',
+            'opening',
+            previewOpening(application.title || 'this', request.lengthMinutes),
+          ),
+          previewLine('l2', 'question', first.question, 't1'),
+        ],
+        status: 'active' as const,
+        timeLeftMs: mockTimeLeft(session),
+      };
+      mockDone.set(request.requestId, result);
+      return structuredClone(result);
+    },
+    answerMockQuestion: async request => {
+      const done = mockDone.get(request.requestId);
+      if (done) {
+        return structuredClone(done) as {
+          turnId: string;
+          transcript: string;
+        } & MockLines;
+      }
+      const session = activeMockSession(request.sessionId, request.lineId);
+      const failure = takeMockFailure();
+      await wait(PREVIEW_BRIEF_MS);
+      mockFailed(session, failure);
+      const turn = session.turns.find(
+        ({ id }) => id === session.current?.turnId,
+      )!;
+      const seconds = Math.max(1, Math.round(request.audio.durationMs / 1_000));
+      const transcript = `I answered for about ${seconds} seconds.`;
+      turn.status = 'answered';
+      turn.answer = {
+        transcript,
+        spokenMs: request.audio.durationMs,
+        words: 5,
+      };
+      turn.answeredAt = now();
+      const result = {
+        turnId: turn.id,
+        transcript,
+        ...mockNext(session, turn, true),
+      };
+      mockDone.set(request.requestId, result);
+      return structuredClone(result);
+    },
+    rephraseMockQuestion: async request => {
+      const done = mockDone.get(request.requestId);
+      if (done) {
+        return structuredClone(done) as MockLines;
+      }
+      const session = activeMockSession(request.sessionId, request.lineId);
+      const turn = session.turns.find(
+        ({ id }) => id === session.current?.turnId,
+      )!;
+      const planned = session.plan.questions.find(
+        ({ id }) => id === turn.planId,
+      );
+      turn.rephrased ??=
+        turn.kind === 'follow-up'
+          ? `Put another way: ${PREVIEW_FOLLOW_UP.charAt(0).toLowerCase()}${PREVIEW_FOLLOW_UP.slice(1)}`
+          : (planned?.rephrased ?? turn.question);
+      const line = mockSay(session, 'rephrase', turn.rephrased, turn.id);
+      session.updatedAt = now();
+      save();
+      const result = { lines: [line], status: 'active' as const };
+      mockDone.set(request.requestId, result);
+      return structuredClone(result);
+    },
+    skipMockQuestion: async request => {
+      const done = mockDone.get(request.requestId);
+      if (done) {
+        return structuredClone(done) as MockLines;
+      }
+      const session = activeMockSession(request.sessionId, request.lineId);
+      const failure = takeMockFailure();
+      await wait(PREVIEW_BRIEF_MS / 2);
+      mockFailed(session, failure);
+      const turn = session.turns.find(
+        ({ id }) => id === session.current?.turnId,
+      )!;
+      turn.status = 'skipped';
+      const result = mockNext(session, turn, false);
+      mockDone.set(request.requestId, result);
+      return structuredClone(result);
+    },
+    pauseMockInterview: async ({ sessionId, paused }) => {
+      const session = mockSessionOf(sessionId);
+      if (session.status === 'ended') {
+        throw new ProfileError(ProfileErrorCode.MockSessionEnded);
+      }
+      const at = now();
+      if (paused && session.pausedAt === null) {
+        session.pausedAt = at;
+      } else if (!paused && session.pausedAt !== null) {
+        session.pausedMs += at - session.pausedAt;
+        session.pausedAt = null;
+      }
+      session.updatedAt = at;
+      save();
+      return { paused, timeLeftMs: mockTimeLeft(session) };
+    },
+    resumeMockInterview: async sessionId => {
+      const session = mockSessionOf(sessionId);
+      if (session.status === 'ended' || !session.current) {
+        throw new ProfileError(ProfileErrorCode.MockSessionEnded);
+      }
+      const turn = session.turns.find(
+        ({ id }) => id === session.current?.turnId,
+      )!;
+      const line: MockLine = previewLine(
+        session.current.lineId,
+        turn.rephrased
+          ? 'rephrase'
+          : turn.kind === 'follow-up'
+            ? 'follow-up'
+            : 'question',
+        turn.rephrased ?? turn.question,
+        turn.id,
+      );
+      return {
+        lines: [line],
+        status: 'active',
+        paused: session.pausedAt !== null,
+        timeLeftMs: mockTimeLeft(session),
+      };
+    },
+    endMockInterview: async sessionId => {
+      const session = mockSessionOf(sessionId);
+      if (session.status === 'active') {
+        mockEnd(session, 'ended');
+        save();
+      }
+    },
+    sendMockFeedback: async ({ sessionId, ...feedback }) => {
+      const session = mockSessionOf(sessionId);
+      if (session.status !== 'ended') {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
+      session.feedback = {
+        feel: feedback.feel,
+        wait: feedback.wait,
+        ...(feedback.cutOff ? { cutOff: feedback.cutOff } : {}),
+        ...(feedback.comment ? { comment: feedback.comment } : {}),
+      };
+      session.updatedAt = now();
+      save();
+    },
+    removeMockSession: async sessionId => {
+      const profile = currentProfile();
+      profile.mockSessions = (profile.mockSessions ?? []).filter(
+        ({ id }) => id !== sessionId,
+      );
+      save();
+    },
+    getMockInterviewsToday: async uid => read(uid).mockToday ?? 0,
   };
   controls.createEditVersion = async (target = { kind: 'general' }) => {
     // The newest CV with its text, as the pages offered first.

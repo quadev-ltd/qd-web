@@ -29,6 +29,7 @@ describe('evaluate', () => {
       cvTool: false,
       textPractice: false,
       coverLetters: false,
+      mockInterview: false,
       aiDiagnostics: false,
     });
     expect(evaluateAll({}, {})).toEqual(DEFAULT_FLAGS);
@@ -42,6 +43,7 @@ describe('registry (mirror of @quadev/flags)', () => {
       'coverLetters',
       'cvTool',
       'interviewAssistant',
+      'mockInterview',
       'smartInspection',
       'textPractice',
     ]);
