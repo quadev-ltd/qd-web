@@ -196,6 +196,17 @@ describe('the answer, in real time (Web-X6-RT-Listening, -RT-States)', () => {
     expect(controller.done).toHaveBeenCalledOnce();
   });
 
+  it('the voice model’s note: a long pause may be taken as the end', () => {
+    renderProfilePage(
+      <RealTimeAnswerCard
+        view={view({ phase: 'listening', way: 'voice-model' })}
+        controller={fakeController()}
+      />,
+    );
+    expect(screen.getByText('mock.liveVoiceModelDoneNote')).toBeVisible();
+    expect(screen.queryByText('mock.liveDoneNote')).not.toBeInTheDocument();
+  });
+
   it('nothing heard yet after "I’m done", and 30 seconds left', () => {
     renderProfilePage(
       <RealTimeAnswerCard

@@ -251,7 +251,10 @@ export const RealTimeAnswerCard: React.FC<{
           </Button>
         </div>
         <p className="text-sm leading-normal text-muted">
-          {t('mock.liveDoneNote')}
+          {/* The voice model may take a long pause as the end (doc 24 §16). */}
+          {view.way === 'voice-model'
+            ? t('mock.liveVoiceModelDoneNote')
+            : t('mock.liveDoneNote')}
         </p>
       </>
     );

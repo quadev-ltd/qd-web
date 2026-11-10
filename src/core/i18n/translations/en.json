@@ -1738,6 +1738,7 @@
     "liveNothingHeardMessage": "We didn’t hear anything yet. Check your microphone, then answer, or skip this question.",
     "liveWarnMessage": "30 seconds left for this answer. At 3:00 the interviewer moves on.",
     "liveDoneNote": "When you stop, the interviewer checks you’ve finished, so a pause to think is fine. Answers can be up to 3 minutes.",
+    "liveVoiceModelDoneNote": "The interviewer notices when you’ve finished. It may take a long pause as the end, so if you need to think, say so first. Answers can be up to 3 minutes.",
     "liveAnswerEnded": "Your answer ended after {{time}}. It’s in what was said, as text.",
     "liveRephraseNote": "After Say it differently, your answer starts again.",
     "liveEndDialogText": "The answer you’re giving now isn’t finished. If you end the interview, it isn’t kept.",
