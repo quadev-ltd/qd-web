@@ -1,6 +1,6 @@
 // One job application: its name, its tabs (the brief, its interviews, with text practice or mock
-// interviews its Sessions (doc 24 §19), the details and, with the CV tool, its CVs) and the tab that
-// is open.
+// interviews its Sessions (doc 24 §19), with the CV tool its CVs, and the details last) and the tab
+// that is open.
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, useParams } from 'react-router';
 
@@ -175,16 +175,17 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
             {t('applications.sessionsTab')}
           </NavLink>
         )}
-        <NavLink
-          to={applicationDetailsPath(application.id)}
-          className={tabClass}>
-          {t('applications.detailsTab')}
-        </NavLink>
         {cvTool && (
           <NavLink to={applicationCvPath(application.id)} className={tabClass}>
             {cvTab}
           </NavLink>
         )}
+        {/* Details last, as on the boards (doc 13). */}
+        <NavLink
+          to={applicationDetailsPath(application.id)}
+          className={tabClass}>
+          {t('applications.detailsTab')}
+        </NavLink>
       </nav>
       {tab === 'interviews' ? (
         <InterviewsTab application={application} />

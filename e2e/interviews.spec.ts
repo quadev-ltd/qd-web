@@ -43,7 +43,7 @@ test('the interviews of the designs: the next on the list of applications, comin
   await openInterviews(page, 'Senior Backend Engineer');
   await expect(
     page.getByRole('navigation', { name: 'Application' }).getByRole('link'),
-  ).toHaveText(['Brief', 'Interviews', 'Details', 'CV']);
+  ).toHaveText(['Brief', 'Interviews', 'CV', 'Details']);
   const comingUp = page.getByRole('region', { name: 'Coming up · 2' });
   await expect(comingUp.getByRole('heading', { level: 3 })).toHaveText([
     'Technical interview',

@@ -98,8 +98,8 @@ describe('the Interviews tab', () => {
     ).toEqual([
       'applications.briefTab',
       'applications.interviewsTab',
-      'applications.detailsTab',
       'applications.cvTab',
+      'applications.detailsTab',
     ]);
     expect(
       within(tabs).getByRole('link', { name: 'applications.interviewsTab' }),
