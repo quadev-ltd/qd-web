@@ -9,6 +9,7 @@
 import { z } from 'zod';
 
 import { INTERVIEW_QUESTION_KINDS, INTERVIEW_TYPES } from './interviews';
+import { type PracticeKeyPoint, PracticeKeyPointSchema } from './practice';
 
 // ---------- Limits ----------
 
@@ -61,6 +62,19 @@ export const MOCK_LINE_KINDS = [
   'closing',
 ] as const;
 export type MockLineKind = (typeof MOCK_LINE_KINDS)[number];
+
+/**
+ * When the page shows a question's hints (FR-22, slice H1): with the question, when the candidate
+ * asks (the default), or once they've answered. The backend writes them for every question
+ * whatever is chosen; the choice only changes what the page shows.
+ */
+export const MOCK_HINTS_SHOWN = [
+  'with-question',
+  'on-request',
+  'after-answer',
+] as const;
+export type MockHintsShown = (typeof MOCK_HINTS_SHOWN)[number];
+export const DEFAULT_MOCK_HINTS_SHOWN: MockHintsShown = 'on-request';
 
 export const MOCK_FEEL = [1, 2, 3, 4, 5] as const;
 export const MOCK_WAIT = ['ok', 'a-bit-long', 'too-long'] as const;
@@ -159,6 +173,28 @@ export const MockTurnSchema = z.object({
 });
 export type MockTurn = z.infer<typeof MockTurnSchema>;
 
+/**
+ * One question's hints, written in the background: a planned question's from the start, a
+ * follow-up's once it is asked. 3 to 5 key points, as text practice's (with `itemId`, that skill
+ * map item's fact; without, advice).
+ */
+export const MockHintsSchema = z.object({
+  status: z.enum(['writing', 'ready', 'failed']),
+  keyPoints: z
+    .array(z.unknown())
+    .catch([])
+    .optional()
+    .transform(points =>
+      (points ?? []).flatMap(point => {
+        const parsed = PracticeKeyPointSchema.safeParse(point);
+        return parsed.success ? [parsed.data] : [];
+      }),
+    ),
+  /** With `failed`: `model`, or `quota` once the day's $2 is reached. */
+  reason: z.enum(['model', 'quota']).optional().catch(undefined),
+});
+export type MockHints = z.infer<typeof MockHintsSchema>;
+
 export const MockFeedbackSchema = z.object({
   feel: z.number().int().min(1).max(5),
   wait: z.enum(MOCK_WAIT),
@@ -188,6 +224,21 @@ export const MockSessionSchema = z.object({
   way: z.enum(MOCK_WAYS).catch('take-turns'),
   lengthMinutes: z.union([z.literal(10), z.literal(20)]).catch(10),
   voice: z.enum(MOCK_VOICES).catch('gemini'),
+  /** A session started before hints (slice H1) shows them on request. */
+  hintsShown: z.enum(MOCK_HINTS_SHOWN).catch(DEFAULT_MOCK_HINTS_SHOWN),
+  /** By `mockHintsKey`: `p1`… for planned questions, `t5`… for follow-ups. */
+  hints: z
+    .record(z.string(), z.unknown())
+    .catch({})
+    .optional()
+    .transform(entries =>
+      Object.fromEntries(
+        Object.entries(entries ?? {}).flatMap(([key, entry]) => {
+          const parsed = MockHintsSchema.safeParse(entry);
+          return parsed.success ? [[key, parsed.data]] : [];
+        }),
+      ),
+    ),
   status: z.enum(MOCK_SESSION_STATUSES),
   endReason: z.enum(MOCK_END_REASONS).optional().catch(undefined),
   plan: z
@@ -257,6 +308,8 @@ export interface StartMockInterviewRequest {
   way: MockWay;
   lengthMinutes: MockLength;
   voice: MockVoice;
+  /** `on-request` when left out. */
+  hints?: MockHintsShown;
   client?: MockClient;
 }
 
@@ -361,6 +414,35 @@ export interface MockLines {
 }
 
 // ---------- What the pages work out ----------
+
+/** Where a turn's hints are kept: its plan question for a planned turn, itself for a follow-up. */
+export const mockHintsKey = (
+  turn: Pick<MockTurn, 'kind' | 'planId' | 'id'>,
+): string => (turn.kind === 'planned' ? turn.planId : turn.id);
+
+/** What there is to show of a question's hints: the points, nothing this time, or not yet. */
+export type MockHintsState =
+  | { status: 'ready'; keyPoints: PracticeKeyPoint[] }
+  | { status: 'none' }
+  | { status: 'pending' };
+
+/**
+ * A turn's hints as the page shows them: pending while they're written (or before the session
+ * read has the turn), none when they failed or came back empty.
+ */
+export const mockHintsOf = (
+  session: Pick<MockSession, 'turns' | 'hints'>,
+  turnId: string,
+): MockHintsState => {
+  const turn = session.turns.find(({ id }) => id === turnId);
+  const hints = turn ? session.hints[mockHintsKey(turn)] : undefined;
+  if (!hints || hints.status === 'writing') {
+    return { status: 'pending' };
+  }
+  return hints.status === 'ready' && hints.keyPoints.length > 0
+    ? { status: 'ready', keyPoints: hints.keyPoints }
+    : { status: 'none' };
+};
 
 /** A session still `active` but not updated for 30 minutes: the backend ends it at its next call. */
 export const isMockIdle = (session: MockSession, now: number): boolean =>

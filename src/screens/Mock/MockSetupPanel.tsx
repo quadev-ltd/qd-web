@@ -1,7 +1,7 @@
 // "Mock interview" set up (Web-X6-Setup, D100): the way in one line (only take turns is built),
 // 10 or 20 minutes, Voice 1 or Voice 2 with "Hear it" (a sample the backend voiced once, served
-// with the site), where the questions come from, and "Continue", which opens the mock interview's
-// page with these choices. The sessions left today are under it. Hints join it with slice H2.
+// with the site), when the hints show (slice H2), where the questions come from, and "Continue",
+// which opens the mock interview's page with these choices. The sessions left today are under it.
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -13,29 +13,35 @@ import ChoiceChips from '@/components/ui/ChoiceChips';
 import SidePanel from '@/components/ui/SidePanel';
 import { dailyLimitResetTime } from '@/core/profile/limits';
 import {
+  DEFAULT_MOCK_HINTS_SHOWN,
+  MOCK_HINTS_SHOWN,
   MOCK_LENGTHS,
   MOCK_VOICES,
+  type MockHintsShown,
   type MockLength,
   type MockVoice,
 } from '@/core/profile/mockInterviews';
 import { applicationInterviewMockPath } from '@/core/profile/paths';
 import { useMockLeft } from '@/core/profile/useMockInterviews';
-import { VOICE_KEYS } from '@/screens/Mock/mockParts';
+import { HINTS_SHOWN_KEYS, VOICE_KEYS } from '@/screens/Mock/mockParts';
 
 export interface MockChoices {
   lengthMinutes: MockLength;
   voice: MockVoice;
+  hints: MockHintsShown;
 }
 
 export const DEFAULT_MOCK_CHOICES: MockChoices = {
   lengthMinutes: 10,
   voice: 'gemini',
+  hints: DEFAULT_MOCK_HINTS_SHOWN,
 };
 
-/** The choices an address carries (`?length=20&voice=chirp`), the defaults otherwise. */
+/** The choices an address carries (`?length=20&voice=chirp&hints=after-answer`), the defaults otherwise. */
 export const mockChoicesOf = (search: URLSearchParams): MockChoices => {
   const length = Number(search.get('length'));
   const voice = search.get('voice');
+  const hints = search.get('hints');
   return {
     lengthMinutes: (MOCK_LENGTHS as readonly number[]).includes(length)
       ? (length as MockLength)
@@ -43,11 +49,17 @@ export const mockChoicesOf = (search: URLSearchParams): MockChoices => {
     voice: (MOCK_VOICES as readonly string[]).includes(voice ?? '')
       ? (voice as MockVoice)
       : DEFAULT_MOCK_CHOICES.voice,
+    hints: (MOCK_HINTS_SHOWN as readonly string[]).includes(hints ?? '')
+      ? (hints as MockHintsShown)
+      : DEFAULT_MOCK_CHOICES.hints,
   };
 };
 
-export const mockChoicesSearch = ({ lengthMinutes, voice }: MockChoices) =>
-  `?length=${lengthMinutes}&voice=${voice}`;
+export const mockChoicesSearch = ({
+  lengthMinutes,
+  voice,
+  hints,
+}: MockChoices) => `?length=${lengthMinutes}&voice=${voice}&hints=${hints}`;
 
 /** Each voice saying the same line (doc 24 §13.8): "Hello, I'm an AI interviewer. …". */
 export const VOICE_SAMPLES = {
@@ -76,6 +88,7 @@ export const MockSetupPanel: React.FC<MockSetupPanelProps> = ({
   const { left } = useMockLeft();
   const [lengthMinutes, setLengthMinutes] = useState(initial.lengthMinutes);
   const [voice, setVoice] = useState(initial.voice);
+  const [hints, setHints] = useState(initial.hints);
   const sample = useRef<HTMLAudioElement | null>(null);
   const noneLeft = left?.left === 0;
 
@@ -148,6 +161,15 @@ export const MockSetupPanel: React.FC<MockSetupPanelProps> = ({
             {t('mock.voiceNote')}
           </p>
         </fieldset>
+        <ChoiceChips
+          label={t('mock.hintsLabel')}
+          options={MOCK_HINTS_SHOWN.map(option => ({
+            value: option,
+            label: t(HINTS_SHOWN_KEYS[option]),
+          }))}
+          value={hints}
+          onChange={setHints}
+        />
         <p className="text-sm leading-normal text-muted">
           {t('mock.sourceNote')}
         </p>
@@ -165,7 +187,7 @@ export const MockSetupPanel: React.FC<MockSetupPanelProps> = ({
             onClick={() =>
               navigate(
                 applicationInterviewMockPath(applicationId, interviewId) +
-                  mockChoicesSearch({ lengthMinutes, voice }),
+                  mockChoicesSearch({ lengthMinutes, voice, hints }),
               )
             }>
             {t('mock.continueButton')}

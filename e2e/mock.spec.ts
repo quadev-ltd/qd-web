@@ -2,8 +2,8 @@
 // setup, the Ready page with "Before you start", the interview with a recorded answer and real
 // sound (a stand-in microphone, the preview's interviewer voicing each line as a short
 // tone), "I'm done", a follow-up, Skip, Pause, a failed send and nothing heard, a blocked
-// microphone, the end with the feedback card, and what was said in Sessions. The preview's backend
-// plays the backend's part.
+// microphone, the end with the feedback card, what was said in Sessions, and the hints (H2) when
+// asked for and after the answer. The preview's backend plays the backend's part.
 import { expect, type Page, test } from '@playwright/test';
 
 import { openApplications, seedApplications } from './support';
@@ -93,11 +93,12 @@ test('a mock interview taken in turns: set up, started, answered, a follow-up, s
 
   // Ready: the choices in short, and the notice before the first one
   await expect(page).toHaveURL(
-    /\/interviews\/[^/]+\/mock\?length=20&voice=chirp$/,
+    /\/interviews\/[^/]+\/mock\?length=20&voice=chirp&hints=on-request$/,
   );
   const summary = page.getByRole('region', { name: 'Your interview' });
   await expect(summary).toContainText('About 20 minutes, 6 to 8 questions');
   await expect(summary).toContainText('Voice 2');
+  await expect(summary).toContainText('When you ask');
   await expect(
     page.getByRole('region', { name: 'Before you start' }),
   ).toContainText('The audio is never kept.');
@@ -235,6 +236,87 @@ test('a reload during the interview continues it; a finished one ends with "Inte
   await expect(
     page.getByRole('heading', { name: 'Interview finished' }),
   ).toBeVisible({ timeout: 10_000 });
+});
+
+const hints = (page: Page) =>
+  page.getByRole('region', { name: 'Hints', exact: true });
+
+test('hints when I ask (H2): beside the interview, shown for this question, on their way for a follow-up', async ({
+  page,
+}) => {
+  await openInterview(page);
+  await start(page);
+
+  // Beside the answer at 1280, under it on a phone
+  const column = await hints(page).boundingBox();
+  const yours = await answer(page).boundingBox();
+  if ((page.viewportSize()?.width ?? 0) >= 1024) {
+    expect(column!.x).toBeGreaterThan(yours!.x + yours!.width - 1);
+  } else {
+    expect(column!.y).toBeGreaterThan(yours!.y + yours!.height - 1);
+  }
+
+  // Hidden until asked, then this question's points
+  await expect(hints(page)).toContainText('Hidden until you ask');
+  await hints(page).getByRole('button', { name: 'Show hints' }).click();
+  await expect(hints(page).getByRole('listitem').first()).toBeVisible();
+  await expect(hints(page)).toContainText('Advice');
+
+  // A follow-up: hidden again, then on their way, then in
+  await page.waitForTimeout(1_200);
+  await answer(page).getByRole('button', { name: 'I’m done' }).click();
+  await expect(interviewer(page)).toContainText(
+    'What was your own part in it',
+    { timeout: 10_000 },
+  );
+  await expect(hints(page)).toContainText('Hidden until you ask');
+  await hints(page).getByRole('button', { name: 'Show hints' }).click();
+  await expect(hints(page)).toContainText(
+    'Hints for this follow-up are on their way.',
+  );
+  await expect(hints(page).getByRole('listitem').first()).toBeVisible({
+    timeout: 15_000,
+  });
+});
+
+test('hints after I answer (H2): hidden while answering, the answered question’s until the next answer, and none when they failed', async ({
+  page,
+}) => {
+  await openInterview(page);
+  await page
+    .getByRole('button', { name: 'Practise for this interview' })
+    .click();
+  const setup = page.getByRole('dialog', { name: 'Mock interview' });
+  await setup.getByText('After I answer').click();
+  await setup.getByRole('button', { name: 'Continue' }).click();
+  await expect(
+    page.getByRole('region', { name: 'Your interview' }),
+  ).toContainText('After you answer');
+  await page.getByRole('button', { name: 'Start the interview' }).click();
+  await expect(answer(page)).toContainText('Recording ·', { timeout: 15_000 });
+
+  await expect(hints(page)).toContainText('Shown once you’ve answered');
+  await page.waitForTimeout(1_200);
+  await answer(page).getByRole('button', { name: 'I’m done' }).click();
+  // The answered question's points, through the follow-up being asked
+  await expect(
+    hints(page).getByText('For the question you just answered'),
+  ).toBeVisible();
+  await expect(hints(page).getByRole('listitem').first()).toBeVisible();
+  // The follow-up's answer starts: its own hints, hidden again
+  await expect(answer(page)).toContainText('Recording ·', { timeout: 10_000 });
+  await expect(hints(page)).toContainText('Shown once you’ve answered');
+
+  // The next question's hints failed: "Show them now" says so
+  await page.evaluate(() => window.qdPreviewProfile?.failNextHints());
+  await interviewer(page).getByRole('button', { name: 'Skip' }).click();
+  await expect(page.getByText(/Question 2 of/)).toBeVisible({
+    timeout: 10_000,
+  });
+  await hints(page).getByRole('button', { name: 'Show them now' }).click();
+  await expect(hints(page)).toContainText(
+    'No hints for this question this time.',
+  );
 });
 
 test('none left today: the setup says so and can’t continue', async ({

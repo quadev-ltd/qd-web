@@ -1,6 +1,8 @@
 import {
   isMockIdle,
   MOCK_IDLE_MS,
+  mockHintsKey,
+  mockHintsOf,
   mockProgress,
   MockSessionSchema,
 } from './mockInterviews';
@@ -89,5 +91,80 @@ describe('a mock interview as stored (D100)', () => {
     expect(
       isMockIdle(stored({ status: 'ended', updatedAt: 0 }), MOCK_IDLE_MS + 1),
     ).toBe(false);
+  });
+});
+
+describe('a mock interview’s hints (slice H1)', () => {
+  const POINTS = [
+    { text: 'Payments migration: 40% fewer incidents', itemId: 'i1' },
+    { text: 'Say what you changed afterwards.' },
+  ];
+
+  it('reads when they show, "When I ask" for a session from before hints', () => {
+    expect(stored().hintsShown).toBe('on-request');
+    expect(stored({ hintsShown: 'after-answer' }).hintsShown).toBe(
+      'after-answer',
+    );
+    expect(stored({ hintsShown: 'sometimes' }).hintsShown).toBe('on-request');
+  });
+
+  it('reads each question’s hints, leaving out an entry or a point it can’t read', () => {
+    const session = stored({
+      hints: {
+        p1: {
+          status: 'ready',
+          keyPoints: [...POINTS, { nothing: 'readable' }],
+          readyAt: 5,
+          ms: 7_000,
+        },
+        t2: { status: 'writing' },
+        p2: { status: 'failed', reason: 'quota' },
+        p3: { status: 'unknown' },
+      },
+    });
+    expect(Object.keys(session.hints)).toEqual(['p1', 't2', 'p2']);
+    expect(session.hints.p1?.keyPoints).toEqual(POINTS);
+    expect(session.hints.p2).toEqual({
+      status: 'failed',
+      reason: 'quota',
+      keyPoints: [],
+    });
+    expect(stored().hints).toEqual({});
+  });
+
+  it('keeps a planned question’s hints by its plan question, a follow-up’s by itself', () => {
+    const [planned, followUp] = stored().turns;
+    expect(mockHintsKey(planned!)).toBe('p1');
+    expect(mockHintsKey(followUp!)).toBe('t2');
+  });
+
+  it('says what there is to show: the points, nothing this time, or not yet', () => {
+    const session = stored({
+      hints: {
+        p1: { status: 'ready', keyPoints: POINTS },
+        t2: { status: 'writing' },
+      },
+    });
+    expect(mockHintsOf(session, 't1')).toEqual({
+      status: 'ready',
+      keyPoints: POINTS,
+    });
+    expect(mockHintsOf(session, 't2')).toEqual({ status: 'pending' });
+    // A turn the read doesn't have yet, or no entry yet
+    expect(mockHintsOf(session, 't9')).toEqual({ status: 'pending' });
+    expect(mockHintsOf(stored(), 't1')).toEqual({ status: 'pending' });
+    // Failed, or ready with nothing in it
+    expect(
+      mockHintsOf(
+        stored({ hints: { p1: { status: 'failed', reason: 'model' } } }),
+        't1',
+      ),
+    ).toEqual({ status: 'none' });
+    expect(
+      mockHintsOf(
+        stored({ hints: { p1: { status: 'ready', keyPoints: [] } } }),
+        't1',
+      ),
+    ).toEqual({ status: 'none' });
   });
 });

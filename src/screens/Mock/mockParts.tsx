@@ -1,5 +1,5 @@
 // Parts the mock interview pages share (X6, R2, D100): the status panel of the boards, the
-// summary of a mock interview's choices, and the words for its voice, length and ending.
+// summary of a mock interview's choices, and the words for its voice, length, hints and ending.
 import { type TFunction } from 'i18next';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import Icon, { type IconName } from '@/components/Icon';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import {
+  type MockHintsShown,
   type MockLength,
   type MockSession,
   type MockVoice,
@@ -22,6 +23,20 @@ export const LENGTH_SUMMARY_KEYS = {
   10: 'mock.lengthSummary10',
   20: 'mock.lengthSummary20',
 } as const satisfies Record<MockLength, string>;
+
+/** The setup's choice, in the candidate's words. */
+export const HINTS_SHOWN_KEYS = {
+  'with-question': 'mock.hintsWithQuestion',
+  'on-request': 'mock.hintsOnRequest',
+  'after-answer': 'mock.hintsAfterAnswer',
+} as const satisfies Record<MockHintsShown, string>;
+
+/** The same, in "Your interview": "When you ask". */
+const HINTS_SUMMARY_KEYS = {
+  'with-question': 'mock.hintsSummaryWithQuestion',
+  'on-request': 'mock.hintsSummaryOnRequest',
+  'after-answer': 'mock.hintsSummaryAfterAnswer',
+} as const satisfies Record<MockHintsShown, string>;
 
 const PANEL_SURFACES = {
   plain: 'bg-surface shadow-card',
@@ -88,13 +103,15 @@ export const MockPanel: React.FC<{
 export const MockSummaryCard: React.FC<{
   lengthMinutes: MockLength;
   voice: MockVoice;
+  hints: MockHintsShown;
   onChange?: () => void;
-}> = ({ lengthMinutes, voice, onChange }) => {
+}> = ({ lengthMinutes, voice, hints, onChange }) => {
   const { t } = useTranslation();
   const rows = [
     [t('mock.summaryWay'), t('mock.wayName')],
     [t('mock.summaryLength'), t(LENGTH_SUMMARY_KEYS[lengthMinutes])],
     [t('mock.summaryVoice'), t(VOICE_KEYS[voice])],
+    [t('mock.summaryHints'), t(HINTS_SUMMARY_KEYS[hints])],
   ];
   return (
     <Card

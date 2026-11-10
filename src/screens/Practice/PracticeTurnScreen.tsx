@@ -51,12 +51,9 @@ import { useSessionUser } from '@/core/session/hooks';
 import { useAppSelector } from '@/core/state/hooks';
 import { selectInterviews } from '@/core/state/selectors/interviews';
 import { selectPractice } from '@/core/state/selectors/practice';
-import {
-  ITEM_KIND_KEYS,
-  QUESTION_KIND_KEYS,
-} from '@/screens/Applications/BriefCards';
+import { QUESTION_KIND_KEYS } from '@/screens/Applications/BriefCards';
 import { interviewTitle } from '@/screens/Applications/interviews/interviewText';
-import useItems from '@/screens/Cv/review/useItems';
+import KeyPointList from '@/screens/Practice/KeyPointList';
 import {
   AnswerCard,
   answerFailureOf,
@@ -134,7 +131,6 @@ const KeyPointsCard: React.FC<{
   onShow?: () => void;
 }> = ({ turn, resources, onShow }) => {
   const { t } = useTranslation();
-  const items = useItems(turn.keyPoints.some(({ itemId }) => itemId));
   if (onShow) {
     return (
       <Card
@@ -177,41 +173,7 @@ const KeyPointsCard: React.FC<{
           {t('practice.keyPointsFrom')}
         </p>
       </div>
-      <ul className="flex flex-col gap-3">
-        {turn.keyPoints.map((point, index) => {
-          const item = point.itemId ? items?.get(point.itemId) : undefined;
-          const source = item
-            ? resources.find(({ id }) => id === item.resourceId)
-            : undefined;
-          return (
-            <li
-              key={`${index}-${point.text}`}
-              className="flex flex-col gap-1 border-t border-border-faint pt-3 first:border-t-0 first:pt-0">
-              <p className="text-[15px] leading-normal wrap-anywhere">
-                {point.text}
-              </p>
-              {item ? (
-                <p className="flex items-center gap-1.5 text-[13px] leading-normal text-muted">
-                  <Icon name="file" size={14} />
-                  {source
-                    ? t('applications.itemSource', {
-                        kind: t(ITEM_KIND_KEYS[item.kind]),
-                        title: source.title,
-                      })
-                    : t(ITEM_KIND_KEYS[item.kind])}
-                </p>
-              ) : (
-                // An item removed since keeps its text without a source (choice 7).
-                !point.itemId && (
-                  <span className="flex">
-                    <Chip tone="neutral">{t('applications.adviceChip')}</Chip>
-                  </span>
-                )
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      <KeyPointList keyPoints={turn.keyPoints} resources={resources} />
     </Card>
   );
 };

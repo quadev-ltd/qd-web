@@ -32,6 +32,7 @@ import { canRecord } from '@/core/mock/audio';
 import { type MockView } from '@/core/mock/MockInterviewController';
 import { useApplications } from '@/core/profile/ApplicationsProvider';
 import { ProfileErrorCode } from '@/core/profile/errors';
+import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
 import { dailyLimitResetTime } from '@/core/profile/limits';
 import {
   isMockIdle,
@@ -59,6 +60,7 @@ import {
   useNow,
 } from '@/screens/Applications/interviews/interviewText';
 import { MockEndPanel, MockFeedbackCard } from '@/screens/Mock/MockEnd';
+import { MockHintsCard, useMockHints } from '@/screens/Mock/MockHints';
 import {
   AnswerCard,
   InterviewerCard,
@@ -312,6 +314,13 @@ export const MockInterviewScreen: React.FC = () => {
   const { state: read, reload } = useMockSession(sessionId);
   const session: MockSession | null =
     read.status === 'loaded' ? read.session : null;
+  const { resources } = useInterviewProfile();
+  const hints = useMockHints({
+    session,
+    view,
+    shown: session?.hintsShown ?? choices.hints,
+    reload,
+  });
 
   // The progress comes from the session: read again with each new question, and at the end.
   const turnId = view.question?.turnId;
@@ -374,9 +383,11 @@ export const MockInterviewScreen: React.FC = () => {
       `${applicationInterviewPath(applicationId, interviewId)}${mockChoicesSearch(again)}&mock=setup`,
     );
 
-  const shell = (children: React.ReactNode) => (
+  /** One column at reading width; `wide` has room for the hints column beside the interview. */
+  const shell = (children: React.ReactNode, wide = false) => (
     <SignedInShell title={t('mock.documentTitle')} mainClassName={PROFILE_MAIN}>
-      <div className="mx-auto flex max-w-[760px] flex-col gap-5">
+      <div
+        className={`mx-auto flex ${wide ? 'max-w-[1120px]' : 'max-w-[760px]'} flex-col gap-5`}>
         {children}
       </div>
       {blocker.state === 'blocked' && (
@@ -476,6 +487,7 @@ export const MockInterviewScreen: React.FC = () => {
                     lengthMinutes:
                       session?.lengthMinutes ?? choices.lengthMinutes,
                     voice: session?.voice ?? choices.voice,
+                    hints: session?.hintsShown ?? choices.hints,
                   })
               : undefined
           }
@@ -515,8 +527,22 @@ export const MockInterviewScreen: React.FC = () => {
             byYou={pausedByYou}
           />
         )}
-        <InterviewerCard view={view} controller={controller} />
-        <AnswerCard view={view} controller={controller} />
+        {/* The hints beside the interview at 1280, under it on a phone (Web-X6-Hints) */}
+        <div className="flex flex-wrap items-start gap-6">
+          <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-5">
+            <InterviewerCard view={view} controller={controller} />
+            <AnswerCard view={view} controller={controller} />
+          </div>
+          <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-5">
+            {hints.now && (
+              <MockHintsCard
+                state={hints.now.state}
+                resources={resources}
+                onReveal={() => hints.now && hints.reveal(hints.now.turnId)}
+              />
+            )}
+          </div>
+        </div>
         {confirmEnd && (
           <Dialog
             title={t('mock.endDialogTitle')}
@@ -546,6 +572,7 @@ export const MockInterviewScreen: React.FC = () => {
           </Dialog>
         )}
       </>,
+      true,
     );
   }
 
@@ -612,6 +639,7 @@ export const MockInterviewScreen: React.FC = () => {
       <MockSummaryCard
         lengthMinutes={session?.lengthMinutes ?? choices.lengthMinutes}
         voice={session?.voice ?? choices.voice}
+        hints={session?.hintsShown ?? choices.hints}
         onChange={continuing ? undefined : () => setupAgain(choices)}
       />
       {!continuing && hasSessions === false && <NoticeCard />}
