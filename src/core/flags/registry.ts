@@ -42,7 +42,7 @@ export const FLAGS = {
   mockInterview: {
     default: false,
     description:
-      'Mock interviews (doc 24, D100): an AI interviewer asks an interview’s questions by voice, in the ways built so far.',
+      'Mock interviews (doc 24, D100): an AI interviewer by voice, in the ways built so far, for testers.',
   },
   aiDiagnostics: {
     default: false,

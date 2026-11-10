@@ -3,8 +3,9 @@
 // played with the microphone off, the answer is recorded until "I'm done" and sent in the call
 // itself, never stored; the next line comes back with its audio. The session keeps each question
 // as asked and the answer as text, for 12 months (D24). A copy of quadev-backend's
-// packages/shared/src/mockInterview.ts as doc 24 §13 gives it (9 Nov 2026); the backend applies
-// the limits again and refuses what fails.
+// packages/shared/src/mockInterview.ts at 5ab5f7e (10 Nov 2026), less what the pages don't read
+// (`skills`, `costUsd`, the backend's own fields); the backend applies the limits again and
+// refuses what fails.
 import { z } from 'zod';
 
 import { INTERVIEW_QUESTION_KINDS, INTERVIEW_TYPES } from './interviews';

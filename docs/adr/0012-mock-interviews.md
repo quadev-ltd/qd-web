@@ -1,7 +1,7 @@
 # ADR 0012: Mock interviews, taken in turns (D100)
 
-- Status: accepted. Slice 2 of research doc 24 (the take-turns way) is built; it merges once the backend's
-  slice 1 is on dev
+- Status: accepted. Slice 2 of research doc 24 (the take-turns way), proven against the backend's slice 1
+  (quadev-backend 5ab5f7e) in its emulators
 - Date: 2026-11-10
 
 ## Context
@@ -44,7 +44,9 @@ with the design chat (§12). Real time and the voice model come with slices 4 an
   by the backend's check, behind "Hear it" in the setup.
 - **The browser tests use a stand-in microphone:** a tone played into a real audio stream, which MediaRecorder
   records as it would a microphone. Chromium's fake devices wait on the system's microphone permission on a
-  Mac, which a headless run never gets.
+  Mac, which a headless run never gets. Against the emulators (`e2e-emulators/mock.spec.ts`) a gain silences it,
+  so a short answer is under the fake's 1,000 bytes and "nothing heard"; the clock is moved with the
+  administrator's REST call, as the backend's own tests move it.
 
 ## Consequences
 
