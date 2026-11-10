@@ -929,7 +929,8 @@ https://firestore.googleapis.com https://firebasestorage.googleapis.com
 https://firebaseremoteconfig.googleapis.com https://firebaseinstallations.googleapis.com
 https://content-firebaseappcheck.googleapis.com
 https://europe-west1-quadevapp-dev.cloudfunctions.net
-https://europe-west1-quadevapp.cloudfunctions.net;
+https://europe-west1-quadevapp.cloudfunctions.net
+wss://live-assist-476492543939.europe-west1.run.app;
 frame-src https://quadevapp-dev.firebaseapp.com https://quadevapp.firebaseapp.com
 https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/;
 manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
@@ -937,7 +938,8 @@ manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 
 Nothing is allowed unless listed. The site's own script and style files (no inline code, no `style`
 attributes, no `eval`), its own images, fonts and sounds (the voices' samples of a mock interview; its
-interviewer's lines are decoded by Web Audio, which the policy doesn't govern); neither React nor Tailwind needs `'unsafe-inline'`
+interviewer's lines are decoded by Web Audio, which the policy doesn't govern), and its own AudioWorklet
+module (`/mock/live-capture.js`, under `script-src 'self'`); neither React nor Tailwind needs `'unsafe-inline'`
 here. The other origins are what Firebase sign-in needs, and nothing uses them while the account
 screens are off:
 
@@ -952,6 +954,7 @@ screens are off:
 | `frame-src`   | `quadevapp-dev.firebaseapp.com`, `quadevapp.firebaseapp.com`                                 | A hidden helper frame through which the Google sign-in window hands back its result                         |
 | `connect-src` | `content-firebaseappcheck.googleapis.com`                                                    | App Check: exchanging the proof for a token                                                                 |
 | `connect-src` | `europe-west1-quadevapp-dev.cloudfunctions.net`, `europe-west1-quadevapp.cloudfunctions.net` | The backend's callable functions (the interview profile)                                                    |
+| `connect-src` | `wss://live-assist-476492543939.europe-west1.run.app`                                        | A mock interview in real time: the backend's relay on dev (doc 24 §15.2); production has none yet           |
 | `script-src`  | `www.google.com/recaptcha/`, `www.gstatic.com/recaptcha/`                                    | reCAPTCHA Enterprise, loaded by App Check                                                                   |
 | `frame-src`   | `www.google.com/recaptcha/`, `recaptcha.google.com/recaptcha/`                               | The hidden reCAPTCHA frame                                                                                  |
 

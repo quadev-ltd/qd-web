@@ -51,6 +51,8 @@ import {
 } from './practice';
 import { type StoredUsageLimits } from './usageLimits';
 
+import { type LiveSocket, type LiveTokens } from '@/core/mock/liveProtocol';
+
 /** Where a file goes, as `createResource` answers for a file. */
 export interface UploadTarget {
   /** Cloud Storage path in the default bucket. */
@@ -347,11 +349,12 @@ export interface ProfileGateway {
   ): Promise<number>;
   /**
    * Starts a mock interview: its question plan is written (one model call) and its first two
-   * lines voiced, 5 to 15 seconds. Stored only when it succeeds; counts as one session today.
+   * lines voiced, 5 to 15 seconds. Stored only when it succeeds; counts as one session today. The
+   * real-time ways voice nothing here: `connect.url` is where the interview is spoken (§15.2).
    */
   startMockInterview(
     request: StartMockInterviewRequest,
-  ): Promise<{ sessionId: string } & MockLines>;
+  ): Promise<{ sessionId: string; connect?: { url: string } } & MockLines>;
   /** Sends a recorded answer; resolves the next line: a follow-up, the next question or the closing. */
   answerMockQuestion(
     request: AnswerMockQuestionRequest,
@@ -364,10 +367,13 @@ export interface ProfileGateway {
   pauseMockInterview(
     request: PauseMockInterviewRequest,
   ): Promise<{ paused: boolean; timeLeftMs: number }>;
-  /** After a reload or a lost connection: the line waiting for an answer, voiced again. */
+  /**
+   * After a reload or a lost connection: the line waiting for an answer, voiced again. The
+   * real-time ways say nothing here: `connect.url` is where to connect again.
+   */
   resumeMockInterview(
     sessionId: string,
-  ): Promise<MockLines & { paused: boolean }>;
+  ): Promise<MockLines & { paused: boolean; connect?: { url: string } }>;
   /** Ends it now ("End interview"). Ending it twice is the same as once. */
   endMockInterview(sessionId: string, played?: MockPlayed[]): Promise<void>;
   /** "How did it go?", once it ended. Sending again replaces it. */
@@ -380,6 +386,10 @@ export interface ProfileGateway {
   removeMockSession(sessionId: string): Promise<void>;
   /** How many mock interviews were started today (UTC), for the limit. */
   getMockInterviewsToday(uid: string): Promise<number>;
+  /** The real-time ways: what the relay's `hello` proves the page and its user with (§15.2). */
+  getLiveTokens(): Promise<LiveTokens>;
+  /** The real-time ways: a connection to the relay at `url`. */
+  openLiveSocket(url: string): LiveSocket;
 
   // ---------- CV versions (delivery 2b) ----------
 

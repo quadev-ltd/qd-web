@@ -501,6 +501,79 @@ test('mock interviews (D100): the setup, Ready, the interviewer speaking and the
   await expectAccessibleAndNotTooWide(page);
 });
 
+test('mock interviews in real time (doc 24 §16): the setup’s ways, Ready, the interviewer speaking, your answer with the words heard, reconnecting, open in another tab: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  test.slow();
+  // A silent microphone the page streams from, made to speak (see mock.spec.ts).
+  await page.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = async () => {
+      const context = new AudioContext();
+      const tone = context.createOscillator();
+      const gain = context.createGain();
+      gain.gain.value = 0;
+      (window as unknown as { qdMicrophone: GainNode }).qdMicrophone = gain;
+      const destination = context.createMediaStreamDestination();
+      tone.connect(gain).connect(destination);
+      tone.start();
+      return destination.stream;
+    };
+  });
+  await openApplications(page);
+  await page.evaluate(() => {
+    window.qdPreview?.setFlag('textPractice', true);
+    window.qdPreview?.setFlag('mockInterview', true);
+  });
+  await seedApplications(page);
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Senior Backend Engineer' })
+    .getByRole('link')
+    .click();
+  await page.getByRole('link', { name: 'Interviews' }).click();
+  await page.getByRole('link', { name: 'Technical interview' }).click();
+
+  await page
+    .getByRole('button', { name: 'Practise for this interview' })
+    .click();
+  const setup = page.getByRole('dialog', { name: 'Mock interview' });
+  await setup.getByRole('radio', { name: 'Real time' }).check();
+  await expectAccessibleAndNotTooWide(page);
+  await setup.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByText('Use headphones if you can.')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+
+  await page.getByRole('button', { name: 'Start the interview' }).click();
+  await expect(page.getByText('Speaking…')).toBeVisible({ timeout: 15_000 });
+  await expectAccessibleAndNotTooWide(page);
+  const answer = page.getByRole('region', { name: 'Your answer' });
+  await expect(answer).toContainText('Listening ·', { timeout: 10_000 });
+  await page.evaluate(() => {
+    (window as unknown as { qdMicrophone: GainNode }).qdMicrophone.gain.value =
+      1;
+  });
+  await expect(answer).toContainText('Heard', { timeout: 5_000 });
+  await expectAccessibleAndNotTooWide(page);
+  await page.evaluate(() => {
+    (window as unknown as { qdMicrophone: GainNode }).qdMicrophone.gain.value =
+      0;
+  });
+  await expect(page.getByText('What was your own part in it')).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(answer).toContainText('Listening ·', { timeout: 10_000 });
+
+  await page.evaluate(() => window.qdPreviewProfile?.dropLiveConnection(3));
+  await expect(page.getByText('Reconnecting…')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await expect(answer).toContainText('Listening ·', { timeout: 20_000 });
+  await page.evaluate(() => window.qdPreviewProfile?.replaceLiveConnection());
+  await expect(
+    page.getByText('This interview is open in another tab'),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+});
+
 test('Sessions and removing kept practice (D99): the remove dialog with its box, Sessions with a removed job, "Remove all" and nothing kept: accessible and no horizontal scroll', async ({
   page,
 }) => {

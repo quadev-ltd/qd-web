@@ -2,6 +2,7 @@
 // callables of quadev-backend's `interview-profile` codebase. The contract is in
 // src/core/profile/mockInterviews.ts. Sessions orders by one field and the counts filter on one,
 // so no read needs a composite index. The audio of an answer goes in the call and is kept nowhere.
+import { getToken } from 'firebase/app-check';
 import {
   collection,
   doc,
@@ -14,11 +15,14 @@ import {
   where,
 } from 'firebase/firestore/lite';
 
-import { db } from './app';
+import { app, auth, db } from './app';
+import { startAppCheck } from './appCheck';
 import { call, mapped, millis } from './interviewProfile';
 
 import logger from '@/core/logger';
+import { type LiveTokens } from '@/core/mock/liveProtocol';
 import { usageDayPath } from '@/core/profile/contract';
+import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import {
   ANSWER_MOCK_QUESTION,
   type AnswerMockQuestionRequest,
@@ -142,14 +146,38 @@ export const countApplicationMockSessions = (
  */
 export const startMockInterview = async (
   request: StartMockInterviewRequest,
-): Promise<{ sessionId: string } & MockLines> => {
-  const { sessionId, lines, timeLeftMs } = await call(
+): Promise<{ sessionId: string; connect?: { url: string } } & MockLines> => {
+  const { sessionId, lines, timeLeftMs, connect } = await call(
     START_MOCK_INTERVIEW,
     StartMockInterviewResponseSchema,
     request,
   );
-  return { sessionId, lines, status: 'active', timeLeftMs };
+  return {
+    sessionId,
+    lines,
+    status: 'active',
+    timeLeftMs,
+    ...(connect ? { connect } : {}),
+  };
 };
+
+/**
+ * The relay's proof of the page and its user (doc 24 §15.2): the signed-in user's ID token and
+ * App Check's token, as the callables send them.
+ */
+export const getLiveTokens = (): Promise<LiveTokens> =>
+  mapped(async () => {
+    const user = auth().currentUser;
+    const appCheck = startAppCheck(app());
+    if (!user || !appCheck) {
+      throw new ProfileError(ProfileErrorCode.SignedOut);
+    }
+    const [idToken, { token }] = await Promise.all([
+      user.getIdToken(),
+      getToken(appCheck),
+    ]);
+    return { idToken, appCheckToken: token };
+  });
 
 /** Sends a recorded answer (the upload, then 2 to 5 seconds): the next line comes back voiced. */
 export const answerMockQuestion = async (
@@ -198,13 +226,19 @@ export const pauseMockInterview = async (
 
 export const resumeMockInterview = async (
   sessionId: string,
-): Promise<MockLines & { paused: boolean }> => {
-  const { lines, paused, timeLeftMs } = await call(
+): Promise<MockLines & { paused: boolean; connect?: { url: string } }> => {
+  const { lines, paused, timeLeftMs, connect } = await call(
     RESUME_MOCK_INTERVIEW,
     ResumeMockInterviewResponseSchema,
     { sessionId },
   );
-  return { lines, status: 'active', paused, timeLeftMs };
+  return {
+    lines,
+    status: 'active',
+    paused,
+    timeLeftMs,
+    ...(connect ? { connect } : {}),
+  };
 };
 
 export const endMockInterview = async (

@@ -104,6 +104,38 @@ ended and every answer's has settled; `retryMockFeedback` asks for one of them a
   interview from the end page, under Sessions from Sessions. "Start again with new key points" on such a
   practice asks the question as typed, since the hints would be the same key points again.
 
+## Real time (slice 4, D100, 10 Nov 2026)
+
+Against the backend's slice 3 (quadev-backend #69, `cf88e08`; the contract in doc 24 §15, its code in
+`packages/live-protocol`) and its #71 (the continue call says where to connect). Drawn as `Web-X6-Setup` redrawn,
+`Web-X6-RT-Ready`, `-RT-Speaking`, `-RT-Listening` and `-RT-States` (canvas versions 70 and 75).
+
+- **A controller of its own** (`src/core/mock/LiveInterviewController.ts`), beside the take-turns one: one
+  WebSocket to the relay, whose `state` messages say what the page shows. The page picks the controller by the way:
+  the session's once there is one, else the setup's. The screens of the interview are its own
+  (`MockLiveRealTime.tsx`); the setup, the progress line, the hints, the pause, the end and what was said are
+  shared.
+- **The microphone streams all the time** in 100 ms frames of 16 kHz PCM, through an AudioWorklet served as it is
+  (`public/mock/live-capture.js`), with the browser's echo cancellation. Paused, nothing is sent and the pings go
+  on. **The voice** is 24 kHz PCM, played frame by frame on the same AudioContext, unlocked in the press.
+- **The page's own voice detection interrupts:** two frames in a row above a level, a higher one while the
+  interviewer plays, since some of its voice comes back in. The line stops, and `interrupt` says how far into it.
+  The closing can't be interrupted. The levels are a first guess, for the relay's `leakedWords` and
+  `falseBargeIns` to measure.
+- **Reconnecting:** a connection that drops after it was ready is tried again at once, then after 1, 2, 4 and 8
+  seconds, with the resume token while it is under 2 minutes old. After that, "We couldn't reconnect" with "Try
+  again" and "End the interview", which uses the call. `reconnect` from the relay connects again at once. `replaced`
+  says the interview is open in another tab; "Continue here" connects again, which takes it back.
+- **Pause and end are messages while connected;** the calls are used only when the socket is down, as the backend
+  asked (a call's pause isn't seen by an open connection).
+- **Continuing after a reload** calls `resumeMockInterview`, which on this way says where the relay is and nothing
+  else; the relay then says the line waiting.
+- **The preview has a stand-in relay** (`previewLiveRelay.ts`), which behaves as the backend's offline fakes: a
+  short tone per line, any sound heard as speech, 1.5 seconds of silence ending an answer. Its controls drop the
+  connection and take it to another tab, for the browser tests.
+- **No Repeat on this way** (doc 24 §16): "Say it differently" and Skip only; the candidate can ask aloud.
+- **The content policy** lists the relay's address on dev under `connect-src`.
+
 ## Consequences
 
 - Real time (slice 4) adds a WebSocket and an AudioWorklet next to the recorder; the controller's view and the

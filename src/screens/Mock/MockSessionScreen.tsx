@@ -51,7 +51,12 @@ import {
   useMockPractise,
 } from '@/screens/Mock/MockFeedback';
 import { clockTime } from '@/screens/Mock/MockLive';
-import { mockMinutes, mockTitle, VOICE_KEYS } from '@/screens/Mock/mockParts';
+import {
+  mockMinutes,
+  mockTitle,
+  VOICE_KEYS,
+  WAY_KEYS,
+} from '@/screens/Mock/mockParts';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 
 /** "9 Nov, 18:20", in the browser's time zone. */
@@ -290,7 +295,7 @@ export const MockSessionScreen: React.FC = () => {
     const going = session.status === 'active' && !isMockIdle(session, now);
     const overall = mockOverallOf(session, feedback.reading);
     const rows = [
-      [t('mock.summaryWay'), t('mock.wayName')],
+      [t('mock.summaryWay'), t(WAY_KEYS[session.way])],
       [
         t('mock.summaryLength'),
         t('mock.lengthUsed', {

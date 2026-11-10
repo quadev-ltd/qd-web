@@ -12,7 +12,22 @@ import {
   type MockLength,
   type MockSession,
   type MockVoice,
+  type MockWay,
 } from '@/core/profile/mockInterviews';
+
+/** Each way's name (doc 24 §16): "Take turns", "Real time". */
+export const WAY_KEYS = {
+  'take-turns': 'mock.wayTakeTurnsName',
+  'real-time': 'mock.wayRealTimeName',
+  'voice-model': 'mock.wayVoiceModelName',
+} as const satisfies Record<MockWay, string>;
+
+/** Each way in one line, for the setup. */
+export const WAY_TEXT_KEYS = {
+  'take-turns': 'mock.wayTakeTurnsText',
+  'real-time': 'mock.wayRealTimeText',
+  'voice-model': 'mock.wayVoiceModelText',
+} as const satisfies Record<MockWay, string>;
 
 export const VOICE_KEYS = {
   gemini: 'mock.voiceGemini',
@@ -101,14 +116,15 @@ export const MockPanel: React.FC<{
 
 /** "Your interview": the way, the length and the voice, with "Change" before it starts. */
 export const MockSummaryCard: React.FC<{
+  way: MockWay;
   lengthMinutes: MockLength;
   voice: MockVoice;
   hints: MockHintsShown;
   onChange?: () => void;
-}> = ({ lengthMinutes, voice, hints, onChange }) => {
+}> = ({ way, lengthMinutes, voice, hints, onChange }) => {
   const { t } = useTranslation();
   const rows = [
-    [t('mock.summaryWay'), t('mock.wayName')],
+    [t('mock.summaryWay'), t(WAY_KEYS[way])],
     [t('mock.summaryLength'), t(LENGTH_SUMMARY_KEYS[lengthMinutes])],
     [t('mock.summaryVoice'), t(VOICE_KEYS[voice])],
     [t('mock.summaryHints'), t(HINTS_SUMMARY_KEYS[hints])],

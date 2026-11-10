@@ -9,7 +9,9 @@
 // removeMockSession; the hints (H1) the trigger writes, read again until in; and the feedback on
 // the answers with the overall view (F1), written by the same trigger from the offline
 // `answer-feedback` and `mock-summary` fakes, one asked for again, and a question practised from
-// it (the `mock` source). The clock is moved as the backend's own tests move it.
+// it (the `mock` source); and the real-time way over the `live-assist` relay with its fakes (doc
+// 24 §15.7: any sound is speech, 1.5 seconds of silence ends an answer, each line is 400 ms of
+// silence). The clock is moved as the backend's own tests move it.
 import { expect, type Page, test } from '@playwright/test';
 
 import {
@@ -31,10 +33,15 @@ const microphone = (page: Page) =>
       const context = new AudioContext();
       const tone = context.createOscillator();
       const gain = context.createGain();
+      const known = window as unknown as {
+        qdMicrophone: GainNode;
+        qdMicrophoneVolume?: number;
+      };
+      gain.gain.value = known.qdMicrophoneVolume ?? 1;
       const destination = context.createMediaStreamDestination();
       tone.connect(gain).connect(destination);
       tone.start();
-      (window as unknown as { qdMicrophone: GainNode }).qdMicrophone = gain;
+      known.qdMicrophone = gain;
       return destination.stream;
     };
   });
@@ -357,6 +364,78 @@ test('feedback (F1, F2): each answer’s and how it went, written by the trigger
     page.getByRole('heading', { name: 'fake-follow-up: what came of it?' }),
   ).toBeVisible();
   await expect(page.getByText('From your mock interview')).toBeVisible();
+});
+
+test('real time (slices 3, 4): over the relay, the opening and the question, an answer ended by a pause and written down, a reload continued, the follow-up answered with "I’m done", ended, read in Sessions', async ({
+  page,
+}) => {
+  // Silent until the candidate speaks: the relay's fake hears any sound as speech.
+  await page.addInitScript(() => {
+    (window as unknown as { qdMicrophoneVolume: number }).qdMicrophoneVolume =
+      0;
+  });
+  await openInterview(page);
+  await page
+    .getByRole('button', { name: 'Practise for this interview' })
+    .click();
+  const setup = page.getByRole('dialog', { name: 'Mock interview' });
+  await setup.getByRole('radio', { name: 'Real time' }).check();
+  await setup.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Start the interview' }).click();
+
+  // The opening and the warm-up, said over the connection
+  await expect(interviewer(page)).toContainText(
+    'fake-warm-up: tell me about your background.',
+    { timeout: 30_000 },
+  );
+  await expect(answer(page)).toContainText('Listening ·', { timeout: 15_000 });
+
+  // Speech, the words heard, then 1.5 seconds of silence ends the answer
+  await setMicrophone(page, 1);
+  await expect(answer(page)).toContainText(/fake-heard: \d+ frames/, {
+    timeout: 10_000,
+  });
+  await setMicrophone(page, 0);
+  await expect(interviewer(page)).toContainText(
+    'fake-follow-up: what came of it?',
+    { timeout: 15_000 },
+  );
+  await expect(answer(page)).toContainText('Listening ·', { timeout: 15_000 });
+
+  // A reload: "Continue the interview" asks where the relay is (quadev-backend #71), which says
+  // the line waiting again
+  page.on('dialog', dialog => void dialog.accept());
+  await page.reload();
+  await page.getByRole('button', { name: 'Continue the interview' }).click();
+  await expect(interviewer(page)).toContainText(
+    'fake-follow-up: what came of it?',
+    { timeout: 15_000 },
+  );
+  await expect(answer(page)).toContainText('Listening ·', { timeout: 15_000 });
+
+  // "I'm done" ends the follow-up's answer at once
+  await setMicrophone(page, 1);
+  await page.waitForTimeout(1_000);
+  await answer(page).getByRole('button', { name: 'I’m done' }).click();
+  await setMicrophone(page, 0);
+  await expect(page.getByText(/Question 2 of 4/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(answer(page)).toContainText('Listening ·', { timeout: 15_000 });
+
+  // The end, over the connection
+  await page.getByRole('button', { name: 'End interview' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Interview ended' }),
+  ).toBeVisible({ timeout: 15_000 });
+
+  // As stored by the relay: the answers written down, the way
+  await page
+    .getByRole('link', { name: 'See your answers and feedback' })
+    .click();
+  const said = page.getByRole('region', { name: 'What was said' });
+  await expect(said).toContainText(/fake-transcript: \d+ frames of speech\./);
+  await expect(page.getByText('Real time', { exact: true })).toBeVisible();
 });
 
 test('mock interview: the backend refuses over the day’s 3, and the page says so', async ({

@@ -18,6 +18,7 @@ import {
   PREVIEW_CV_MS,
   PREVIEW_FEEDBACK_ANSWER_MS,
   PREVIEW_FEEDBACK_OVERALL_MS,
+  PREVIEW_LIVE_URL,
   PREVIEW_HINTS_FOLLOW_UP_MS,
   PREVIEW_HINTS_PLANNED_MS,
   PREVIEW_READ_MS,
@@ -3063,5 +3064,181 @@ describe('previewProfileGateway, the feedback on a mock interview (D101)', () =>
         }),
       ),
     ).resolves.toBe(ProfileErrorCode.NotFound);
+  });
+});
+
+describe('previewProfileGateway, a mock interview in real time (doc 24 §15.7)', () => {
+  /** A microphone frame: all at `value`. */
+  const micFrame = (value: number) => {
+    const bytes = new ArrayBuffer(8 + 3_200);
+    const view = new DataView(bytes);
+    view.setUint8(0, 1);
+    view.setUint8(1, 1);
+    for (let index = 0; index < 1_600; index += 1) {
+      view.setInt16(8 + index * 2, value, true);
+    }
+    return bytes;
+  };
+
+  const connected = async () => {
+    vi.useFakeTimers();
+    const context = await setUp();
+    const { applicationId } = await context.gateway.createApplication({
+      job: { source: 'text', text: 'Senior Backend Engineer. Go and Kafka.' },
+      title: 'Senior Backend Engineer',
+    });
+    context.pass(PREVIEW_READ_MS);
+    await context.gateway.getApplications(UID);
+    const started = await context.gateway.startMockInterview({
+      requestId: 'request-1',
+      applicationId,
+      way: 'real-time',
+      lengthMinutes: 10,
+      voice: 'gemini',
+    });
+    const socket = context.gateway.openLiveSocket(started.connect!.url);
+    const messages: Record<string, unknown>[] = [];
+    let voiceFrames = 0;
+    socket.onmessage = data => {
+      if (typeof data === 'string') {
+        messages.push(JSON.parse(data) as Record<string, unknown>);
+      } else {
+        voiceFrames += 1;
+      }
+    };
+    socket.onopen = () =>
+      socket.send(
+        JSON.stringify({
+          type: 'hello',
+          version: 1,
+          sessionId: started.sessionId,
+          idToken: 'id',
+          appCheckToken: 'check',
+        }),
+      );
+    await vi.advanceTimersByTimeAsync(0);
+    const read = async () =>
+      (await context.gateway.getMockSession(UID, started.sessionId))!;
+    const speak = (frames: number, value: number) => {
+      for (let frame = 0; frame < frames; frame += 1) {
+        socket.send(micFrame(value));
+      }
+    };
+    return {
+      ...context,
+      started,
+      socket,
+      messages,
+      voiceFrames: () => voiceFrames,
+      read,
+      speak,
+    };
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('starts with nothing said and where to connect; the relay says the opening and the question, then listens', async () => {
+    const { started, messages, voiceFrames } = await connected();
+    expect(started.lines).toEqual([]);
+    expect(started.connect).toEqual({ url: PREVIEW_LIVE_URL });
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(messages.map(({ type }) => type)).toEqual([
+      'ready',
+      'state',
+      'line',
+      'lineEnd',
+      'line',
+      'lineEnd',
+      'state',
+    ]);
+    expect(messages[2]).toMatchObject({ lineId: 'l1', kind: 'opening' });
+    expect(messages[4]).toMatchObject({ lineId: 'l2', turnId: 't1' });
+    expect(messages.at(-1)).toMatchObject({ state: 'listening' });
+    expect(voiceFrames()).toBe(10);
+  });
+
+  it('hears an answer, ends it after 1.5 seconds of silence, and says what comes next', async () => {
+    const { messages, speak, read } = await connected();
+    await vi.advanceTimersByTimeAsync(2_000);
+    speak(20, 4_000);
+    expect(messages.filter(({ type }) => type === 'heard')).toHaveLength(2);
+    speak(15, 0);
+    expect(messages.at(-1)).toMatchObject({ type: 'state', state: 'thinking' });
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    const session = await read();
+    expect(session.turns[0]).toMatchObject({
+      status: 'answered',
+      answer: {
+        transcript: 'I answered for about 2 seconds.',
+        spokenMs: 2_000,
+      },
+    });
+    expect(
+      messages.some(
+        ({ type, kind }) => type === 'line' && kind === 'follow-up',
+      ),
+    ).toBe(true);
+  });
+
+  it('"I’m done" with nothing heard says so; an interruption starts the answer at once', async () => {
+    const { messages, socket } = await connected();
+    await vi.advanceTimersByTimeAsync(600);
+    // The opening interrupted: the question at once
+    socket.send(
+      JSON.stringify({ type: 'interrupt', id: 'a1', lineId: 'l1', atMs: 200 }),
+    );
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(messages.at(-1)).toMatchObject({ state: 'listening' });
+    socket.send(
+      JSON.stringify({
+        type: 'done',
+        id: 'a2',
+        lineId: messages.filter(({ type }) => type === 'line').at(-1)!.lineId,
+      }),
+    );
+    expect(messages.at(-1)).toEqual({ type: 'notice', kind: 'nothing-heard' });
+  });
+
+  it('a dropped connection stops the clock; the next hello says the line waiting again', async () => {
+    const { gateway, messages, read, started } = await connected();
+    await vi.advanceTimersByTimeAsync(2_000);
+    gateway.controls.dropLiveConnection();
+    expect((await read()).pausedAt).not.toBeNull();
+
+    const again = gateway.openLiveSocket(PREVIEW_LIVE_URL);
+    const said: Record<string, unknown>[] = [];
+    again.onmessage = data => {
+      if (typeof data === 'string') {
+        said.push(JSON.parse(data) as Record<string, unknown>);
+      }
+    };
+    again.onopen = () =>
+      again.send(
+        JSON.stringify({ type: 'hello', sessionId: started.sessionId }),
+      );
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect((await read()).pausedAt).toBeNull();
+    expect(said.find(({ type }) => type === 'line')).toMatchObject({
+      lineId: 'l3',
+      turnId: 't1',
+    });
+    expect(messages.length).toBeGreaterThan(0);
+  });
+
+  it('ends when asked, and the continue call says where to connect', async () => {
+    const { gateway, socket, messages, read, started } = await connected();
+    await expect(
+      gateway.resumeMockInterview(started.sessionId),
+    ).resolves.toMatchObject({
+      lines: [],
+      connect: { url: PREVIEW_LIVE_URL },
+    });
+    socket.send(JSON.stringify({ type: 'end', id: 'e1' }));
+    expect(messages.at(-1)).toEqual({ type: 'ended', endReason: 'ended' });
+    expect((await read()).status).toBe('ended');
   });
 });

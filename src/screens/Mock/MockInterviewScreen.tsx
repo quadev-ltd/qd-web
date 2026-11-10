@@ -29,6 +29,8 @@ import Card from '@/components/ui/Card';
 import Dialog from '@/components/ui/Dialog';
 import { useFlag } from '@/core/flags/FlagsProvider';
 import { canRecord } from '@/core/mock/audio';
+import { canStream } from '@/core/mock/liveAudio';
+import { type LivePhase } from '@/core/mock/LiveInterviewController';
 import { type MockView } from '@/core/mock/MockInterviewController';
 import { useApplications } from '@/core/profile/ApplicationsProvider';
 import { ProfileErrorCode } from '@/core/profile/errors';
@@ -77,6 +79,12 @@ import {
   useTicking,
 } from '@/screens/Mock/MockLive';
 import {
+  RealTimeAnswerCard,
+  RealTimeConnectionPanel,
+  RealTimeInterviewerCard,
+  RealTimePausedPanel,
+} from '@/screens/Mock/MockLiveRealTime';
+import {
   MockPanel,
   MockSummaryCard,
   mockTitle,
@@ -86,7 +94,10 @@ import {
   mockChoicesOf,
   mockChoicesSearch,
 } from '@/screens/Mock/MockSetupPanel';
-import { useMockController } from '@/screens/Mock/useMockController';
+import {
+  useLiveController,
+  useMockController,
+} from '@/screens/Mock/useMockController';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 
 const LIVE_PHASES: ReadonlySet<MockView['phase']> = new Set([
@@ -96,6 +107,17 @@ const LIVE_PHASES: ReadonlySet<MockView['phase']> = new Set([
   'sending',
   'issue',
   'paused',
+]);
+
+/** Real time: the interview is under way, the connection down included. */
+const REAL_TIME_PHASES: ReadonlySet<LivePhase> = new Set([
+  'speaking',
+  'listening',
+  'thinking',
+  'paused',
+  'reconnecting',
+  'disconnected',
+  'replaced',
 ]);
 
 /** What a refused start says. */
@@ -185,7 +207,7 @@ const NoticeCard: React.FC = () => {
 
 /** The press that starts or continues it, or what stands in its way. */
 const StartArea: React.FC<{
-  view: MockView;
+  view: { phase: string; startFailure?: ProfileErrorCode };
   label: string;
   note: string;
   onPress: () => void;
@@ -239,6 +261,15 @@ const StartArea: React.FC<{
           lead={<Spinner decorative />}
           title={t('mock.startingTitle')}>
           <p>{t('mock.startingText')}</p>
+        </MockPanel>
+      );
+    case 'connecting':
+      // Real time: the relay may be waking up (doc 24 §15.2).
+      return (
+        <MockPanel
+          lead={<Spinner decorative />}
+          title={t('mock.connectingTitle')}>
+          <p>{t('mock.connectingText')}</p>
         </MockPanel>
       );
     default:
@@ -313,19 +344,26 @@ export const MockInterviewScreen: React.FC = () => {
   const [pausedByYou, setPausedByYou] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
 
-  const { controller, view } = useMockController(id =>
+  const started = (id: string) =>
     navigate(applicationInterviewMockPath(applicationId, interviewId, id), {
       replace: true,
-    }),
-  );
-  const sessionId = view.sessionId ?? routeSessionId;
+    });
+  const { controller, view } = useMockController(started);
+  const live = useLiveController(started);
+  const sessionId = view.sessionId ?? live.view.sessionId ?? routeSessionId;
   const { state: read, reload } = useMockSession(sessionId);
   const session: MockSession | null =
     read.status === 'loaded' ? read.session : null;
+  // The way: the session's once there is one, else the setup's (doc 24 §16).
+  const realTime = (session?.way ?? choices.way) === 'real-time';
+  const current: { phase: string } & Pick<
+    MockView,
+    'question' | 'answered' | 'sessionId' | 'endReason' | 'startFailure'
+  > = realTime ? live.view : view;
   const { resources } = useInterviewProfile();
   const hints = useMockHints({
     session,
-    view,
+    view: current,
     shown: session?.hintsShown ?? choices.hints,
     reload,
   });
@@ -347,32 +385,42 @@ export const MockInterviewScreen: React.FC = () => {
   );
 
   // The progress comes from the session: read again with each new question, and at the end.
-  const turnId = view.question?.turnId;
+  const turnId = current.question?.turnId;
+  const phase = current.phase;
   useEffect(() => {
-    if (turnId || view.phase === 'ended') {
+    if (turnId || phase === 'ended') {
       reload();
     }
-  }, [turnId, view.phase, reload]);
+  }, [turnId, phase, reload]);
   useEffect(() => {
-    if (view.phase === 'ended') {
+    if (phase === 'ended') {
       reread();
     }
-  }, [view.phase, reread]);
+  }, [phase, reread]);
 
   // Leaving the tab pauses the interview, and its clock (§12).
   useEffect(() => {
     const onHidden = () => {
       if (document.visibilityState === 'hidden') {
         setPausedByYou(false);
-        controller.pause();
+        if (realTime) {
+          live.controller.pause();
+        } else {
+          controller.pause();
+        }
       }
     };
     document.addEventListener('visibilitychange', onHidden);
     return () => document.removeEventListener('visibilitychange', onHidden);
-  }, [controller]);
+  }, [controller, live.controller, realTime]);
 
   // An answer held only in the page: leaving asks first.
-  const holds = LIVE_PHASES.has(view.phase) && controller.holdsAnswer();
+  const running = realTime
+    ? REAL_TIME_PHASES.has(live.view.phase)
+    : LIVE_PHASES.has(view.phase);
+  const holds =
+    running &&
+    (realTime ? live.controller.holdsAnswer() : controller.holdsAnswer());
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       holds && currentLocation.pathname !== nextLocation.pathname,
@@ -386,7 +434,7 @@ export const MockInterviewScreen: React.FC = () => {
     return () => window.removeEventListener('beforeunload', onLeave);
   }, [holds]);
 
-  useTicking(LIVE_PHASES.has(view.phase));
+  useTicking(running);
 
   const application = applications.find(({ id }) => id === applicationId);
   const interview = interviews.find(({ id }) => id === interviewId);
@@ -488,13 +536,13 @@ export const MockInterviewScreen: React.FC = () => {
 
   // The end: just now, or opened again.
   const ended =
-    view.phase === 'ended' ||
-    (view.phase === 'idle' &&
+    phase === 'ended' ||
+    (phase === 'idle' &&
       session !== null &&
       (session.status === 'ended' || isMockIdle(session, now)));
   if (ended && sessionId) {
     const ending =
-      view.endReason ??
+      current.endReason ??
       session?.endReason ??
       (session && isMockIdle(session, now) ? 'idle' : 'ended');
     const overall = session ? mockOverallOf(session, feedback.reading) : null;
@@ -509,6 +557,7 @@ export const MockInterviewScreen: React.FC = () => {
             interview
               ? () =>
                   setupAgain({
+                    way: realTime ? 'real-time' : 'take-turns',
                     lengthMinutes:
                       session?.lengthMinutes ?? choices.lengthMinutes,
                     voice: session?.voice ?? choices.voice,
@@ -526,12 +575,119 @@ export const MockInterviewScreen: React.FC = () => {
             practise={practise}
           />
         )}
-        <MockFeedbackCard sessionId={sessionId} sent={session?.feedback} />
+        <MockFeedbackCard
+          sessionId={sessionId}
+          sent={session?.feedback}
+          realTime={realTime}
+        />
       </>,
     );
   }
 
-  if (LIVE_PHASES.has(view.phase)) {
+  /** The hints beside the interview at 1280, under it on a phone (Web-X6-Hints). */
+  const beside = (interview: React.ReactNode) => (
+    <div className="flex flex-wrap items-start gap-6">
+      <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-5">
+        {interview}
+      </div>
+      <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-5">
+        {hints.now && (
+          <MockHintsCard
+            state={hints.now.state}
+            resources={resources}
+            onReveal={() => hints.now && hints.reveal(hints.now.turnId)}
+          />
+        )}
+      </div>
+    </div>
+  );
+  const endDialog = (onConfirm: () => void) =>
+    confirmEnd && (
+      <Dialog
+        title={t('mock.endDialogTitle')}
+        icon="alert"
+        tone="danger"
+        onClose={() => setConfirmEnd(false)}>
+        <p className="text-[16px] leading-normal text-muted">
+          {t(realTime ? 'mock.liveEndDialogText' : 'mock.unsentAnswerText')}
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Button
+            variant="danger"
+            onClick={() => {
+              setConfirmEnd(false);
+              onConfirm();
+            }}
+            className="flex-[1_1_200px]">
+            {t('mock.endConfirmButton')}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setConfirmEnd(false)}
+            className="flex-[1_1_140px]">
+            {t('mock.keepAnsweringButton')}
+          </Button>
+        </div>
+      </Dialog>
+    );
+
+  // Real time (doc 24 §16): the relay says what to show; the connection has its own panels.
+  if (realTime && REAL_TIME_PHASES.has(live.view.phase)) {
+    const pause = () => {
+      setPausedByYou(true);
+      live.controller.pause();
+    };
+    const end = () => {
+      if (live.controller.holdsAnswer()) {
+        setConfirmEnd(true);
+      } else {
+        void live.controller.end();
+      }
+    };
+    const connection =
+      live.view.phase === 'reconnecting' ||
+      live.view.phase === 'disconnected' ||
+      live.view.phase === 'replaced';
+    return shell(
+      <>
+        <h1 className="font-display text-[clamp(22px,4vw,24px)] leading-tight font-semibold wrap-anywhere">
+          {title}
+        </h1>
+        <MockProgress
+          view={live.view}
+          progress={session ? mockProgress(session, turnId) : null}
+          onPause={pause}
+          onEnd={end}
+        />
+        {live.view.phase === 'paused' && (
+          <RealTimePausedPanel
+            controller={live.controller}
+            byYou={pausedByYou}
+          />
+        )}
+        {connection && (
+          <RealTimeConnectionPanel
+            view={live.view}
+            controller={live.controller}
+            onEnd={() => void live.controller.end()}
+          />
+        )}
+        {beside(
+          <>
+            <RealTimeInterviewerCard
+              view={live.view}
+              controller={live.controller}
+            />
+            <RealTimeAnswerCard view={live.view} controller={live.controller} />
+          </>,
+        )}
+        {endDialog(() => void live.controller.end())}
+      </>,
+      true,
+    );
+  }
+
+  if (!realTime && LIVE_PHASES.has(view.phase)) {
     const pause = () => {
       setPausedByYou(true);
       controller.pause();
@@ -561,56 +717,22 @@ export const MockInterviewScreen: React.FC = () => {
             byYou={pausedByYou}
           />
         )}
-        {/* The hints beside the interview at 1280, under it on a phone (Web-X6-Hints) */}
-        <div className="flex flex-wrap items-start gap-6">
-          <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-5">
+        {beside(
+          <>
             <InterviewerCard view={view} controller={controller} />
             <AnswerCard view={view} controller={controller} />
-          </div>
-          <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-5">
-            {hints.now && (
-              <MockHintsCard
-                state={hints.now.state}
-                resources={resources}
-                onReveal={() => hints.now && hints.reveal(hints.now.turnId)}
-              />
-            )}
-          </div>
-        </div>
-        {confirmEnd && (
-          <Dialog
-            title={t('mock.endDialogTitle')}
-            icon="alert"
-            tone="danger"
-            onClose={() => setConfirmEnd(false)}>
-            <p className="text-[16px] leading-normal text-muted">
-              {t('mock.unsentAnswerText')}
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Button
-                variant="danger"
-                onClick={() => {
-                  setConfirmEnd(false);
-                  void controller.end();
-                }}
-                className="flex-[1_1_200px]">
-                {t('mock.endConfirmButton')}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setConfirmEnd(false)}
-                className="flex-[1_1_140px]">
-                {t('mock.keepAnsweringButton')}
-              </Button>
-            </div>
-          </Dialog>
+          </>,
         )}
+        {endDialog(() => void controller.end())}
       </>,
       true,
     );
   }
 
-  if (!canRecord() || view.phase === 'unsupported') {
+  if (
+    (realTime ? !canStream() : !canRecord()) ||
+    current.phase === 'unsupported'
+  ) {
     return shell(
       <>
         {head}
@@ -620,7 +742,7 @@ export const MockInterviewScreen: React.FC = () => {
   }
 
   // A session opened again: still going, or not there.
-  if (routeSessionId && !view.sessionId) {
+  if (routeSessionId && !current.sessionId) {
     if (read.status === 'loading') {
       return shell(
         <div className="flex justify-center py-16 text-primary">
@@ -671,29 +793,27 @@ export const MockInterviewScreen: React.FC = () => {
       {breadcrumb}
       {head}
       <MockSummaryCard
+        way={realTime ? 'real-time' : 'take-turns'}
         lengthMinutes={session?.lengthMinutes ?? choices.lengthMinutes}
         voice={session?.voice ?? choices.voice}
         hints={session?.hintsShown ?? choices.hints}
         onChange={continuing ? undefined : () => setupAgain(choices)}
       />
       {!continuing && hasSessions === false && <NoticeCard />}
+      {realTime && <Banner tone="info">{t('mock.headphonesMessage')}</Banner>}
       <StartArea
-        view={view}
+        view={current}
         max={left?.max}
         label={
           continuing ? t('mock.continueInterviewButton') : t('mock.startButton')
         }
         note={continuing ? t('mock.continueNote') : t('mock.startNote')}
-        onPress={() =>
+        onPress={() => {
+          const runner = realTime ? live.controller : controller;
           void (continuing && routeSessionId
-            ? controller.resume(routeSessionId)
-            : controller.start({
-                applicationId,
-                interviewId,
-                way: 'take-turns',
-                ...choices,
-              }))
-        }
+            ? runner.resume(routeSessionId)
+            : runner.start({ applicationId, interviewId, ...choices }));
+        }}
       />
     </>,
   );
