@@ -56,8 +56,28 @@ with the design chat (§12). Real time and the voice model come with slices 4 an
   these headers, and their stand-in microphone replaces `getUserMedia`, so they could not see `microphone=()`,
   which blocked every mock interview on dev until this was fixed (10 Nov 2026).
 
+## Hints (slice H2, 10 Nov 2026)
+
+Against the backend's slice H1 (quadev-backend #67, `8bff7f1`): the setup's choice goes with the start as `hints`
+and is kept on the session as `hintsShown`; the trigger `onMockSessionWritten` writes each question's 3 to 5 key
+points into the session's `hints`, by plan question for a planned turn and by turn for a follow-up. Drawn as
+`Web-X6-Hints` (canvas version 69).
+
+- **The page reads the session again for hints, every 3 seconds,** while the ones it shows are on their way, and
+  stops when they are in or failed, or after a minute (then "No hints for this question this time"). The site
+  reads Firestore with Firestore Lite, which has no listeners; a follow-up's hints take 5 to 15 seconds, so about
+  5 reads.
+- **"After I answer" follows the controller:** its view says which turn's answer was just sent, from "I'm done"
+  until the next answer starts recording, and the column shows that turn's points under "For the question you
+  just answered" meanwhile (agreed with the design chat: a few seconds of thinking are too short to read them).
+- **"Show hints" and "Show them now" hold for one turn,** so a follow-up starts hidden again.
+- **A column beside the interview at 1280** (the page widens to 1120 px), under the answer on a phone; none
+  during the opening.
+- **The points are drawn as text practice's key points,** one component for both (`KeyPointList`).
+- **An empty recording is "nothing heard",** decided in the page: "I'm done" pressed within a few milliseconds
+  gave the backend an empty recording, which it refuses as invalid, and the page said the answer couldn't be sent.
+
 ## Consequences
 
 - Real time (slice 4) adds a WebSocket and an AudioWorklet next to the recorder; the controller's view and the
   screens stay, with the end of the answer noticed by the server.
-- Hints (slice H2) take the side column at 1280; until then the interview is one column.

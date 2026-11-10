@@ -28,6 +28,7 @@ const Q2 = line('l3', 'question', 'Tell me about an incident you led.', 't2');
 const CLOSING = line('l4', 'closing', 'That’s all my questions.');
 
 const SETUP = {
+  hints: 'on-request' as const,
   applicationId: 'a1',
   interviewId: 'i1',
   way: 'take-turns' as const,
@@ -203,6 +204,32 @@ describe('a mock interview taken in turns (D100)', () => {
     expect(recorders).toHaveLength(2);
   });
 
+  it('knows the question just answered, from “I’m done” until the next answer records (hints after the answer)', async () => {
+    const { controller, gateway } = setUp();
+    gateway.answerMockQuestion.mockRejectedValueOnce(
+      new ProfileError(ProfileErrorCode.MockNothingHeard),
+    );
+    await controller.start(SETUP);
+    const seen: string[] = [];
+    controller.subscribe(() => {
+      const { phase, answered } = controller.getView();
+      seen.push(`${phase}:${answered ?? '-'}`);
+    });
+
+    // Not heard: not answered
+    await controller.done();
+    expect(controller.getView()).toMatchObject({ issue: 'nothing-heard' });
+    expect(controller.getView().answered).toBeUndefined();
+
+    controller.restartAnswer();
+    await controller.done();
+    expect(seen).toContain('sending:t1');
+    // Still the answered one while the next question plays, then cleared as it records
+    expect(seen).toContain('speaking:t1');
+    expect(controller.getView()).toMatchObject({ phase: 'answering' });
+    expect(controller.getView().answered).toBeUndefined();
+  });
+
   it('“Stop and answer now” stops the interviewer and records at once', async () => {
     let finish: () => void = () => {};
     const { controller, deps, recorders } = setUp();
@@ -240,6 +267,33 @@ describe('a mock interview taken in turns (D100)', () => {
     controller.restartAnswer();
     expect(controller.getView().phase).toBe('answering');
     expect(recorders).toHaveLength(2);
+  });
+
+  it('hears nothing in an empty recording without sending it (“I’m done” pressed at once)', async () => {
+    const { controller, deps, gateway } = setUp({
+      createRecorder: () => ({
+        start: vi.fn(),
+        pause: vi.fn(),
+        resume: vi.fn(),
+        elapsedMs: () => 50,
+        stop: () =>
+          Promise.resolve({
+            blob: new Blob([]),
+            mimeType: 'audio/webm;codecs=opus',
+            durationMs: 50,
+          }),
+        discard: vi.fn(),
+      }),
+    });
+    await controller.start(SETUP);
+
+    await controller.done();
+    expect(gateway.answerMockQuestion).not.toHaveBeenCalled();
+    expect(controller.getView()).toMatchObject({
+      phase: 'issue',
+      issue: 'nothing-heard',
+    });
+    expect(deps.openMicrophone).toHaveBeenCalledOnce();
   });
 
   it('keeps an answer that couldn’t be sent, and sends it again as the same request', async () => {

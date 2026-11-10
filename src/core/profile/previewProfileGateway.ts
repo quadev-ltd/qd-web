@@ -72,11 +72,13 @@ import { type ProfileGateway } from './gateway';
 import { type ApplicationInterview, INTERVIEWS_MAX } from './interviews';
 import { browserTimeZone } from './interviewTime';
 import {
+  DEFAULT_MOCK_HINTS_SHOWN,
   MOCK_SESSIONS_MAX,
   type MockLine,
   type MockLines,
   type MockSession,
   type MockTurn,
+  mockHintsKey,
 } from './mockInterviews';
 import {
   PRACTICE_ANSWER_MAX_CHARS,
@@ -299,6 +301,8 @@ export interface PreviewProfileControls {
   ): void;
   /** How many mock interviews were already started today. */
   setMockToday(count: number): void;
+  /** The hints of the next question asked fail: it goes on without them (slice H1). */
+  failNextHints(): void;
   /**
    * A version as they were made before D83: edits to the profile's CV (doc 18), made in the
    * background like any other. The pages no longer ask for one; their review stays. Resolves its id.
@@ -312,6 +316,9 @@ export interface PreviewProfileControls {
 export const PREVIEW_BRIEF_MS = 1200;
 /** How long the fake takes to make a CV version; the real one takes about a minute. */
 export const PREVIEW_CV_MS = 2000;
+/** When a mock interview's hints are written: the planned questions' after the start, a follow-up's after it is asked (5 to 15 seconds for real). */
+export const PREVIEW_HINTS_PLANNED_MS = 1500;
+export const PREVIEW_HINTS_FOLLOW_UP_MS = 4000;
 
 /** The lines of a CV that say something: 20 characters at least, without their list mark. */
 const cvLines = (cv: string) =>
@@ -733,6 +740,58 @@ export const createPreviewProfileGateway = ({
     return failure;
   };
 
+  let nextHintsFailure = false;
+  /** A question just asked: its hints fail if the controls said so, else they're written. */
+  const mockAsked = (session: MockSession, turn: MockTurn) => {
+    if (nextHintsFailure) {
+      nextHintsFailure = false;
+      session.hints = {
+        ...session.hints,
+        [mockHintsKey(turn)]: {
+          status: 'failed',
+          reason: 'model',
+          keyPoints: [],
+        },
+      };
+    }
+  };
+
+  /**
+   * The hints written by now, as the backend's trigger writes them: every planned question's soon
+   * after the start, a follow-up's a few seconds after it is asked. Worked out from the session's
+   * own times, so a reload finds them too.
+   */
+  const settleMockHints = (session: MockSession, items: SkillMapItem[]) => {
+    const at = now();
+    const due = [
+      ...(session.startedAt !== null &&
+      at - session.startedAt >= PREVIEW_HINTS_PLANNED_MS
+        ? session.plan.questions.map(({ id }) => id)
+        : []),
+      ...session.turns
+        .filter(
+          turn =>
+            turn.kind === 'follow-up' &&
+            turn.askedAt !== null &&
+            at - turn.askedAt >= PREVIEW_HINTS_FOLLOW_UP_MS,
+        )
+        .map(({ id }) => id),
+    ].filter(key => !session.hints[key]);
+    if (due.length === 0) {
+      return false;
+    }
+    session.hints = {
+      ...session.hints,
+      ...Object.fromEntries(
+        due.map(key => [
+          key,
+          { status: 'ready' as const, keyPoints: previewKeyPointsFor(items) },
+        ]),
+      ),
+    };
+    return true;
+  };
+
   const mockSessionOf = (sessionId: string): MockSession => {
     const session = currentProfile().mockSessions?.find(
       ({ id }) => id === sessionId,
@@ -845,6 +904,7 @@ export const createPreviewProfileGateway = ({
         answeredAt: null,
       };
       session.turns = [...session.turns, next];
+      mockAsked(session, next);
       line = mockSay(
         session,
         step.kind === 'follow-up' ? 'follow-up' : 'question',
@@ -1610,6 +1670,9 @@ export const createPreviewProfileGateway = ({
     setMockToday: count => {
       currentProfile().mockToday = count;
       save();
+    },
+    failNextHints: () => {
+      nextHintsFailure = true;
     },
     // Set once the gateway exists, below: it asks the gateway for the version.
     createEditVersion: () => Promise.reject(new Error('Not ready')),
@@ -3323,7 +3386,11 @@ export const createPreviewProfileGateway = ({
         (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
       ),
     getMockSession: async (uid, sessionId) => {
-      const found = read(uid).mockSessions?.find(({ id }) => id === sessionId);
+      const profile = read(uid);
+      const found = profile.mockSessions?.find(({ id }) => id === sessionId);
+      if (found && settleMockHints(found, profile.items)) {
+        save();
+      }
       return found ? structuredClone(found) : null;
     },
     countMockSessions: async uid => (read(uid).mockSessions ?? []).length,
@@ -3396,6 +3463,8 @@ export const createPreviewProfileGateway = ({
         way: request.way,
         lengthMinutes: request.lengthMinutes,
         voice: request.voice,
+        hintsShown: request.hints ?? DEFAULT_MOCK_HINTS_SHOWN,
+        hints: {},
         status: 'active',
         plan: { questions: plan },
         turns: [first],
@@ -3408,6 +3477,7 @@ export const createPreviewProfileGateway = ({
         updatedAt: at,
       };
       mockLineCounts.set(sessionId, 2);
+      mockAsked(session, first);
       profile.mockSessions = [...(profile.mockSessions ?? []), session];
       save();
       const result = {

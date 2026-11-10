@@ -6,7 +6,8 @@
 // and followed up by the `interviewer-next` fake; rephraseMockQuestion, skipMockQuestion,
 // pauseMockInterview, resumeMockInterview after a reload, endMockInterview, sendMockFeedback; the
 // session read back under the rules in Sessions, the day's count from `usage`, and
-// removeMockSession. The clock is moved as the backend's own tests move it.
+// removeMockSession; and the hints (H1) the trigger writes, read again until in. The clock is
+// moved as the backend's own tests move it.
 import { expect, type Page, test } from '@playwright/test';
 
 import {
@@ -246,6 +247,45 @@ test('mock interview: nothing heard in a silent answer, then out of time, the cl
   await expect(
     page.getByRole('heading', { name: 'Interview finished' }),
   ).toBeVisible();
+});
+
+test('hints (H1, H2): chosen at the setup and kept by the session, the trigger’s points read for a planned question and for a follow-up', async ({
+  page,
+}) => {
+  await openInterview(page);
+  await page
+    .getByRole('button', { name: 'Practise for this interview' })
+    .click();
+  const setup = page.getByRole('dialog', { name: 'Mock interview' });
+  await setup.getByText('With each question').click();
+  await setup.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Start the interview' }).click();
+  await expect(interviewer(page)).toContainText(
+    'fake-warm-up: tell me about your background.',
+  );
+
+  // The warm-up's hints, keyed by its plan question: with an empty profile, the fake's advice
+  const hints = page.getByRole('region', { name: 'Hints', exact: true });
+  await expect(hints.getByRole('listitem')).toHaveCount(3);
+  await expect(hints).toContainText('fake-advice');
+
+  // The follow-up's, keyed by its turn, written once it is asked and read again until in
+  await answerNow(page);
+  await expect(interviewer(page)).toContainText(
+    'fake-follow-up: what came of it?',
+  );
+  await expect(hints.getByRole('listitem')).toHaveCount(3);
+  await expect(hints).toContainText('fake-advice');
+
+  // The choice is the session's: after a reload, still shown with each question
+  page.on('dialog', dialog => void dialog.accept());
+  await page.reload();
+  await page.getByRole('button', { name: 'Continue the interview' }).click();
+  await expect(answer(page)).toContainText('Recording ·');
+  await expect(hints.getByRole('listitem')).toHaveCount(3);
+  await expect(
+    hints.getByRole('button', { name: 'Show hints' }),
+  ).not.toBeVisible();
 });
 
 test('mock interview: the backend refuses over the day’s 3, and the page says so', async ({

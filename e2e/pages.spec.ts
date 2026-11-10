@@ -406,7 +406,7 @@ test('feedback on a typed answer (D94 slice 3): try first, getting feedback, the
   await expectAccessibleAndNotTooWide(page);
 });
 
-test('mock interviews (D100): the setup, Ready, the interviewer speaking and the answer recording, paused, the end with its feedback card, what was said and Sessions: accessible and no horizontal scroll', async ({
+test('mock interviews (D100): the setup, Ready, the interviewer speaking and the answer recording, the hints, paused, the end with its feedback card, what was said and Sessions: accessible and no horizontal scroll', async ({
   page,
 }) => {
   // A microphone the page records from: a tone into a real audio stream (see mock.spec.ts).
@@ -451,6 +451,13 @@ test('mock interviews (D100): the setup, Ready, the interviewer speaking and the
   await expectAccessibleAndNotTooWide(page);
   const answer = page.getByRole('region', { name: 'Your answer' });
   await expect(answer).toContainText('Recording ·', { timeout: 10_000 });
+  await expectAccessibleAndNotTooWide(page);
+  // The hints column (H2), its points shown
+  const hints = page.getByRole('region', { name: 'Hints', exact: true });
+  await hints.getByRole('button', { name: 'Show hints' }).click();
+  await expect(hints.getByRole('listitem').first()).toBeVisible({
+    timeout: 10_000,
+  });
   await expectAccessibleAndNotTooWide(page);
   await page.getByRole('button', { name: 'Pause' }).click();
   await expect(page.getByRole('heading', { name: 'Paused' })).toBeVisible();

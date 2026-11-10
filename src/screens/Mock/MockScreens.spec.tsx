@@ -40,6 +40,8 @@ const session = (overrides: Partial<MockSession> = {}): MockSession => ({
   way: 'take-turns',
   lengthMinutes: 10,
   voice: 'chirp',
+  hintsShown: 'on-request',
+  hints: {},
   status: 'ended',
   endReason: 'finished',
   plan: {
@@ -145,7 +147,7 @@ afterEach(() => {
 });
 
 describe('setting up a mock interview (Web-X6-Setup)', () => {
-  it('opens the mock interview with the length and the voice chosen', async () => {
+  it('opens the mock interview with the length, the voice and the hints chosen', async () => {
     const user = userEvent.setup();
     const gateway = createMockProfileGateway();
     gateway.getMockInterviewsToday.mockResolvedValue(1);
@@ -167,13 +169,20 @@ describe('setting up a mock interview (Web-X6-Setup)', () => {
     expect(await within(panel).findByText('mock.left')).toBeVisible();
     await user.click(within(panel).getAllByRole('radio')[1]!);
     await user.click(within(panel).getAllByRole('radio')[3]!);
+    // Hints: "When I ask" first chosen, then "After I answer"
+    expect(
+      within(panel).getByRole('radio', { name: 'mock.hintsOnRequest' }),
+    ).toBeChecked();
+    await user.click(
+      within(panel).getByRole('radio', { name: 'mock.hintsAfterAnswer' }),
+    );
     await user.click(
       within(panel).getByRole('button', { name: 'mock.continueButton' }),
     );
 
     expect(
       screen.getByText(
-        'now at /applications/a1/interviews/i1/mock?length=20&voice=chirp',
+        'now at /applications/a1/interviews/i1/mock?length=20&voice=chirp&hints=after-answer',
       ),
     ).toBeInTheDocument();
   });
@@ -202,13 +211,16 @@ describe('setting up a mock interview (Web-X6-Setup)', () => {
 
 describe('a mock interview’s page (Web-X6-Ready, -End, -CantRecord)', () => {
   it('Ready: the choices from the address, "Before you start" until the first, and the start', async () => {
-    renderMock('/applications/a1/interviews/i1/mock?length=20&voice=chirp');
+    renderMock(
+      '/applications/a1/interviews/i1/mock?length=20&voice=chirp&hints=after-answer',
+    );
 
     const summary = await screen.findByRole('region', {
       name: 'mock.summaryTitle',
     });
     expect(summary).toHaveTextContent('mock.lengthSummary20');
     expect(summary).toHaveTextContent('mock.voiceChirp');
+    expect(summary).toHaveTextContent('mock.hintsSummaryAfterAnswer');
     expect(
       await screen.findByRole('region', { name: 'mock.noticeTitle' }),
     ).toBeVisible();
@@ -231,7 +243,7 @@ describe('a mock interview’s page (Web-X6-Ready, -End, -CantRecord)', () => {
     );
     expect(
       screen.getByText(
-        'now at /applications/a1/interviews/i1?length=10&voice=gemini&mock=setup',
+        'now at /applications/a1/interviews/i1?length=10&voice=gemini&hints=on-request&mock=setup',
       ),
     ).toBeInTheDocument();
     expect(gateway.countMockSessions).toHaveBeenCalled();

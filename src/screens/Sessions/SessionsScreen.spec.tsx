@@ -96,6 +96,8 @@ describe('groupsOf, with mock interviews (D100)', () => {
       way: 'take-turns' as const,
       lengthMinutes: 10 as const,
       voice: 'gemini' as const,
+      hintsShown: 'on-request' as const,
+      hints: {},
       status: 'ended' as const,
       plan: { questions: [] },
       turns: [],

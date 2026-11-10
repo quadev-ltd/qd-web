@@ -60,6 +60,7 @@ describe('selectProfileGateway', () => {
       setCoverLettersToday: expect.any(Function),
       setPracticeToday: expect.any(Function),
       setMockToday: expect.any(Function),
+      failNextHints: expect.any(Function),
       createEditVersion: expect.any(Function),
       setUsageLimits: expect.any(Function),
     });

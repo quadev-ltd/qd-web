@@ -16,6 +16,8 @@ import {
   exposePreviewProfileControls,
   PREVIEW_BRIEF_MS,
   PREVIEW_CV_MS,
+  PREVIEW_HINTS_FOLLOW_UP_MS,
+  PREVIEW_HINTS_PLANNED_MS,
   PREVIEW_READ_MS,
   type PreviewProfileStorage,
 } from './previewProfileGateway';
@@ -2116,6 +2118,83 @@ describe('previewProfileGateway, the likely questions of an interview (D94)', ()
     await expect(
       codeOf(gateway.writeInterviewQuestions('gone', 'gone')),
     ).resolves.toBe(ProfileErrorCode.NotFound);
+  });
+});
+
+describe('previewProfileGateway, a mock interview’s hints (slice H1)', () => {
+  const started = async (hints?: 'with-question' | 'after-answer') => {
+    const context = await setUp();
+    const { applicationId } = await context.gateway.createApplication({
+      job: { source: 'text', text: 'Senior Backend Engineer. Go and Kafka.' },
+      title: 'Senior Backend Engineer',
+      company: 'Northwind Logistics',
+    });
+    context.pass(PREVIEW_READ_MS);
+    await context.gateway.getApplications(UID);
+    const { sessionId } = await context.gateway.startMockInterview({
+      requestId: 'request-1',
+      applicationId,
+      way: 'take-turns',
+      lengthMinutes: 10,
+      voice: 'gemini',
+      ...(hints ? { hints } : {}),
+    });
+    const read = async () =>
+      (await context.gateway.getMockSession(UID, sessionId))!;
+    return { ...context, sessionId, read };
+  };
+
+  it('keeps the setup’s choice, "When I ask" when there was none', async () => {
+    expect((await (await started('after-answer')).read()).hintsShown).toBe(
+      'after-answer',
+    );
+    expect((await (await started()).read()).hintsShown).toBe('on-request');
+  });
+
+  it('writes every planned question’s soon after the start, a follow-up’s a few seconds after it is asked', async () => {
+    const { gateway, sessionId, read, pass } = await started('with-question');
+    expect((await read()).hints).toEqual({});
+
+    pass(PREVIEW_HINTS_PLANNED_MS);
+    const session = await read();
+    expect(Object.keys(session.hints)).toEqual(
+      session.plan.questions.map(({ id }) => id),
+    );
+    expect(session.hints.p1).toMatchObject({ status: 'ready' });
+    expect(session.hints.p1?.keyPoints.length).toBeGreaterThanOrEqual(3);
+
+    // The first answer gets a follow-up: its hints come later
+    await gateway.answerMockQuestion({
+      requestId: 'request-2',
+      sessionId,
+      lineId: 'l2',
+      audio: { mimeType: 'audio/webm', base64: 'YW5zd2Vy', durationMs: 9_000 },
+    });
+    const followUp = (await read()).turns.at(-1)!;
+    expect(followUp.kind).toBe('follow-up');
+    expect((await read()).hints[followUp.id]).toBeUndefined();
+    pass(PREVIEW_HINTS_FOLLOW_UP_MS);
+    expect((await read()).hints[followUp.id]).toMatchObject({
+      status: 'ready',
+    });
+  });
+
+  it('fails the next question’s when the controls say so', async () => {
+    const { gateway, sessionId, read, pass } = await started('with-question');
+    gateway.controls.failNextHints();
+    await gateway.skipMockQuestion({
+      requestId: 'request-2',
+      sessionId,
+      lineId: 'l2',
+    });
+    pass(PREVIEW_HINTS_PLANNED_MS);
+    const session = await read();
+    expect(session.hints.p2).toEqual({
+      status: 'failed',
+      reason: 'model',
+      keyPoints: [],
+    });
+    expect(session.hints.p3).toMatchObject({ status: 'ready' });
   });
 });
 

@@ -11,6 +11,7 @@ import {
   MOCK_ANSWER_MAX_MS,
   type MockClient,
   type MockEndReason,
+  type MockHintsShown,
   type MockLength,
   type MockLine,
   type MockLines,
@@ -70,6 +71,12 @@ export interface MockView {
   sending?: 'answer' | 'skip' | 'rephrase';
   /** "Say it differently" was asked for this question: once each. */
   rephrased: boolean;
+  /**
+   * The turn whose answer was just sent, from "I'm done" until the next answer starts recording:
+   * hints shown "after I answer" are its, under "For the question you just answered" (H2). Not
+   * set while its answer wasn't heard or didn't go.
+   */
+  answered?: string;
   /** The time left as last told, and when; it runs down while the interview runs. */
   timeLeft?: { ms: number; at: number };
   /** Why the start or the resume was refused. */
@@ -83,6 +90,7 @@ export interface MockSetup {
   way: MockWay;
   lengthMinutes: MockLength;
   voice: MockVoice;
+  hints: MockHintsShown;
 }
 
 export interface RecorderLike {
@@ -430,7 +438,12 @@ export class MockInterviewController {
       // At 3 minutes the answer is sent for the candidate.
       void this.done();
     }, MOCK_ANSWER_MAX_MS);
-    this.set({ phase: 'answering', issue: undefined, speaking: undefined });
+    this.set({
+      phase: 'answering',
+      issue: undefined,
+      speaking: undefined,
+      answered: undefined,
+    });
   }
 
   /** Stops and forgets the answer being recorded. */
@@ -504,8 +517,20 @@ export class MockInterviewController {
     if (!pending || !sessionId || !question) {
       return;
     }
+    if (pending.kind === 'answer' && pending.recording.blob.size === 0) {
+      // "I'm done" before the browser gave any sound (a quick double press): nothing to hear, and
+      // the backend refuses an empty recording.
+      this.pending = null;
+      this.set({ phase: 'issue', issue: 'nothing-heard', answered: undefined });
+      return;
+    }
     const generation = ++this.generation;
-    this.set({ phase: 'sending', sending: pending.kind, issue: undefined });
+    this.set({
+      phase: 'sending',
+      sending: pending.kind,
+      issue: undefined,
+      ...(pending.kind === 'answer' ? { answered: question.turnId } : {}),
+    });
     const played = [...this.played.values()];
     const base = {
       requestId: pending.requestId,
@@ -561,7 +586,7 @@ export class MockInterviewController {
     const code = getProfileErrorCode(error);
     if (code === ProfileErrorCode.MockNothingHeard) {
       this.pending = null;
-      this.set({ phase: 'issue', issue: 'nothing-heard' });
+      this.set({ phase: 'issue', issue: 'nothing-heard', answered: undefined });
       return;
     }
     if (code === ProfileErrorCode.MockNotCurrent) {
@@ -573,7 +598,9 @@ export class MockInterviewController {
     this.refused(error, () =>
       this.set({
         phase: 'issue',
-        issue: pending.kind === 'answer' ? 'send-failed' : 'action-failed',
+        ...(pending.kind === 'answer'
+          ? { issue: 'send-failed', answered: undefined }
+          : { issue: 'action-failed' }),
       }),
     );
   }
