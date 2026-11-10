@@ -909,22 +909,22 @@ with a 404 that carries the one-year cache header, and the live service does not
 **Security headers**, on every response (the first rule uses `"regex": ".*"`: in the emulator the glob `**`
 skipped the files under the dot-folder `/.well-known/`, and a regular expression leaves no doubt):
 
-| Header                                | Value                                                          | Effect                                                                                                                                  |
-| ------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `Strict-Transport-Security`           | `max-age=31536000`                                             | Browsers use HTTPS only, for a year. No `includeSubDomains` or `preload` yet (ADR 0003).                                                |
-| `X-Content-Type-Options`              | `nosniff`                                                      | Files are used as the type the server says.                                                                                             |
-| `Referrer-Policy`                     | `strict-origin-when-cross-origin`                              | Other sites see the origin only, never the path.                                                                                        |
-| `Permissions-Policy`                  | `camera=(), geolocation=(), microphone=(), payment=(), usb=()` | The site and anything embedded in it cannot use these. A feature that needs one (a live interview needs the microphone) allows it here. |
-| `X-Frame-Options`                     | `DENY`                                                         | No site can show this one in a frame (older browsers).                                                                                  |
-| `Content-Security-Policy`             | `frame-ancestors 'none'`                                       | The same, for current browsers. Enforced.                                                                                               |
-| `Content-Security-Policy-Report-Only` | see below                                                      | The full policy, not enforced yet.                                                                                                      |
+| Header                                | Value                                                              | Effect                                                                                                                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Strict-Transport-Security`           | `max-age=31536000`                                                 | Browsers use HTTPS only, for a year. No `includeSubDomains` or `preload` yet (ADR 0003).                                                                                                   |
+| `X-Content-Type-Options`              | `nosniff`                                                          | Files are used as the type the server says.                                                                                                                                                |
+| `Referrer-Policy`                     | `strict-origin-when-cross-origin`                                  | Other sites see the origin only, never the path.                                                                                                                                           |
+| `Permissions-Policy`                  | `camera=(), geolocation=(), microphone=(self), payment=(), usb=()` | The site and anything embedded in it cannot use these, except the site's own pages the microphone: mock interviews record the answers (D100). A feature that needs another allows it here. |
+| `X-Frame-Options`                     | `DENY`                                                             | No site can show this one in a frame (older browsers).                                                                                                                                     |
+| `Content-Security-Policy`             | `frame-ancestors 'none'`                                           | The same, for current browsers. Enforced.                                                                                                                                                  |
+| `Content-Security-Policy-Report-Only` | see below                                                          | The full policy, not enforced yet.                                                                                                                                                         |
 
 ### Content-Security-Policy
 
 ```
 default-src 'none'; script-src 'self' https://apis.google.com https://www.google.com/recaptcha/
 https://www.gstatic.com/recaptcha/; style-src 'self'; img-src 'self'; font-src 'self';
-connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com
+media-src 'self'; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com
 https://firestore.googleapis.com https://firebasestorage.googleapis.com
 https://firebaseremoteconfig.googleapis.com https://firebaseinstallations.googleapis.com
 https://content-firebaseappcheck.googleapis.com
@@ -936,7 +936,8 @@ manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 ```
 
 Nothing is allowed unless listed. The site's own script and style files (no inline code, no `style`
-attributes, no `eval`), its own images and fonts; neither React nor Tailwind needs `'unsafe-inline'`
+attributes, no `eval`), its own images, fonts and sounds (the voices' samples of a mock interview; its
+interviewer's lines are decoded by Web Audio, which the policy doesn't govern); neither React nor Tailwind needs `'unsafe-inline'`
 here. The other origins are what Firebase sign-in needs, and nothing uses them while the account
 screens are off:
 

@@ -50,6 +50,12 @@ with the design chat (§12). Real time and the voice model come with slices 4 an
   so a short answer is under the fake's 1,000 bytes and "nothing heard"; the clock is moved with the
   administrator's REST call, as the backend's own tests move it.
 
+- **The hosting headers let the site's own pages use the microphone** (`Permissions-Policy: microphone=(self)`,
+  the other features still off) and play its own sounds (`media-src 'self'` in the content policy waiting to be
+  enforced, for the voices' samples). A spec reads `firebase.json`: the browser tests are served by Vite without
+  these headers, and their stand-in microphone replaces `getUserMedia`, so they could not see `microphone=()`,
+  which blocked every mock interview on dev until this was fixed (10 Nov 2026).
+
 ## Consequences
 
 - Real time (slice 4) adds a WebSocket and an AudioWorklet next to the recorder; the controller's view and the
