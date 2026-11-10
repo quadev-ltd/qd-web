@@ -52,11 +52,14 @@ export const InterviewMocksCard: React.FC<{
         ))}
       </ul>
       {held.length > INTERVIEW_MOCKS_SHOWN && (
-        <Link
-          to={applicationSessionsPath(applicationId)}
-          className="flex min-h-11 items-center self-start border-t border-border-faint pt-2 text-[15px] leading-natural font-bold">
-          {t('mock.seeAllMocksLink', { count: held.length })}
-        </Link>
+        // A rule across the card, as under the likely questions.
+        <div className="flex border-t border-border-faint pt-2">
+          <Link
+            to={applicationSessionsPath(applicationId)}
+            className="flex min-h-11 items-center text-[15px] leading-natural font-bold">
+            {t('mock.seeAllMocksLink', { count: held.length })}
+          </Link>
+        </div>
       )}
     </Card>
   );

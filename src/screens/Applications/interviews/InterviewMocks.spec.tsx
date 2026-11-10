@@ -259,6 +259,24 @@ describe('the application’s Sessions tab (Web-R1-Application-Tab)', () => {
     expect(await screen.findByText('sessions.appEmpty')).toBeVisible();
   });
 
+  it('the tabs in the boards’ order: Sessions after Interviews, Details last', async () => {
+    renderTab(createMockProfileGateway(), {
+      mockInterview: true,
+      cvTool: true,
+    });
+    const tabs = within(
+      await screen.findByRole('navigation', { name: 'applications.tabsLabel' }),
+    ).getAllByRole('link');
+    const names = tabs.map(tab => tab.textContent);
+    expect(names.slice(0, 3)).toEqual([
+      'applications.briefTab',
+      'applications.interviewsTab',
+      'applications.sessionsTab',
+    ]);
+    expect(names.at(-1)).toBe('applications.detailsTab');
+    expect(names).toHaveLength(5);
+  });
+
   it('no tab without text practice or mock interviews', async () => {
     renderAt(
       '/applications/a1/interviews',
