@@ -17,7 +17,7 @@ import {
   type LiveInterviewController,
   type LiveView,
 } from '@/core/mock/LiveInterviewController';
-import { clockTime, useTicking } from '@/screens/Mock/MockLive';
+import { clockTime, Level, useTicking } from '@/screens/Mock/MockLive';
 import { MockPanel } from '@/screens/Mock/mockParts';
 
 const STATUS = {
@@ -87,7 +87,8 @@ export const RealTimeInterviewerCard: React.FC<{
           </p>
         </div>
       ) : (
-        line && (
+        line &&
+        (line.text ? (
           <>
             {followUp && (
               <span className="flex">
@@ -100,7 +101,20 @@ export const RealTimeInterviewerCard: React.FC<{
               {line.text}
             </p>
           </>
-        )
+        ) : view.cutOffLine === line.lineId ? (
+          // The voice model cut off within its first word: no words came.
+          <p className="text-[15px] leading-normal text-muted">
+            {t('mock.liveCutOffText')}
+          </p>
+        ) : (
+          // The voice model writes its words once it has said them.
+          <div className="flex flex-col gap-2">
+            <Level />
+            <p className="text-[15px] leading-normal text-muted">
+              {t('mock.liveWordsComeText')}
+            </p>
+          </div>
+        ))
       )}
       {view.phase === 'speaking' && line?.kind !== 'closing' && (
         <div className="flex flex-wrap gap-2">
@@ -237,7 +251,10 @@ export const RealTimeAnswerCard: React.FC<{
           </Button>
         </div>
         <p className="text-sm leading-normal text-muted">
-          {t('mock.liveDoneNote')}
+          {/* The voice model may take a long pause as the end (doc 24 §16). */}
+          {view.way === 'voice-model'
+            ? t('mock.liveVoiceModelDoneNote')
+            : t('mock.liveDoneNote')}
         </p>
       </>
     );

@@ -1501,9 +1501,11 @@
     "voiceLabel": "Voice",
     "voiceGemini": "Voice 1",
     "voiceChirp": "Voice 2",
+    "voiceModelOwn": "The model’s own",
     "hearItButton": "Hear it",
     "hearVoiceButton": "Hear it: {{voice}}",
     "voiceNote": "Both are AI voices. Choose the one you’d rather practise with.",
+    "voiceModelNote": "The voice model speaks in its own voice, so there’s no choice of voice.",
     "sourceNote": "The questions come from this interview’s likely questions, what you know about it, your brief and your profile.",
     "hintsLabel": "Hints",
     "hintsWithQuestion": "With each question",
@@ -1736,6 +1738,7 @@
     "liveNothingHeardMessage": "We didn’t hear anything yet. Check your microphone, then answer, or skip this question.",
     "liveWarnMessage": "30 seconds left for this answer. At 3:00 the interviewer moves on.",
     "liveDoneNote": "When you stop, the interviewer checks you’ve finished, so a pause to think is fine. Answers can be up to 3 minutes.",
+    "liveVoiceModelDoneNote": "The interviewer notices when you’ve finished. It may take a long pause as the end, so if you need to think, say so first. Answers can be up to 3 minutes.",
     "liveAnswerEnded": "Your answer ended after {{time}}. It’s in what was said, as text.",
     "liveRephraseNote": "After Say it differently, your answer starts again.",
     "liveEndDialogText": "The answer you’re giving now isn’t finished. If you end the interview, it isn’t kept.",
@@ -1744,6 +1747,8 @@
     "cutOffOnce": "Once",
     "cutOffMore": "More",
     "livePausedByYouText": "The clock stopped. When you continue, the interviewer asks the question again and your answer starts over. It ends by itself after 30 minutes paused.",
-    "livePausedTabText": "You left the page, so the interview paused and the clock stopped. When you continue, the interviewer asks the question again and your answer starts over. It ends by itself after 30 minutes paused."
+    "livePausedTabText": "You left the page, so the interview paused and the clock stopped. When you continue, the interviewer asks the question again and your answer starts over. It ends by itself after 30 minutes paused.",
+    "liveWordsComeText": "Its words appear here when it finishes speaking.",
+    "liveCutOffText": "The interviewer stopped when you started speaking."
   }
 }

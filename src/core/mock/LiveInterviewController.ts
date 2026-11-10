@@ -1,11 +1,13 @@
-// A mock interview in real time (D100, research doc 24 §15 and §16; way 2), apart from React: the
+// A mock interview in real time (D100, research doc 24 §15 and §16; ways 2 and 3), apart from React: the
 // start call, then one connection to the `live-assist` relay. The microphone streams all the time
 // in 100 ms frames; the interviewer's voice plays as its frames come; the relay says what to show
 // (speaking, listening, thinking, paused, ended) and notices the end of each answer. The page's own
 // voice detection stops the interviewer when the candidate speaks over it, and it reconnects when
 // the connection drops (the relay stops the clock meanwhile). The page shows its `view` and calls
 // its actions; the gateway, the microphone, the streamer and the voice are given, so the specs
-// replace them.
+// replace them. The voice model (way 3) speaks first and writes its words after (`lineEnd`), says
+// the opening and the first question in one line, and gives no `answerEnd`: an answer ends when
+// it starts speaking again, or thinks.
 import {
   encodeMicFrame,
   LIVE_PING_MS,
@@ -28,6 +30,7 @@ import {
   type MockClient,
   type MockEndReason,
   type MockLine,
+  type MockWay,
 } from '@/core/profile/mockInterviews';
 
 export type LivePhase =
@@ -82,6 +85,14 @@ export interface LiveView {
   /** Why the start, or the relay, refused. */
   startFailure?: ProfileErrorCode;
   endReason?: MockEndReason;
+  /** The way the relay said it speaks: the voice model's lines come with their words at their end. */
+  way?: MockWay;
+  /** The voice model's line cut off within its first word: no words came for it. */
+  cutOffLine?: string;
+  /** The line whose answer just ended: the voice model's turns are matched to their lines. */
+  answeredLine?: string;
+  /** Lines whose words have come (`lineEnd`): the voice model's record has the line's turn by then. */
+  linesEnded: number;
 }
 
 export interface LiveStreamerLike {
@@ -170,6 +181,7 @@ export class LiveInterviewController {
     rephrased: false,
     nothingHeard: false,
     answerTimeWarn: false,
+    linesEnded: 0,
   };
   private readonly listeners = new Set<() => void>();
   private onStarted: ((sessionId: string) => void) | null = null;
@@ -254,10 +266,13 @@ export class LiveInterviewController {
     this.startRequestId ??= this.deps.uuid();
     let result: Awaited<ReturnType<LiveDeps['gateway']['startMockInterview']>>;
     try {
+      // The voice model speaks in its own voice: none is sent.
+      const { voice, ...rest } = setup;
       result = await this.busyRetry(() =>
         this.deps.gateway.startMockInterview({
           requestId: this.startRequestId!,
-          ...setup,
+          ...rest,
+          ...(setup.way === 'voice-model' || !voice ? {} : { voice }),
           ...(client ? { client } : {}),
         }),
       );
@@ -521,6 +536,7 @@ export class LiveInterviewController {
         this.set({
           phase: message.paused && !this.continuing ? 'paused' : 'thinking',
           startFailure: undefined,
+          way: message.way,
         });
         this.continuing = false;
         return false;
@@ -559,6 +575,7 @@ export class LiveInterviewController {
         );
         return false;
       case 'interrupted':
+        this.interrupted = message.lineId;
         this.deps.voice.stop(lineNumber(message.lineId));
         return false;
       case 'ended':
@@ -619,7 +636,11 @@ export class LiveInterviewController {
     });
     this.interrupted = null;
     this.speechFrames = 0;
-    const asks = ANSWERABLE.has(message.kind);
+    // The voice model's opening asks the first question too, and its later lines say only
+    // "question": the line with a turn is the one to answer.
+    const asks =
+      ANSWERABLE.has(message.kind) ||
+      (this.state.way === 'voice-model' && Boolean(message.turnId));
     const newQuestion = asks && message.turnId !== this.state.question?.turnId;
     this.set({
       speaking: line,
@@ -637,9 +658,13 @@ export class LiveInterviewController {
   }
 
   private lineEnd(message: Extract<LiveRelayMessage, { type: 'lineEnd' }>) {
-    // The voice model's words come only now.
+    // The voice model's words come only now; cut off within its first word, none come.
     const { speaking, question } = this.state;
     this.set({
+      linesEnded: this.state.linesEnded + 1,
+      ...(!message.text && this.interrupted === message.lineId
+        ? { cutOffLine: message.lineId }
+        : {}),
       ...(speaking?.lineId === message.lineId
         ? { speaking: { ...speaking, text: message.text } }
         : {}),
@@ -683,6 +708,19 @@ export class LiveInterviewController {
   private relayState(
     state: Extract<LiveRelayMessage, { type: 'state' }>['state'],
   ) {
+    // The voice model gives no `answerEnd`: the answer ended when it speaks or thinks again.
+    if (
+      this.state.way === 'voice-model' &&
+      this.state.phase === 'listening' &&
+      (state === 'speaking' || state === 'thinking')
+    ) {
+      this.set({
+        answered: this.state.question?.turnId,
+        answeredLine: this.state.question?.lineId,
+        answerEndedMs: this.listeningMs(),
+        nothingHeard: false,
+      });
+    }
     switch (state) {
       case 'speaking':
         this.set({ phase: 'speaking' });

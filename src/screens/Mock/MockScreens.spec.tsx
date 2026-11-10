@@ -173,13 +173,21 @@ describe('setting up a mock interview (Web-X6-Setup)', () => {
     expect(
       within(ways).getByRole('radio', { name: 'mock.wayTakeTurnsName' }),
     ).toBeChecked();
-    expect(within(ways).getAllByRole('radio')).toHaveLength(2);
+    expect(within(ways).getAllByRole('radio')).toHaveLength(3);
+    // The voice model speaks in its own voice: no choice of voice
+    await user.click(
+      within(ways).getByRole('radio', { name: 'mock.wayVoiceModelName' }),
+    );
+    expect(within(panel).getByText('mock.voiceModelNote')).toBeVisible();
+    expect(
+      within(panel).queryByRole('group', { name: 'mock.voiceLabel' }),
+    ).not.toBeInTheDocument();
     await user.click(
       within(ways).getByRole('radio', { name: 'mock.wayRealTimeName' }),
     );
     // 20 minutes, Voice 2
-    await user.click(within(panel).getAllByRole('radio')[3]!);
-    await user.click(within(panel).getAllByRole('radio')[5]!);
+    await user.click(within(panel).getAllByRole('radio')[4]!);
+    await user.click(within(panel).getAllByRole('radio')[6]!);
     // Hints: "When I ask" first chosen, then "After I answer"
     expect(
       within(panel).getByRole('radio', { name: 'mock.hintsOnRequest' }),

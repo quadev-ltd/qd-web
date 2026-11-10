@@ -48,6 +48,7 @@ const view = (change: Partial<LiveView>): LiveView => ({
   rephrased: false,
   nothingHeard: false,
   answerTimeWarn: false,
+  linesEnded: 0,
   question: QUESTION,
   speaking: QUESTION,
   ...change,
@@ -124,6 +125,39 @@ describe('the interviewer, in real time (Web-X6-RT-Speaking, -RT-Listening)', ()
   });
 });
 
+describe('the voice model speaking (Web-X6-RT-States)', () => {
+  it('before its words come: the level, and where they will be', () => {
+    renderProfilePage(
+      <RealTimeInterviewerCard
+        view={view({
+          way: 'voice-model',
+          speaking: { ...QUESTION, text: '' },
+        })}
+        controller={fakeController()}
+      />,
+    );
+    expect(screen.getByText('mock.liveWordsComeText')).toBeVisible();
+  });
+
+  it('cut off within its first word: it stopped when you started speaking', () => {
+    renderProfilePage(
+      <RealTimeInterviewerCard
+        view={view({
+          phase: 'listening',
+          way: 'voice-model',
+          question: { ...QUESTION, text: '' },
+          cutOffLine: 'l2',
+        })}
+        controller={fakeController()}
+      />,
+    );
+    expect(screen.getByText('mock.liveCutOffText')).toBeVisible();
+    expect(
+      screen.queryByText('mock.liveWordsComeText'),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('the answer, in real time (Web-X6-RT-Listening, -RT-States)', () => {
   it('while the interviewer speaks: the microphone is on, speaking interrupts', () => {
     renderProfilePage(
@@ -160,6 +194,17 @@ describe('the answer, in real time (Web-X6-RT-Listening, -RT-States)', () => {
     ).toBeNull();
     await user.click(screen.getByRole('button', { name: 'mock.doneButton' }));
     expect(controller.done).toHaveBeenCalledOnce();
+  });
+
+  it('the voice model’s note: a long pause may be taken as the end', () => {
+    renderProfilePage(
+      <RealTimeAnswerCard
+        view={view({ phase: 'listening', way: 'voice-model' })}
+        controller={fakeController()}
+      />,
+    );
+    expect(screen.getByText('mock.liveVoiceModelDoneNote')).toBeVisible();
+    expect(screen.queryByText('mock.liveDoneNote')).not.toBeInTheDocument();
   });
 
   it('nothing heard yet after "I’m done", and 30 seconds left', () => {

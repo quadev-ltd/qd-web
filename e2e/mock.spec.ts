@@ -473,7 +473,7 @@ test('real time (doc 24 §16): set up, the opening and the question, an answer e
   ).toContainText(
     'Like a call: it notices when you’ve finished, and you can interrupt it.',
   );
-  await setup.getByRole('radio', { name: 'Real time' }).check();
+  await setup.getByRole('radio', { name: 'Real time', exact: true }).check();
   await setup.getByRole('button', { name: 'Continue' }).click();
   await expect(page).toHaveURL(/&way=real-time$/);
   await expect(
@@ -548,6 +548,73 @@ test('real time (doc 24 §16): set up, the opening and the question, an answer e
   await expect(
     page.getByRole('region', { name: 'What was said' }),
   ).toContainText(/I answered for about \d+ seconds\./);
+});
+
+test('the voice model (doc 24 §16): no voice to choose, its words after it speaks, an answer it notices, cut off within its first word, ended', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    (window as unknown as { qdMicrophoneVolume: number }).qdMicrophoneVolume =
+      0;
+  });
+  await openInterview(page);
+  await page
+    .getByRole('button', { name: 'Practise for this interview' })
+    .click();
+  const setup = page.getByRole('dialog', { name: 'Mock interview' });
+  await setup.getByRole('radio', { name: 'Real time, voice model' }).check();
+  await expect(setup).toContainText(
+    'The voice model speaks in its own voice, so there’s no choice of voice.',
+  );
+  await expect(setup.getByRole('radio', { name: 'Voice 2' })).toHaveCount(0);
+  await setup.getByRole('button', { name: 'Continue' }).click();
+  await expect(page).toHaveURL(/&way=voice-model$/);
+  await expect(
+    page.getByRole('region', { name: 'Your interview' }),
+  ).toContainText('The model’s own');
+
+  // The opening asks the first question; its words come once it has said them
+  await page.getByRole('button', { name: 'Start the interview' }).click();
+  await expect(interviewer(page)).toContainText(
+    'Its words appear here when it finishes speaking.',
+    { timeout: 15_000 },
+  );
+  await expect(interviewer(page)).toContainText(
+    'Tell me about an incident you led from alert to fix.',
+  );
+  await expect(answer(page)).toContainText('Listening ·', { timeout: 10_000 });
+
+  // An answer it notices: speech, then silence; the follow-up's words after it
+  await setMicrophone(page, 1);
+  await page.waitForTimeout(2_000);
+  await setMicrophone(page, 0);
+  await expect(interviewer(page)).toContainText(
+    'What was your own part in it',
+    { timeout: 10_000 },
+  );
+  await expect(answer(page)).toContainText('Listening ·', { timeout: 10_000 });
+
+  // "I'm done" while still speaking: the next line is spoken over at once, cut off within its
+  // first word, so no words come for it
+  await setMicrophone(page, 1);
+  await page.waitForTimeout(1_000);
+  await answer(page).getByRole('button', { name: 'I’m done' }).click();
+  await expect(interviewer(page)).toContainText(
+    'The interviewer stopped when you started speaking.',
+    { timeout: 10_000 },
+  );
+  await expect(answer(page)).toContainText('Listening ·');
+  await setMicrophone(page, 0);
+
+  await page.getByRole('button', { name: 'End interview' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Interview ended' }),
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(
+    page
+      .getByRole('region', { name: 'How did it go?' })
+      .getByText('Did the interviewer cut you off, or hear itself?'),
+  ).toBeVisible();
 });
 
 test('none left today: the setup says so and can’t continue', async ({

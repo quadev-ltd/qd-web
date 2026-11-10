@@ -652,3 +652,87 @@ describe('LiveInterviewController: the end', () => {
     expect(sockets).toHaveLength(1);
   });
 });
+
+describe('LiveInterviewController: the voice model (doc 24 §15, way 3)', () => {
+  const VOICE_MODEL = { ...SETUP, way: 'voice-model' as const };
+
+  it('starts with no voice: the model speaks in its own', async () => {
+    const { controller, gateway, connected } = setUp();
+    void controller.start(VOICE_MODEL);
+    await connected();
+    expect(gateway.startMockInterview).toHaveBeenCalledWith(
+      expect.not.objectContaining({ voice: expect.anything() }),
+    );
+    expect(gateway.startMockInterview).toHaveBeenCalledWith(
+      expect.objectContaining({ way: 'voice-model' }),
+    );
+  });
+
+  it('its words come at the line’s end; the opening asks the first question', async () => {
+    const { controller, latest, connected } = setUp();
+    void controller.start(VOICE_MODEL);
+    await connected();
+    latest().relay({ ...READY, way: 'voice-model' });
+    latest().relay({ type: 'state', state: 'speaking' });
+    latest().relay({
+      type: 'line',
+      lineId: 'l1',
+      kind: 'opening',
+      turnId: 't1',
+      text: '',
+    });
+    expect(controller.getView()).toMatchObject({
+      way: 'voice-model',
+      speaking: { lineId: 'l1', text: '' },
+      question: { lineId: 'l1', turnId: 't1' },
+    });
+    latest().relay({
+      type: 'lineEnd',
+      lineId: 'l1',
+      text: 'Hello. Tell me about yourself.',
+      durationMs: 4_000,
+    });
+    expect(controller.getView()).toMatchObject({
+      speaking: { text: 'Hello. Tell me about yourself.' },
+      question: { text: 'Hello. Tell me about yourself.' },
+      linesEnded: 1,
+    });
+
+    // No answerEnd: the answer ended when the model speaks again
+    latest().relay({ type: 'state', state: 'listening' });
+    controller.done();
+    expect(latest().messages().at(-1)).toMatchObject({
+      type: 'done',
+      lineId: 'l1',
+    });
+    latest().relay({ type: 'state', state: 'thinking' });
+    expect(controller.getView()).toMatchObject({
+      answered: 't1',
+      answeredLine: 'l1',
+    });
+  });
+
+  it('cut off within its first word: no words, said so', async () => {
+    const { controller, latest, connected, speak } = setUp();
+    void controller.start(VOICE_MODEL);
+    await connected();
+    latest().relay({ ...READY, way: 'voice-model' });
+    latest().relay({ type: 'state', state: 'speaking' });
+    latest().relay({
+      type: 'line',
+      lineId: 'l3',
+      kind: 'question',
+      turnId: 't2',
+      text: '',
+    });
+    speak(1);
+    speak(1);
+    expect(latest().messages().at(-1)).toMatchObject({
+      type: 'interrupt',
+      lineId: 'l3',
+    });
+    latest().relay({ type: 'interrupted', lineId: 'l3' });
+    latest().relay({ type: 'lineEnd', lineId: 'l3', text: '', durationMs: 80 });
+    expect(controller.getView().cutOffLine).toBe('l3');
+  });
+});
