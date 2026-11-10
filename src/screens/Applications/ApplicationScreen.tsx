@@ -1,6 +1,6 @@
-// One job application: its name, its tabs (the brief, its interviews, the details and, with the
-// CV tool, its CVs) and the tab that is open. Sessions have no backend yet, so they have no tab
-// (ADR 0008).
+// One job application: its name, its tabs (the brief, its interviews, with text practice or mock
+// interviews its Sessions (doc 24 §19), the details and, with the CV tool, its CVs) and the tab that
+// is open.
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, useParams } from 'react-router';
 
@@ -26,6 +26,7 @@ import {
   applicationCvPath,
   applicationDetailsPath,
   applicationInterviewsPath,
+  applicationSessionsPath,
   applicationPath,
   APPLICATIONS_PATH,
 } from '@/core/profile/paths';
@@ -34,6 +35,7 @@ import ApplicationLetters from '@/screens/Letters/ApplicationLetters';
 import { useCvTabLabel } from '@/screens/Letters/useCvTabLabel';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 import { shortAddress } from '@/screens/Profile/Resource/resourceMeta';
+import ApplicationSessionsTab from '@/screens/Sessions/ApplicationSessionsTab';
 
 const TAB =
   'flex min-h-11 items-center border-b-2 px-4 text-[16px] leading-natural font-medium no-underline';
@@ -50,7 +52,8 @@ const BackLink: React.FC = () => {
   );
 };
 
-export type ApplicationTab = 'brief' | 'interviews' | 'details' | 'cv';
+export type ApplicationTab =
+  'brief' | 'interviews' | 'sessions' | 'details' | 'cv';
 
 export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
   tab,
@@ -58,6 +61,10 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
   const { t } = useTranslation();
   // The CV tab comes with the CV tool (delivery 2b).
   const cvTool = useFlag('cvTool');
+  // This job's practice (doc 24 §19), once there is some to have.
+  const textPractice = useFlag('textPractice');
+  const mockInterview = useFlag('mockInterview');
+  const sessionsTab = textPractice || mockInterview;
   // "CV and letter" with cover letters (D98).
   const cvTab = useCvTabLabel();
   const coverLetters = useFlag('coverLetters');
@@ -151,7 +158,7 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
       </div>
       <nav
         aria-label={t('applications.tabsLabel')}
-        className="-mt-2 flex gap-1 border-b border-border">
+        className="-mt-2 flex flex-wrap gap-1 border-b border-border">
         <NavLink end to={applicationPath(application.id)} className={tabClass}>
           {t('applications.briefTab')}
         </NavLink>
@@ -161,6 +168,13 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
           className={tabClass}>
           {t('applications.interviewsTab')}
         </NavLink>
+        {sessionsTab && (
+          <NavLink
+            to={applicationSessionsPath(application.id)}
+            className={tabClass}>
+            {t('applications.sessionsTab')}
+          </NavLink>
+        )}
         <NavLink
           to={applicationDetailsPath(application.id)}
           className={tabClass}>
@@ -174,6 +188,8 @@ export const ApplicationScreen: React.FC<{ tab: ApplicationTab }> = ({
       </nav>
       {tab === 'interviews' ? (
         <InterviewsTab application={application} />
+      ) : tab === 'sessions' && sessionsTab ? (
+        <ApplicationSessionsTab application={application} />
       ) : tab === 'details' ? (
         <DetailsTab application={application} />
       ) : tab === 'cv' && cvTool ? (
@@ -210,6 +226,10 @@ export const ApplicationBriefScreen: React.FC = () => (
 
 export const ApplicationInterviewsScreen: React.FC = () => (
   <ApplicationScreen tab="interviews" />
+);
+
+export const ApplicationSessionsScreen: React.FC = () => (
+  <ApplicationScreen tab="sessions" />
 );
 
 export const ApplicationDetailsScreen: React.FC = () => (

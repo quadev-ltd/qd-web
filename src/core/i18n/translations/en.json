@@ -475,6 +475,7 @@
     "replaceDialogText": "You changed the text of this job. Reading the posting again replaces your text with a new copy of the posting.",
     "replaceConfirmButton": "Replace my text",
     "interviewsTab": "Interviews",
+    "sessionsTab": "Sessions",
     "nextInterview": "Next interview {{when}}",
     "moreButton": "More for this application",
     "menuLabel": "Application"
@@ -611,7 +612,12 @@
     "mockMinutes_one": "{{count}} minute",
     "mockMinutes_other": "{{count}} minutes",
     "mockGoing": "Still going",
-    "mockNotFinished": "Not finished"
+    "mockNotFinished": "Not finished",
+    "appMocksTitle": "Mock interviews · {{count}}",
+    "appTurnsTitle": "Questions practised · {{count}}",
+    "appKeptNote": "Kept for 12 months after you last practised. Sessions in the menu has every job’s practice.",
+    "appEmpty": "No practice for this job yet. Start from one of its interviews.",
+    "appLoadError": "We couldn’t load this job’s practice. Check your connection and try again."
   },
   "practice": {
     "documentTitle": "Practise a question | QuaDev",
@@ -1749,6 +1755,12 @@
     "livePausedByYouText": "The clock stopped. When you continue, the interviewer asks the question again and your answer starts over. It ends by itself after 30 minutes paused.",
     "livePausedTabText": "You left the page, so the interview paused and the clock stopped. When you continue, the interviewer asks the question again and your answer starts over. It ends by itself after 30 minutes paused.",
     "liveWordsComeText": "Its words appear here when it finishes speaking.",
-    "liveCutOffText": "The interviewer stopped when you started speaking."
+    "liveCutOffText": "The interviewer stopped when you started speaking.",
+    "feedbackReadyChip": "Feedback ready",
+    "feedbackPreparingChip": "Preparing feedback",
+    "feedbackNoneChip": "No feedback yet",
+    "interviewMocksTitle": "Your mock interviews",
+    "interviewMocksText": "For this interview, the newest first: what was said, and feedback on your answers.",
+    "seeAllMocksLink": "See all {{count}} in Sessions"
   }
 }

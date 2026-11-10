@@ -1,13 +1,14 @@
 // One interview of an application (A8, D89): the way there (D96), its
 // name with the application under it, "Details" with when it is and what the candidate knows
 // about it, and "Edit". Until text practice exists (D92), "Get ready for it" says what will come.
-// With text practice (D94), its likely questions take that card's place. Then "Remove this
-// interview".
+// With text practice (D94), its likely questions take that card's place. With mock interviews
+// (D100), the ones held for it come between the two (doc 24 §19). Then "Remove this interview".
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import DateTile from './DateTile';
+import InterviewMocksCard from './InterviewMocksCard';
 import InterviewPanel from './InterviewPanel';
 import InterviewQuestionsCard from './InterviewQuestionsCard';
 import {
@@ -49,6 +50,7 @@ import {
   APPLICATIONS_PATH,
 } from '@/core/profile/paths';
 import { useInterviews } from '@/core/profile/useInterviews';
+import { useMockSessions } from '@/core/profile/useMockInterviews';
 import MockSetupPanel, { mockChoicesOf } from '@/screens/Mock/MockSetupPanel';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 
@@ -234,6 +236,8 @@ const InterviewPage: React.FC<{
   );
   const interview = interviews.find(({ id }) => id === interviewId);
   const tabPath = applicationInterviewsPath(application.id);
+  // D100, doc 24 §19: the mock interviews held for it, read with it; left out if they can't be.
+  const mocks = useMockSessions({ interviewId, enabled: mockInterview });
 
   if (!interview) {
     if (status === 'error') {
@@ -267,6 +271,15 @@ const InterviewPage: React.FC<{
     );
   }
 
+  // Drawn with the interview, so the likely questions don't move once they are.
+  if (mockInterview && mocks.state.status === 'loading') {
+    return (
+      <div className="flex justify-center py-16 text-primary">
+        <Spinner />
+      </div>
+    );
+  }
+
   const title = interviewTitle(t, interview);
   const subtitle = [application.title, application.company]
     .filter(Boolean)
@@ -297,6 +310,12 @@ const InterviewPage: React.FC<{
         timeZone={timeZone}
         onEdit={() => setEditing(true)}
       />
+      {mocks.state.status === 'loaded' && (
+        <InterviewMocksCard
+          applicationId={application.id}
+          sessions={mocks.state.sessions}
+        />
+      )}
       {textPractice ? (
         <InterviewQuestionsCard
           application={application}

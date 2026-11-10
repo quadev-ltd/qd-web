@@ -118,6 +118,24 @@ export const getMockSession = (
       : null;
   });
 
+/**
+ * One interview's mock interviews (doc 24 §19), in no order: one field's equality, so no
+ * composite index. The page orders them.
+ */
+export const getInterviewMockSessions = (
+  uid: string,
+  interviewId: string,
+): Promise<MockSession[]> =>
+  mapped(async () => {
+    const snapshot = await getDocs(
+      query(
+        collection(db(), mockSessionsPath(uid)),
+        where('interviewId', '==', interviewId),
+      ),
+    );
+    return parse('getInterviewMockSessions', snapshot.docs);
+  });
+
 /** How many mock interviews the account keeps: a count, not a read of each. */
 export const countMockSessions = (uid: string): Promise<number> =>
   mapped(async () => {

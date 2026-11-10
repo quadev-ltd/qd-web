@@ -105,6 +105,7 @@ export const createMockProfileGateway = (): Mocked<ProfileGateway> => ({
   endMockInterview: vi.fn(() => Promise.resolve()),
   sendMockFeedback: vi.fn(() => Promise.resolve()),
   retryMockFeedback: vi.fn(() => Promise.resolve()),
+  getInterviewMockSessions: vi.fn(() => Promise.resolve([])),
   getLiveTokens: vi.fn(() =>
     Promise.resolve({ idToken: 'id-token', appCheckToken: 'app-check-token' }),
   ),

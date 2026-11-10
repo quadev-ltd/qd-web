@@ -574,6 +574,85 @@ test('mock interviews in real time (doc 24 §16): the setup’s ways, Ready, the
   await expectAccessibleAndNotTooWide(page);
 });
 
+test('mock interviews where the job is (doc 24 §19): the interview’s card, the Interviews tab’s chip, and the application’s Sessions tab with its five tabs: accessible and no horizontal scroll', async ({
+  page,
+}) => {
+  test.slow();
+  await page.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = async () => {
+      const context = new AudioContext();
+      const tone = context.createOscillator();
+      const destination = context.createMediaStreamDestination();
+      tone.connect(destination);
+      tone.start();
+      return destination.stream;
+    };
+  });
+  await openApplications(page);
+  await page.evaluate(() => {
+    window.qdPreview?.setFlag('textPractice', true);
+    window.qdPreview?.setFlag('mockInterview', true);
+    window.qdPreview?.setFlag('cvTool', true);
+    window.qdPreview?.setFlag('coverLetters', true);
+  });
+  await seedApplications(page);
+  const openJob = async () => {
+    await page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'Applications' })
+      .click();
+    await page
+      .getByRole('listitem')
+      .filter({ hasText: 'Senior Backend Engineer' })
+      .getByRole('link')
+      .first()
+      .click();
+  };
+  await openJob();
+  await page.getByRole('link', { name: 'Interviews' }).click();
+  await page.getByRole('link', { name: 'Technical interview' }).click();
+  await page
+    .getByRole('button', { name: 'Practise for this interview' })
+    .click();
+  await page
+    .getByRole('dialog', { name: 'Mock interview' })
+    .getByRole('button', { name: 'Continue' })
+    .click();
+  await page.getByRole('button', { name: 'Start the interview' }).click();
+  const answer = page.getByRole('region', { name: 'Your answer' });
+  await expect(answer).toContainText('Recording ·', { timeout: 15_000 });
+  await page.waitForTimeout(1_200);
+  await answer.getByRole('button', { name: 'I’m done' }).click();
+  await expect(answer).toContainText('Recording ·', { timeout: 15_000 });
+  await page.getByRole('button', { name: 'End interview' }).click();
+  await page
+    .getByRole('dialog', { name: 'End the interview?' })
+    .getByRole('button', { name: 'End the interview' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Interview ended' }),
+  ).toBeVisible();
+
+  await openJob();
+  await page.getByRole('link', { name: 'Interviews' }).click();
+  await expect(page.getByText('1 mock interview')).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await page.getByRole('link', { name: 'Technical interview' }).click();
+  await expect(
+    page.getByRole('region', { name: 'Your mock interviews' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+  await openJob();
+  await page
+    .getByRole('navigation', { name: 'Application' })
+    .getByRole('link', { name: 'Sessions' })
+    .click();
+  await expect(
+    page.getByRole('region', { name: 'Mock interviews · 1' }),
+  ).toBeVisible();
+  await expectAccessibleAndNotTooWide(page);
+});
+
 test('Sessions and removing kept practice (D99): the remove dialog with its box, Sessions with a removed job, "Remove all" and nothing kept: accessible and no horizontal scroll', async ({
   page,
 }) => {

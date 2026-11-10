@@ -11,7 +11,8 @@
 // `answer-feedback` and `mock-summary` fakes, one asked for again, and a question practised from
 // it (the `mock` source); and the real-time way over the `live-assist` relay with its fakes (doc
 // 24 §15.7: any sound is speech, 1.5 seconds of silence ends an answer, each line is 400 ms of
-// silence). The clock is moved as the backend's own tests move it.
+// silence); and a session found where the job is (doc 24 §19). The clock is moved as the backend's
+// own tests move it.
 import { expect, type Page, test } from '@playwright/test';
 
 import {
@@ -263,6 +264,24 @@ test('mock interview: nothing heard in a silent answer, then out of time, the cl
   await expect(
     page.getByRole('heading', { name: 'Interview finished' }),
   ).toBeVisible();
+
+  // Where the job is (doc 24 §19), read under the rules: the interview's page queries its mock
+  // interviews, the Interviews tab counts them, the application's Sessions tab lists them
+  await page.goto(new URL(page.url()).pathname.replace(/\/mock\/[^/]+$/, ''));
+  const mocks = page.getByRole('region', { name: 'Your mock interviews' });
+  await expect(mocks).toContainText('Take turns ·');
+  await expect(mocks).toContainText('1 question');
+  await page.locator('main a[href$="/interviews"]:visible').first().click();
+  await expect(
+    page.getByRole('listitem').filter({ hasText: 'Technical interview' }),
+  ).toContainText('1 mock interview');
+  await page
+    .getByRole('navigation', { name: 'Application' })
+    .getByRole('link', { name: 'Sessions' })
+    .click();
+  await expect(
+    page.getByRole('region', { name: 'Mock interviews · 1' }),
+  ).toContainText('Technical interview');
 });
 
 test('hints (H1, H2): chosen at the setup and kept by the session, the trigger’s points read for a planned question and for a follow-up', async ({

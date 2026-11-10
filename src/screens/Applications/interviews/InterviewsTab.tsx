@@ -1,5 +1,6 @@
 // The Interviews tab of an application (A8, D89): "Coming up", the next one first, with "Add an
-// interview", then "Past", the latest first. Each row opens the interview. With none yet, what
+// interview", then "Past", the latest first. Each row opens the interview, its mock interviews
+// counted in a chip after its type and length (D100, doc 24 §19), once read. With none yet, what
 // to add and why.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +24,7 @@ import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
+import { useFlag } from '@/core/flags/FlagsProvider';
 import { type JobApplication } from '@/core/profile/applications';
 import {
   type ApplicationInterview,
@@ -35,13 +37,16 @@ import {
 } from '@/core/profile/interviewTime';
 import { applicationInterviewPath } from '@/core/profile/paths';
 import { useInterviews } from '@/core/profile/useInterviews';
+import { useMockSessions } from '@/core/profile/useMockInterviews';
+import { heldMockSessions } from '@/screens/Applications/interviews/InterviewMocksCard';
 
-/** The type and length of an interview, as chips. */
+/** The type and length of an interview, as chips, and the mock interviews held for it. */
 export const InterviewChips: React.FC<{
   interview: Pick<ApplicationInterview, 'type' | 'lengthMinutes'>;
-}> = ({ interview: { type, lengthMinutes } }) => {
+  mocks?: number;
+}> = ({ interview: { type, lengthMinutes }, mocks = 0 }) => {
   const { t } = useTranslation();
-  if (!type && !lengthMinutes) {
+  if (!type && !lengthMinutes && mocks === 0) {
     return null;
   }
   return (
@@ -50,6 +55,11 @@ export const InterviewChips: React.FC<{
       {lengthMinutes && (
         <Chip tone="neutral">
           {t('interviews.lengthChip', { minutes: lengthMinutes })}
+        </Chip>
+      )}
+      {mocks > 0 && (
+        <Chip tone="brand" icon="wave">
+          {t('sessions.mockInterviews', { count: mocks })}
         </Chip>
       )}
     </span>
@@ -62,7 +72,8 @@ const InterviewRow: React.FC<{
   past: boolean;
   now: number;
   timeZone: string;
-}> = ({ applicationId, interview, past, now, timeZone }) => {
+  mocks?: number;
+}> = ({ applicationId, interview, past, now, timeZone, mocks }) => {
   const { t } = useTranslation();
   const when = [
     dayOf(interview.startsAt, now, timeZone),
@@ -87,7 +98,7 @@ const InterviewRow: React.FC<{
             {interview.description}
           </p>
         )}
-        <InterviewChips interview={interview} />
+        <InterviewChips interview={interview} mocks={mocks} />
       </div>
       <span aria-hidden="true" className="flex self-center text-muted">
         <Icon name="right" />
@@ -102,7 +113,9 @@ const InterviewList: React.FC<{
   past?: boolean;
   now: number;
   timeZone: string;
-}> = ({ applicationId, interviews, past = false, now, timeZone }) => (
+  /** Mock interviews held, by interview. */
+  mocks: ReadonlyMap<string, number>;
+}> = ({ applicationId, interviews, past = false, now, timeZone, mocks }) => (
   <Card elevation="raised" className="px-5 py-1">
     <ul className="flex flex-col">
       {interviews.map(interview => (
@@ -113,6 +126,7 @@ const InterviewList: React.FC<{
           past={past}
           now={now}
           timeZone={timeZone}
+          mocks={mocks.get(interview.id)}
         />
       ))}
     </ul>
@@ -126,10 +140,24 @@ export const InterviewsTab: React.FC<{ application: JobApplication }> = ({
 }) => {
   const { t } = useTranslation();
   const { status, interviews, reload } = useInterviews(application.id);
+  // The account's mock interviews (200 at most), counted by interview; the chips come once read.
+  const mockInterview = useFlag('mockInterview');
+  const { state: mockRead } = useMockSessions({ enabled: mockInterview });
   const [adding, setAdding] = useState(false);
   const now = useNow();
   const [timeZone] = useState(browserTimeZone);
   const full = interviews.length >= INTERVIEWS_MAX;
+  const mocks = new Map<string, number>();
+  if (mockRead.status === 'loaded') {
+    for (const session of heldMockSessions(mockRead.sessions, now)) {
+      if (session.interviewId && !session.interviewRemoved) {
+        mocks.set(
+          session.interviewId,
+          (mocks.get(session.interviewId) ?? 0) + 1,
+        );
+      }
+    }
+  }
 
   let body: React.ReactNode;
   if (status === 'error') {
@@ -218,6 +246,7 @@ export const InterviewsTab: React.FC<{ application: JobApplication }> = ({
               interviews={comingUp}
               now={now}
               timeZone={timeZone}
+              mocks={mocks}
             />
           ) : (
             <p className="text-[15px] leading-normal text-muted">
@@ -238,6 +267,7 @@ export const InterviewsTab: React.FC<{ application: JobApplication }> = ({
               past
               now={now}
               timeZone={timeZone}
+              mocks={mocks}
             />
           </section>
         )}

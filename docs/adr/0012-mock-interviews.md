@@ -158,6 +158,22 @@ that listens and speaks in its own voice. Drawn on `Web-X6-RT-States` (canvas ve
   once, before the model stops by itself.
 - **The stand-in relay** has the voice model's way too, as the backend's fake model behaves.
 
+## Where the job is (doc 24 §19, 10 Nov 2026)
+
+The owner noticed mock interviews could be found only from Sessions in the menu. Drawn in canvas version 78.
+
+- **The interview's page** shows "Your mock interviews" under its details: the ones held for it, the newest first,
+  up to 3, then "See all n in Sessions", which links to the application's Sessions tab. A session still going is
+  left out. The page queries `mockSessions` where `interviewId ==` (one field: no index) alongside the interview,
+  and draws both together so the likely questions don't move. A failed read leaves the card out.
+- **The Interviews tab** counts each interview's mock interviews in a chip, from the account's sessions read once
+  (200 at most). The chips may come a moment after the list.
+- **The application's Sessions tab** comes with text practice or mock interviews, after Interviews. It shows this
+  job's practice as Sessions groups it: its mock interviews, named by their interview, then its questions practised.
+  The tab bar wraps at phone width.
+- **The feedback chip:** "Preparing feedback" while any of it is being written or not yet due; otherwise "Feedback
+  ready" once one answer's is; otherwise "No feedback yet". Agreed with the design chat.
+
 ## Consequences
 
 - Real time (slice 4) adds a WebSocket and an AudioWorklet next to the recorder; the controller's view and the
