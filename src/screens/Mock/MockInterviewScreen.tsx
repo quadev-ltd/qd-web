@@ -7,7 +7,7 @@
 // - Continue: a session still going, opened again: "Continue the interview".
 // - The interview itself (MockLive), one column until hints come; leaving or ending during an
 //   answer asks first; leaving the tab pauses it.
-// - The end (MockEnd), with the feedback card.
+// - The end (MockEnd): "How it went" (MockFeedback, D101), then the testers' feedback card.
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -37,16 +37,19 @@ import { dailyLimitResetTime } from '@/core/profile/limits';
 import {
   isMockIdle,
   MOCK_SESSIONS_MAX,
+  mockOverallOf,
   mockProgress,
   type MockSession,
 } from '@/core/profile/mockInterviews';
 import {
   applicationInterviewMockPath,
   applicationInterviewPath,
+  applicationInterviewPracticePath,
   applicationInterviewsPath,
   applicationPath,
   APPLICATIONS_PATH,
   sessionMockPath,
+  sessionPracticePath,
 } from '@/core/profile/paths';
 import { MOCK_INTERVIEW_DAILY_LIMIT } from '@/core/profile/usageLimits';
 import { useInterviews } from '@/core/profile/useInterviews';
@@ -60,6 +63,11 @@ import {
   useNow,
 } from '@/screens/Applications/interviews/interviewText';
 import { MockEndPanel, MockFeedbackCard } from '@/screens/Mock/MockEnd';
+import {
+  MockOverallCard,
+  useMockFeedback,
+  useMockPractise,
+} from '@/screens/Mock/MockFeedback';
 import { MockHintsCard, useMockHints } from '@/screens/Mock/MockHints';
 import {
   AnswerCard,
@@ -321,6 +329,22 @@ export const MockInterviewScreen: React.FC = () => {
     shown: session?.hintsShown ?? choices.hints,
     reload,
   });
+  // Feedback once the interview has ended (D101), read again while it is being written; its
+  // questions practised open under this interview while it is there.
+  const feedback = useMockFeedback({
+    session,
+    shown: session?.status === 'ended',
+    reload,
+  });
+  const practise = useMockPractise(session, practiceTurnId =>
+    session?.interviewId && !session.interviewRemoved
+      ? applicationInterviewPracticePath(
+          session.applicationId,
+          session.interviewId,
+          practiceTurnId,
+        )
+      : sessionPracticePath(practiceTurnId),
+  );
 
   // The progress comes from the session: read again with each new question, and at the end.
   const turnId = view.question?.turnId;
@@ -473,6 +497,7 @@ export const MockInterviewScreen: React.FC = () => {
       view.endReason ??
       session?.endReason ??
       (session && isMockIdle(session, now) ? 'idle' : 'ended');
+    const overall = session ? mockOverallOf(session, feedback.reading) : null;
     return shell(
       <>
         {head}
@@ -492,6 +517,15 @@ export const MockInterviewScreen: React.FC = () => {
               : undefined
           }
         />
+        {session && overall && (
+          <MockOverallCard
+            session={session}
+            state={overall}
+            page="end"
+            feedback={feedback}
+            practise={practise}
+          />
+        )}
         <MockFeedbackCard sessionId={sessionId} sent={session?.feedback} />
       </>,
     );

@@ -467,6 +467,21 @@ describe('the callables', () => {
       },
       ProfileErrorCode.Invalid,
     ],
+    // "Try again" on a mock interview's feedback (D101): being written already, or never offered.
+    [
+      {
+        code: 'functions/failed-precondition',
+        details: { reason: 'not-failed' },
+      },
+      ProfileErrorCode.MockFeedbackNotFailed,
+    ],
+    [
+      {
+        code: 'functions/failed-precondition',
+        details: { reason: 'not-answered' },
+      },
+      ProfileErrorCode.Invalid,
+    ],
     [
       { code: 'functions/resource-exhausted', details: { reason: 'quota' } },
       ProfileErrorCode.DailyLimit,

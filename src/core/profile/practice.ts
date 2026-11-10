@@ -4,7 +4,8 @@
 // user, not the application: removing an application or an interview keeps them, marked as
 // removed, until the candidate removes them (D99) or they are 12 months old (D24). The names,
 // limits and checks are quadev-backend's packages/shared/src/practiceTurn.ts (slice 3's contract,
-// 9 Nov 2026); the backend applies them again and refuses what fails.
+// 9 Nov 2026, and the `mock` source of doc 24 §18.5); the backend applies them again and refuses
+// what fails.
 import { z } from 'zod';
 
 import { INTERVIEW_QUESTION_KINDS, INTERVIEW_TYPES } from './interviews';
@@ -26,6 +27,8 @@ export const PRACTICE_QUESTION_SOURCES = [
   'typed',
   'interview',
   'brief',
+  /** A question of a mock interview: "Practise it" (D101). */
+  'mock',
 ] as const;
 export type PracticeQuestionSource = (typeof PRACTICE_QUESTION_SOURCES)[number];
 
@@ -122,6 +125,9 @@ export const PracticeTurnSchema = z.object({
     /** `interview` only: the list it was practised from, and the question's id there. */
     listId: optionalText,
     questionId: optionalText,
+    /** `mock` only: the mock interview, and its turn. */
+    sessionId: optionalText,
+    mockTurnId: optionalText,
   }),
   /** 3 to 5. One that can't be read is left out. */
   keyPoints: z
@@ -157,12 +163,17 @@ export const REMOVE_PRACTICE_TURN = 'removePracticeTurn';
 /** Every turn of one application (D99), whether the application is still there or not. */
 export const REMOVE_APPLICATION_PRACTICE = 'removeApplicationPractice';
 
-/** The question to practise: typed, one of an interview's list, or one of the brief's. */
+/** The question to practise: typed, one of an interview's list, the brief's, or a mock interview's. */
 export type PracticeQuestionRequest =
   | { source: 'typed'; text: string }
   /** `listId` is left out only for a list that has none: the call then gives it one. */
   | { source: 'interview'; listId?: string; questionId: string }
-  | { source: 'brief'; text: string };
+  | { source: 'brief'; text: string }
+  /**
+   * The turn's question as first asked; its hints, when ready, are the key points. The
+   * interview is the session's, so the request names none.
+   */
+  | { source: 'mock'; sessionId: string; turnId: string };
 
 /** A typed answer to a turn: one model call, 5 to 15 seconds, a minute at most. */
 export interface AnswerPracticeTurnRequest {
@@ -250,13 +261,16 @@ export const practiceStartKey = ({
       return `brief/${applicationId}/${question.text}`;
     case 'typed':
       return `typed/${applicationId}/${interviewId ?? ''}`;
+    case 'mock':
+      return `mock/${question.sessionId}/${question.turnId}`;
   }
 };
 
 /**
  * The same question asked again, for "Start again with new key points" once a turn has its 5
  * tries; `null` when it can't be asked from what the turn holds (an interview's question with no
- * list or interview to name).
+ * list or interview to name). A mock interview's is asked as typed: its hints would be the same
+ * key points again.
  */
 export const practiceRestartRequest = (
   turn: PracticeTurn,
@@ -281,6 +295,7 @@ export const practiceRestartRequest = (
         question: { source: 'brief', text: question.text },
       };
     case 'typed':
+    case 'mock':
       return {
         applicationId,
         ...(interviewId ? { interviewId } : {}),

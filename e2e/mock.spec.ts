@@ -2,8 +2,10 @@
 // setup, the Ready page with "Before you start", the interview with a recorded answer and real
 // sound (a stand-in microphone, the preview's interviewer voicing each line as a short
 // tone), "I'm done", a follow-up, Skip, Pause, a failed send and nothing heard, a blocked
-// microphone, the end with the feedback card, what was said in Sessions, and the hints (H2) when
-// asked for and after the answer. The preview's backend plays the backend's part.
+// microphone, the end with the feedback card, what was said in Sessions, the hints (H2) when
+// asked for and after the answer, and the feedback on the answers with "How it went" (D101), one
+// failed and asked for again, and a question practised from it. The preview's backend plays the
+// backend's part.
 import { expect, type Page, test } from '@playwright/test';
 
 import { openApplications, seedApplications } from './support';
@@ -75,6 +77,26 @@ const start = async (page: Page) => {
   await expect(answer(page)).toContainText('Recording ·', { timeout: 15_000 });
 };
 
+/** A second or so of answer, then "I'm done", and the next line recording. */
+const answerNow = async (page: Page) => {
+  await page.waitForTimeout(1_200);
+  await answer(page).getByRole('button', { name: 'I’m done' }).click();
+  await expect(answer(page)).toContainText('Sending your answer…');
+  await expect(answer(page)).toContainText('Recording ·', { timeout: 15_000 });
+};
+
+/** "End interview" during an answer, which asks first. */
+const endNow = async (page: Page) => {
+  await page.getByRole('button', { name: 'End interview' }).click();
+  await page
+    .getByRole('dialog', { name: 'End the interview?' })
+    .getByRole('button', { name: 'End the interview' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Interview ended' }),
+  ).toBeVisible();
+};
+
 test('a mock interview taken in turns: set up, started, answered, a follow-up, skipped, ended, rated, and read in Sessions', async ({
   page,
 }) => {
@@ -143,6 +165,11 @@ test('a mock interview taken in turns: set up, started, answered, a follow-up, s
     page.getByRole('heading', { name: 'Interview ended' }),
   ).toBeVisible();
 
+  // One answer: no overall view, its feedback in Sessions
+  await expect(page.getByRole('region', { name: 'How it went' })).toContainText(
+    'An overall view needs at least 2 answers.',
+  );
+
   // The feedback card
   const feedback = page.getByRole('region', { name: 'How did it go?' });
   await feedback.getByText('4', { exact: true }).click();
@@ -151,7 +178,9 @@ test('a mock interview taken in turns: set up, started, answered, a follow-up, s
   await expect(feedback).toContainText('Thank you.');
 
   // What was said, in Sessions
-  await page.getByRole('link', { name: 'See the transcript' }).click();
+  await page
+    .getByRole('link', { name: 'See your answers and feedback' })
+    .click();
   await expect(page).toHaveURL(/\/sessions\/mock\/[^/]+$/);
   const said = page.getByRole('region', { name: 'What was said' });
   await expect(said).toContainText(
@@ -186,8 +215,10 @@ test('nothing heard, a failed send sent again, and a pause with the same answer 
   await answer(page).getByRole('button', { name: 'Answer again' }).click();
   await expect(answer(page)).toContainText('Recording ·');
 
-  // A send that failed is sent again, the same answer
+  // A send that failed is sent again, the same answer: a second of it, as an empty recording
+  // is nothing heard without asking the backend
   await page.evaluate(() => window.qdPreviewProfile?.failNextMock('model'));
+  await page.waitForTimeout(1_200);
   await answer(page).getByRole('button', { name: 'I’m done' }).click();
   await expect(answer(page)).toContainText('We couldn’t send your answer.', {
     timeout: 10_000,
@@ -317,6 +348,87 @@ test('hints after I answer (H2): hidden while answering, the answered question�
   await expect(hints(page)).toContainText(
     'No hints for this question this time.',
   );
+});
+
+test('feedback after the end (D101): how it went on its way then ready, each answer’s in Sessions, and a question practised from it', async ({
+  page,
+}) => {
+  await openInterview(page);
+  await start(page);
+  await answerNow(page);
+  await answerNow(page);
+  await endNow(page);
+
+  // The end page: "How it went" on its way, then ready, above the testers' card
+  const overall = page.getByRole('region', { name: 'How it went' });
+  await expect(overall).toContainText(
+    /Preparing your feedback · \d of 2 answers ready/,
+  );
+  await expect(overall).toContainText('It takes about a minute.');
+  await expect(overall).toContainText('What went well', { timeout: 20_000 });
+  await expect(overall).toContainText('What to work on');
+  await expect(overall).toContainText('Worth practising again');
+  await expect(overall).toContainText('Never on your voice or tone.');
+  await expect(
+    overall.getByRole('button', { name: 'Practise it' }),
+  ).toBeVisible();
+
+  // In Sessions: how it went at the top, each answer with its length and its feedback
+  await page
+    .getByRole('link', { name: 'See your answers and feedback' })
+    .click();
+  await expect(page.getByRole('region', { name: 'How it went' })).toContainText(
+    'What went well',
+  );
+  const said = page.getByRole('region', { name: 'What was said' });
+  await expect(said).not.toContainText('Feedback on each answer comes later.');
+  const first = said.getByRole('listitem').first();
+  await expect(first).toContainText(/Your answer · 0:0\d spoken/);
+  await first.getByRole('button', { name: 'Show feedback' }).click();
+  await expect(first).toContainText('Try this next time');
+  await first.getByRole('button', { name: 'Hide feedback' }).click();
+  await expect(first).not.toContainText('Try this next time');
+
+  // "Practise this question": text practice with the question, from the mock interview
+  await first.getByRole('button', { name: 'Practise this question' }).click();
+  await expect(page).toHaveURL(/\/sessions\/[^/]+$/, { timeout: 15_000 });
+  await expect(page.getByText('From your mock interview')).toBeVisible();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Tell me about an incident you led from alert to fix.',
+    }),
+  ).toBeVisible();
+});
+
+test('an answer’s feedback that failed is asked for again in Sessions; one answer has no overall view', async ({
+  page,
+}) => {
+  await openInterview(page);
+  await start(page);
+  await page.evaluate(() =>
+    window.qdPreviewProfile?.failNextFeedback('answer', 'failed'),
+  );
+  await answerNow(page);
+  await endNow(page);
+
+  await page
+    .getByRole('link', { name: 'See your answers and feedback' })
+    .click();
+  await expect(page.getByRole('region', { name: 'How it went' })).toContainText(
+    'An overall view needs at least 2 answers. Your answer’s feedback is under it',
+  );
+  const first = page
+    .getByRole('region', { name: 'What was said' })
+    .getByRole('listitem')
+    .first();
+  await expect(first).toContainText(
+    'We couldn’t prepare feedback on this answer.',
+  );
+  await first.getByRole('button', { name: 'Try again' }).click();
+  await expect(first).toContainText('Preparing feedback on this answer…');
+  await expect(
+    first.getByRole('button', { name: 'Show feedback' }),
+  ).toBeVisible({ timeout: 15_000 });
 });
 
 test('none left today: the setup says so and can’t continue', async ({

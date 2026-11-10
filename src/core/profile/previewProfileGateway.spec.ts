@@ -16,6 +16,8 @@ import {
   exposePreviewProfileControls,
   PREVIEW_BRIEF_MS,
   PREVIEW_CV_MS,
+  PREVIEW_FEEDBACK_ANSWER_MS,
+  PREVIEW_FEEDBACK_OVERALL_MS,
   PREVIEW_HINTS_FOLLOW_UP_MS,
   PREVIEW_HINTS_PLANNED_MS,
   PREVIEW_READ_MS,
@@ -2872,5 +2874,194 @@ describe('previewProfileGateway, cover letters (D98)', () => {
     const restored = await gateway.getCoverLetter(UID, letterId);
     expect(restored?.paragraphs).toEqual(written?.paragraphs);
     expect(restored?.writtenParagraphs).toBeUndefined();
+  });
+});
+
+describe('previewProfileGateway, the feedback on a mock interview (D101)', () => {
+  const started = async (storage: PreviewProfileStorage | null = null) => {
+    const context = await setUp(storage);
+    const { applicationId } = await context.gateway.createApplication({
+      job: { source: 'text', text: 'Senior Backend Engineer. Go and Kafka.' },
+      title: 'Senior Backend Engineer',
+      company: 'Northwind Logistics',
+    });
+    context.pass(PREVIEW_READ_MS);
+    await context.gateway.getApplications(UID);
+    const { sessionId } = await context.gateway.startMockInterview({
+      requestId: 'request-1',
+      applicationId,
+      way: 'take-turns',
+      lengthMinutes: 10,
+      voice: 'gemini',
+    });
+    const read = async () =>
+      (await context.gateway.getMockSession(UID, sessionId))!;
+    let requests = 1;
+    const answer = async () => {
+      requests += 1;
+      const { current } = await read();
+      await context.gateway.answerMockQuestion({
+        requestId: `request-${requests}`,
+        sessionId,
+        lineId: current!.lineId,
+        audio: {
+          mimeType: 'audio/webm',
+          base64: 'YW5zd2Vy',
+          durationMs: 31_000,
+        },
+      });
+    };
+    return { ...context, applicationId, sessionId, read, answer };
+  };
+
+  it('writes each answer’s as it is given, then the overall view once the interview has ended', async () => {
+    const { gateway, sessionId, read, answer, pass } = await started();
+    await answer();
+    expect((await read()).answerFeedback.t1).toMatchObject({
+      status: 'writing',
+    });
+    pass(PREVIEW_FEEDBACK_ANSWER_MS);
+    expect((await read()).answerFeedback.t1).toMatchObject({
+      status: 'ready',
+      feedback: { suggestions: expect.any(Array) },
+    });
+
+    await answer();
+    pass(PREVIEW_FEEDBACK_ANSWER_MS);
+    expect((await read()).overall).toBeUndefined();
+
+    await gateway.endMockInterview(sessionId);
+    expect((await read()).overall).toMatchObject({ status: 'writing' });
+    pass(PREVIEW_FEEDBACK_OVERALL_MS);
+    const { overall } = await read();
+    expect(overall).toMatchObject({ status: 'ready' });
+    expect(overall?.wentWell.length).toBeGreaterThan(0);
+    expect(overall?.workOn.length).toBeGreaterThan(0);
+    expect(overall?.practiseAgain).toEqual([
+      { turnId: 't1', reason: expect.any(String) },
+    ]);
+  });
+
+  it('writes no overall view of one answer', async () => {
+    const { gateway, sessionId, read, answer, pass } = await started();
+    await answer();
+    pass(PREVIEW_FEEDBACK_ANSWER_MS);
+    await gateway.endMockInterview(sessionId);
+    expect((await read()).overall).toMatchObject({ status: 'none' });
+  });
+
+  it('fails as the controls say, and "Try again" writes it again', async () => {
+    const { gateway, sessionId, read, answer, pass } = await started();
+    gateway.controls.failNextFeedback('answer', 'failed');
+    gateway.controls.failNextFeedback('overall', 'quota');
+    await answer();
+    await answer();
+    pass(PREVIEW_FEEDBACK_ANSWER_MS);
+    expect((await read()).answerFeedback.t1).toEqual({ status: 'failed' });
+    // The overall view only once ended
+    await expect(
+      codeOf(gateway.retryMockFeedback({ sessionId, overall: true })),
+    ).resolves.toBe(ProfileErrorCode.Invalid);
+
+    await gateway.retryMockFeedback({ sessionId, turnId: 't1' });
+    expect((await read()).answerFeedback.t1).toMatchObject({
+      status: 'writing',
+    });
+    pass(PREVIEW_FEEDBACK_ANSWER_MS);
+    expect((await read()).answerFeedback.t1).toMatchObject({
+      status: 'ready',
+    });
+    await expect(
+      codeOf(gateway.retryMockFeedback({ sessionId, turnId: 't1' })),
+    ).resolves.toBe(ProfileErrorCode.MockFeedbackNotFailed);
+
+    await gateway.endMockInterview(sessionId);
+    expect((await read()).overall).toMatchObject({ status: 'quota' });
+    await gateway.retryMockFeedback({ sessionId, overall: true });
+    expect((await read()).overall).toMatchObject({ status: 'writing' });
+    pass(PREVIEW_FEEDBACK_OVERALL_MS);
+    expect((await read()).overall).toMatchObject({ status: 'ready' });
+  });
+
+  it('refuses a turn that is gone or wasn’t answered', async () => {
+    const { gateway, sessionId } = await started();
+    await expect(
+      codeOf(gateway.retryMockFeedback({ sessionId, turnId: 't1' })),
+    ).resolves.toBe(ProfileErrorCode.Invalid);
+    await expect(
+      codeOf(gateway.retryMockFeedback({ sessionId, turnId: 't9' })),
+    ).resolves.toBe(ProfileErrorCode.NotFound);
+    await expect(
+      codeOf(gateway.retryMockFeedback({ sessionId: 'gone', turnId: 't1' })),
+    ).resolves.toBe(ProfileErrorCode.NotFound);
+  });
+
+  it('a session from before feedback: one "Try again" writes every answer’s, then the overall view', async () => {
+    const storage = memoryStorage();
+    const before = await started(storage);
+    await before.answer();
+    await before.answer();
+    await before.gateway.endMockInterview(before.sessionId);
+    const [key, stored] = [...storage.values].find(([name]) =>
+      name.endsWith('-profile'),
+    )!;
+    const state = JSON.parse(stored) as {
+      profiles: Record<string, { mockSessions: Record<string, unknown>[] }>;
+    };
+    for (const session of state.profiles[UID]!.mockSessions) {
+      delete session.answerFeedback;
+    }
+    storage.setItem(key, JSON.stringify(state));
+
+    const { gateway, clock } = await setUp(storage);
+    clock.time = before.clock.time;
+    const read = async () =>
+      (await gateway.getMockSession(UID, before.sessionId))!;
+    expect((await read()).answerFeedback).toEqual({});
+    expect((await read()).overall).toBeUndefined();
+
+    await gateway.retryMockFeedback({
+      sessionId: before.sessionId,
+      turnId: 't1',
+    });
+    expect((await read()).answerFeedback).toMatchObject({
+      t1: { status: 'writing' },
+      t2: { status: 'writing' },
+    });
+    clock.time += PREVIEW_FEEDBACK_ANSWER_MS;
+    await read();
+    clock.time += PREVIEW_FEEDBACK_OVERALL_MS;
+    expect((await read()).overall).toMatchObject({ status: 'ready' });
+  });
+
+  it('"Practise it": the turn’s question as first asked, its hints the key points, the interview the session’s', async () => {
+    const { gateway, applicationId, sessionId, read, answer, pass } =
+      await started();
+    pass(PREVIEW_HINTS_PLANNED_MS);
+    await answer();
+    const session = await read();
+
+    const { turnId } = await gateway.startPracticeTurn({
+      applicationId,
+      question: { source: 'mock', sessionId, turnId: 't1' },
+    });
+    const practised = await gateway.getPracticeTurn(UID, turnId);
+    expect(practised?.question).toEqual({
+      text: session.turns[0]!.question,
+      kind: session.plan.questions[0]!.kind,
+      source: 'mock',
+      sessionId,
+      mockTurnId: 't1',
+    });
+    expect(practised?.keyPoints).toEqual(session.hints.p1?.keyPoints);
+
+    await expect(
+      codeOf(
+        gateway.startPracticeTurn({
+          applicationId,
+          question: { source: 'mock', sessionId, turnId: 't9' },
+        }),
+      ),
+    ).resolves.toBe(ProfileErrorCode.NotFound);
   });
 });

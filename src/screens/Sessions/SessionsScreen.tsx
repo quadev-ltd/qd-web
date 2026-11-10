@@ -153,9 +153,11 @@ const TurnRow: React.FC<{ turn: PracticeTurn }> = ({ turn }) => {
       ? t('sessions.fromBrief')
       : turn.question.source === 'typed'
         ? t('sessions.typed')
-        : turn.interview
-          ? interviewTitle(t, turn.interview)
-          : null;
+        : turn.question.source === 'mock'
+          ? t('sessions.fromMock')
+          : turn.interview
+            ? interviewTitle(t, turn.interview)
+            : null;
   const meta = [
     from,
     turn.attempts.length > 0

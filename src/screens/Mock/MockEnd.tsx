@@ -1,6 +1,6 @@
-// The end of a mock interview (Web-X6-End, -End-Other, D100): how it ended, with "See the
-// transcript" and "Start a new one", and the tester's feedback card. Take turns doesn't ask
-// whether the interviewer cut them off (doc 24 §14).
+// The end of a mock interview (Web-X6-End, -End-Other, D100): how it ended, with "See your
+// answers and feedback" and "Start a new one", then "How it went" (D101, MockFeedback) and the
+// tester's feedback card. Take turns doesn't ask whether the interviewer cut them off (doc 24 §14).
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

@@ -73,9 +73,13 @@ import { type ApplicationInterview, INTERVIEWS_MAX } from './interviews';
 import { browserTimeZone } from './interviewTime';
 import {
   DEFAULT_MOCK_HINTS_SHOWN,
+  MOCK_FEEDBACK_SETTLE_MS,
+  MOCK_OVERALL_MIN_ANSWERS,
   MOCK_SESSIONS_MAX,
+  type MockAnswerFeedback,
   type MockLine,
   type MockLines,
+  type MockOverall,
   type MockSession,
   type MockTurn,
   mockHintsKey,
@@ -304,6 +308,11 @@ export interface PreviewProfileControls {
   /** The hints of the next question asked fail: it goes on without them (slice H1). */
   failNextHints(): void;
   /**
+   * The next answer's feedback, or the next overall view, fails after its two tries or stops at
+   * the day's limit (D101).
+   */
+  failNextFeedback(of: 'answer' | 'overall', reason: 'failed' | 'quota'): void;
+  /**
    * A version as they were made before D83: edits to the profile's CV (doc 18), made in the
    * background like any other. The pages no longer ask for one; their review stays. Resolves its id.
    */
@@ -319,6 +328,22 @@ export const PREVIEW_CV_MS = 2000;
 /** When a mock interview's hints are written: the planned questions' after the start, a follow-up's after it is asked (5 to 15 seconds for real). */
 export const PREVIEW_HINTS_PLANNED_MS = 1500;
 export const PREVIEW_HINTS_FOLLOW_UP_MS = 4000;
+/**
+ * When a mock interview's feedback is written: an answer's after it was given, the overall view
+ * once the session has ended and every answer's has settled (15 to 30 seconds, then about 20,
+ * for real).
+ */
+export const PREVIEW_FEEDBACK_ANSWER_MS = 2000;
+export const PREVIEW_FEEDBACK_OVERALL_MS = 2000;
+
+const PREVIEW_WENT_WELL = [
+  'You said what you did yourself, not only what the team did.',
+  'You kept to the question you were asked.',
+];
+const PREVIEW_WORK_ON = [
+  'Say what changed because of your work, with a number when you have one.',
+  'Your answers ran short: up to 2 minutes is fine for a story.',
+];
 
 /** The lines of a CV that say something: 20 characters at least, without their list mark. */
 const cvLines = (cv: string) =>
@@ -790,6 +815,150 @@ export const createPreviewProfileGateway = ({
       ),
     };
     return true;
+  };
+
+  const nextFeedbackFailure: Partial<
+    Record<'answer' | 'overall', 'failed' | 'quota'>
+  > = {};
+  const takeFeedbackFailure = (of: 'answer' | 'overall') => {
+    const failure = nextFeedbackFailure[of];
+    delete nextFeedbackFailure[of];
+    return failure;
+  };
+  const noOverall = { wentWell: [], workOn: [], practiseAgain: [] };
+
+  /** An answer just given: its feedback is claimed at once, as the backend's trigger does. */
+  const mockAnswered = (session: MockSession, turn: MockTurn) => {
+    const failure = takeFeedbackFailure('answer');
+    const entry: MockAnswerFeedback = failure
+      ? { status: failure }
+      : { status: 'writing', startedAt: now() };
+    session.answerFeedback = { ...session.answerFeedback, [turn.id]: entry };
+  };
+
+  /**
+   * The feedback written by now, as the trigger writes it: each answer's a moment after it was
+   * claimed, then the overall view, claimed once the session has ended and every answer's has
+   * settled. Worked out from the times stored, so a reload finds it too.
+   */
+  const settleMockFeedback = (session: MockSession) => {
+    const at = now();
+    const due = (entry?: { status: string; startedAt?: number }) =>
+      entry?.status === 'writing' &&
+      entry.startedAt !== undefined &&
+      at - entry.startedAt >= PREVIEW_FEEDBACK_ANSWER_MS;
+    let changed = false;
+    // Sessions stored before F1 have no feedback at all, as on the backend.
+    const entries = { ...(session.answerFeedback ?? {}) };
+    for (const turn of session.turns) {
+      const entry = entries[turn.id];
+      if (turn.answer && due(entry)) {
+        entries[turn.id] = {
+          status: 'ready',
+          feedback: previewFeedbackFor(
+            { keyPoints: session.hints[mockHintsKey(turn)]?.keyPoints ?? [] },
+            turn.answer.transcript,
+          ),
+          startedAt: entry.startedAt,
+          readyAt: at,
+        };
+        changed = true;
+      }
+    }
+    session.answerFeedback = entries;
+    const answered = session.turns.filter(
+      ({ status }) => status === 'answered',
+    );
+    if (session.status === 'ended' && !session.overall) {
+      if (answered.length < MOCK_OVERALL_MIN_ANSWERS) {
+        session.overall = { status: 'none', ...noOverall };
+        changed = true;
+      } else if (
+        answered.every(
+          ({ id }) => entries[id] && entries[id].status !== 'writing',
+        )
+      ) {
+        const failure = takeFeedbackFailure('overall');
+        session.overall = failure
+          ? { status: failure, ...noOverall }
+          : { status: 'writing', startedAt: at, ...noOverall };
+        changed = true;
+      }
+    }
+    const { overall } = session;
+    if (
+      overall?.status === 'writing' &&
+      overall.startedAt !== undefined &&
+      at - overall.startedAt >= PREVIEW_FEEDBACK_OVERALL_MS
+    ) {
+      const skipped = session.turns.find(({ status }) => status === 'skipped');
+      const ready: MockOverall = {
+        status: 'ready',
+        wentWell: PREVIEW_WENT_WELL,
+        workOn: PREVIEW_WORK_ON,
+        practiseAgain: [
+          ...(skipped ? [{ turnId: skipped.id, reason: 'Skipped' }] : []),
+          {
+            turnId: answered[0].id,
+            reason: 'Your own part came out only at the end.',
+          },
+        ],
+        startedAt: overall.startedAt,
+        readyAt: at,
+      };
+      session.overall = ready;
+      changed = true;
+    }
+    return changed;
+  };
+
+  /** Feedback that can be asked for again: failed, stopped by the limit, or stuck while written. */
+  const mockRetryable = (
+    entry: { status: string; startedAt?: number } | undefined,
+  ) =>
+    !entry ||
+    entry.status === 'failed' ||
+    entry.status === 'quota' ||
+    (entry.status === 'writing' &&
+      entry.startedAt !== undefined &&
+      now() - entry.startedAt > MOCK_FEEDBACK_SETTLE_MS);
+
+  /**
+   * "Practise it" on a mock interview's question (D101): the turn's question as first asked, with
+   * its plan question's kind, and its hints as the key points when they are ready.
+   */
+  const mockPracticeOf = (
+    applicationId: string,
+    { sessionId, turnId }: { sessionId: string; turnId: string },
+  ) => {
+    const session = currentProfile().mockSessions?.find(
+      ({ id }) => id === sessionId,
+    );
+    const turn = session?.turns.find(({ id }) => id === turnId);
+    if (!session || !turn) {
+      throw new ProfileError(ProfileErrorCode.NotFound);
+    }
+    if (session.applicationId !== applicationId) {
+      throw new ProfileError(ProfileErrorCode.Invalid);
+    }
+    const hints = session.hints[mockHintsKey(turn)];
+    const asked: PracticeTurn['question'] = {
+      text: turn.question,
+      kind:
+        session.plan.questions.find(({ id }) => id === turn.planId)?.kind ??
+        'behavioural',
+      source: 'mock',
+      sessionId,
+      mockTurnId: turnId,
+    };
+    return {
+      session,
+      asked,
+      keyPoints:
+        hints?.status === 'ready' && hints.keyPoints.length > 0
+          ? hints.keyPoints
+          : undefined,
+    };
   };
 
   const mockSessionOf = (sessionId: string): MockSession => {
@@ -1673,6 +1842,9 @@ export const createPreviewProfileGateway = ({
     },
     failNextHints: () => {
       nextHintsFailure = true;
+    },
+    failNextFeedback: (of, reason) => {
+      nextFeedbackFailure[of] = reason;
     },
     // Set once the gateway exists, below: it asks the gateway for the version.
     createEditVersion: () => Promise.reject(new Error('Not ready')),
@@ -3243,13 +3415,19 @@ export const createPreviewProfileGateway = ({
     startPracticeTurn: async ({ applicationId, interviewId, question }) => {
       const profile = currentProfile();
       const application = applicationOf(profile, applicationId);
+      // A mock interview's question: the interview is the session's, if it is still there.
+      const mock =
+        question.source === 'mock'
+          ? mockPracticeOf(applicationId, question)
+          : undefined;
+      const askedInterviewId = mock ? mock.session.interviewId : interviewId;
       const interview =
-        interviewId === undefined
+        askedInterviewId === undefined
           ? undefined
           : interviewsOf(profile, applicationId).find(
-              ({ id }) => id === interviewId,
+              ({ id }) => id === askedInterviewId,
             );
-      if (interviewId !== undefined && !interview) {
+      if (!mock && interviewId !== undefined && !interview) {
         throw new ProfileError(ProfileErrorCode.NotFound);
       }
       if (isJobPending(application)) {
@@ -3279,7 +3457,7 @@ export const createPreviewProfileGateway = ({
           listId: list.listId,
           questionId: item.id,
         };
-      } else {
+      } else if (question.source === 'brief') {
         const found = application.brief?.questions.find(
           ({ text }) => text === question.text,
         );
@@ -3287,6 +3465,10 @@ export const createPreviewProfileGateway = ({
           throw new ProfileError(ProfileErrorCode.QuestionChanged);
         }
         asked = { text: found.text, kind: found.kind, source: 'brief' };
+      } else if (mock) {
+        asked = mock.asked;
+      } else {
+        throw new ProfileError(ProfileErrorCode.Invalid);
       }
       const turns = profile.practiceTurns ?? [];
       if (turns.length >= PRACTICE_TURNS_MAX) {
@@ -3324,7 +3506,7 @@ export const createPreviewProfileGateway = ({
             }
           : {}),
         question: asked,
-        keyPoints: previewKeyPointsFor(profile.items),
+        keyPoints: mock?.keyPoints ?? previewKeyPointsFor(profile.items),
         attempts: [],
         createdAt: at,
         updatedAt: at,
@@ -3388,8 +3570,11 @@ export const createPreviewProfileGateway = ({
     getMockSession: async (uid, sessionId) => {
       const profile = read(uid);
       const found = profile.mockSessions?.find(({ id }) => id === sessionId);
-      if (found && settleMockHints(found, profile.items)) {
-        save();
+      if (found) {
+        const hints = settleMockHints(found, profile.items);
+        if (settleMockFeedback(found) || hints) {
+          save();
+        }
       }
       return found ? structuredClone(found) : null;
     },
@@ -3465,6 +3650,7 @@ export const createPreviewProfileGateway = ({
         voice: request.voice,
         hintsShown: request.hints ?? DEFAULT_MOCK_HINTS_SHOWN,
         hints: {},
+        answerFeedback: {},
         status: 'active',
         plan: { questions: plan },
         turns: [first],
@@ -3520,6 +3706,7 @@ export const createPreviewProfileGateway = ({
         words: 5,
       };
       turn.answeredAt = now();
+      mockAnswered(session, turn);
       const result = {
         turnId: turn.id,
         transcript,
@@ -3628,6 +3815,49 @@ export const createPreviewProfileGateway = ({
         ...(feedback.comment ? { comment: feedback.comment } : {}),
       };
       session.updatedAt = now();
+      save();
+    },
+    retryMockFeedback: async request => {
+      const session = mockSessionOf(request.sessionId);
+      if ('overall' in request) {
+        if (session.status !== 'ended') {
+          throw new ProfileError(ProfileErrorCode.Invalid);
+        }
+        if (!mockRetryable(session.overall)) {
+          throw new ProfileError(ProfileErrorCode.MockFeedbackNotFailed);
+        }
+        // Claimed again once every answer has settled.
+        delete session.overall;
+      } else {
+        const turn = session.turns.find(({ id }) => id === request.turnId);
+        if (!turn) {
+          throw new ProfileError(ProfileErrorCode.NotFound);
+        }
+        if (turn.status !== 'answered') {
+          throw new ProfileError(ProfileErrorCode.Invalid);
+        }
+        if (!mockRetryable(session.answerFeedback[turn.id])) {
+          throw new ProfileError(ProfileErrorCode.MockFeedbackNotFailed);
+        }
+        // The trigger claims every answer with no feedback, not only this one.
+        const claimed = { status: 'writing' as const, startedAt: now() };
+        session.answerFeedback = {
+          ...Object.fromEntries(
+            session.turns
+              .filter(
+                ({ id, status }) =>
+                  status === 'answered' && !session.answerFeedback[id],
+              )
+              .map(({ id }) => [id, claimed]),
+          ),
+          ...session.answerFeedback,
+          [turn.id]: claimed,
+        };
+        // The overall view is written again once this answer has settled.
+        if (session.overall?.status !== 'none') {
+          delete session.overall;
+        }
+      }
       save();
     },
     removeMockSession: async sessionId => {

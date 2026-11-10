@@ -61,6 +61,7 @@ describe('selectProfileGateway', () => {
       setPracticeToday: expect.any(Function),
       setMockToday: expect.any(Function),
       failNextHints: expect.any(Function),
+      failNextFeedback: expect.any(Function),
       createEditVersion: expect.any(Function),
       setUsageLimits: expect.any(Function),
     });

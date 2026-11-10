@@ -98,6 +98,7 @@ describe('groupsOf, with mock interviews (D100)', () => {
       voice: 'gemini' as const,
       hintsShown: 'on-request' as const,
       hints: {},
+      answerFeedback: {},
       status: 'ended' as const,
       plan: { questions: [] },
       turns: [],
@@ -154,6 +155,32 @@ describe('Sessions (R1, D94)', () => {
     expect(lumen).toHaveTextContent('sessions.applicationRemovedChip');
     expect(lumen).toHaveTextContent('sessions.typed · sessions.tries');
     expect(screen.getByText('sessions.removedNote')).toBeVisible();
+  });
+
+  it('says a question practised from a mock interview came from it (D101)', async () => {
+    const gateway = createMockProfileGateway();
+    gateway.getPracticeTurns.mockResolvedValue([
+      practiceTurnFixture({
+        id: 't4',
+        updatedAt: AT,
+        attempts: [practiceAttemptFixture()],
+        question: {
+          text: 'Walk me through an incident.',
+          kind: 'behavioural',
+          source: 'mock',
+          sessionId: 's1',
+          mockTurnId: 't3',
+        },
+      }),
+    ]);
+    setUp(gateway);
+
+    const northwind = await screen.findByRole('region', {
+      name: 'Staff Backend Engineer',
+    });
+    expect(within(northwind).getByRole('listitem')).toHaveTextContent(
+      'sessions.fromMock · sessions.tries · 25 Oct 2026',
+    );
   });
 
   it('removes a removed application’s practice after asking, then reads Sessions again (D99)', async () => {

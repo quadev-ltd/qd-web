@@ -1,6 +1,7 @@
 // The mock interview pages around the interview itself (D100): the setup, Ready with "Before you
-// start", a session opened again (Continue, or its end), the end's feedback card, what was said in
-// Sessions, and a browser that can't record. The interview's own steps are the controller's spec
+// start", a session opened again (Continue, or its end), the end's "How it went" and feedback
+// card, what was said in Sessions with the feedback on each answer (D101), and a browser that
+// can't record. The interview's own steps are the controller's spec
 // and the browser journeys'.
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -42,6 +43,7 @@ const session = (overrides: Partial<MockSession> = {}): MockSession => ({
   voice: 'chirp',
   hintsShown: 'on-request',
   hints: {},
+  answerFeedback: {},
   status: 'ended',
   endReason: 'finished',
   plan: {
@@ -303,6 +305,43 @@ describe('a mock interview’s page (Web-X6-Ready, -End, -CantRecord)', () => {
     expect(await within(card).findByText('mock.feedbackThanks')).toBeVisible();
   });
 
+  it('an ended one: "How it went" on its way, above the testers’ card, and the way to the answers and feedback', async () => {
+    const gateway = createMockProfileGateway();
+    gateway.getMockSession.mockResolvedValue(
+      session({
+        endedAt: Date.now(),
+        answerFeedback: {
+          t1: {
+            status: 'ready',
+            feedback: {
+              covered: [],
+              missing: [],
+              structure: '',
+              clarity: '',
+              suggestions: ['Say what was at stake.'],
+            },
+          },
+          t2: { status: 'writing', startedAt: Date.now() },
+        },
+      }),
+    );
+    renderMock('/applications/a1/interviews/i1/mock/s1', gateway);
+
+    const overall = await screen.findByRole('region', {
+      name: 'mock.overallTitle',
+    });
+    expect(overall).toHaveTextContent('mock.overallPreparing');
+    expect(overall).toHaveTextContent('mock.overallPreparingEnd');
+    const testers = screen.getByRole('region', { name: 'mock.feedbackTitle' });
+    expect(
+      overall.compareDocumentPosition(testers) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: 'mock.transcriptButton' }),
+    ).toHaveAttribute('href', '/sessions/mock/s1');
+  });
+
   it('an active one idle for 30 minutes is shown as not finished', async () => {
     const gateway = createMockProfileGateway();
     gateway.getMockSession.mockResolvedValue(
@@ -351,11 +390,14 @@ describe('a mock interview’s page (Web-X6-Ready, -End, -CantRecord)', () => {
 });
 
 describe('a mock interview in Sessions (Web-R2-Mock)', () => {
-  const renderSession = (gateway = createMockProfileGateway()) =>
+  const renderSession = (
+    gateway = createMockProfileGateway(),
+    textPractice = false,
+  ) =>
     renderProfilePage(<></>, {
       gateway,
       route: '/sessions/mock/s1',
-      flags: { mockInterview: true },
+      flags: { mockInterview: true, textPractice },
       routes: [
         { path: '/sessions/mock/:sessionId', element: <MockSessionScreen /> },
         { path: '*', element: <Location /> },
@@ -400,6 +442,111 @@ describe('a mock interview in Sessions (Web-R2-Mock)', () => {
     expect(turns[1]).toHaveTextContent('mock.firstAsked');
     expect(turns[0]).not.toHaveTextContent('mock.saidDifferentlyChip');
     expect(turns[0]).not.toHaveTextContent('mock.firstAsked');
+  });
+
+  it('how it went at the top, then each answer with how long it was spoken and its feedback (D101)', async () => {
+    const user = userEvent.setup();
+    const gateway = createMockProfileGateway();
+    gateway.getMockSession.mockResolvedValue(
+      session({
+        answerFeedback: {
+          t1: {
+            status: 'ready',
+            feedback: {
+              covered: ['You named your team.'],
+              missing: [],
+              structure: 'In order.',
+              clarity: '',
+              suggestions: ['Say what was at stake.'],
+            },
+          },
+          t2: { status: 'failed' },
+        },
+        overall: {
+          status: 'ready',
+          wentWell: ['Concrete answers.'],
+          workOn: ['Say your own part first.'],
+          practiseAgain: [{ turnId: 't3', reason: 'Skipped' }],
+        },
+      }),
+    );
+    renderSession(gateway);
+
+    const overall = await screen.findByRole('region', {
+      name: 'mock.overallTitle',
+    });
+    expect(overall).toHaveTextContent('Concrete answers.');
+    const said = screen.getByRole('region', { name: 'mock.saidTitle' });
+    expect(
+      overall.compareDocumentPosition(said) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(said).not.toHaveTextContent('mock.laterNote');
+
+    const [first, second, skipped] = within(said).getAllByRole('listitem');
+    expect(first).toHaveTextContent('mock.yourAnswerSpoken');
+    await user.click(
+      within(first!).getByRole('button', { name: 'mock.showFeedbackButton' }),
+    );
+    expect(first).toHaveTextContent('You named your team.');
+    expect(within(second!).getByRole('alert')).toHaveTextContent(
+      'mock.answerFeedbackFailed',
+    );
+    await user.click(
+      within(second!).getByRole('button', { name: 'mock.retryButton' }),
+    );
+    expect(gateway.retryMockFeedback).toHaveBeenCalledWith({
+      sessionId: 's1',
+      turnId: 't2',
+    });
+    // Without text practice, nothing to practise
+    expect(
+      within(skipped!).queryByRole('button', {
+        name: 'mock.practiseQuestionButton',
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('"Practise this question" with text practice: it starts from the mock interview’s turn and opens', async () => {
+    const user = userEvent.setup();
+    const gateway = createMockProfileGateway();
+    gateway.getMockSession.mockResolvedValue(session());
+    gateway.startPracticeTurn.mockResolvedValue({ turnId: 'turn-9' });
+    renderSession(gateway, true);
+
+    const said = await screen.findByRole('region', { name: 'mock.saidTitle' });
+    const skipped = within(said).getAllByRole('listitem')[2]!;
+    await user.click(
+      within(skipped).getByRole('button', {
+        name: 'mock.practiseQuestionButton',
+      }),
+    );
+
+    expect(gateway.startPracticeTurn).toHaveBeenCalledWith({
+      applicationId: 'a1',
+      question: { source: 'mock', sessionId: 's1', turnId: 't3' },
+    });
+    expect(await screen.findByText('now at /sessions/turn-9')).toBeVisible();
+  });
+
+  it('a session still going shows no feedback', async () => {
+    const gateway = createMockProfileGateway();
+    gateway.getMockSession.mockResolvedValue(
+      session({
+        status: 'active',
+        endReason: undefined,
+        endedAt: null,
+        updatedAt: Date.now(),
+      }),
+    );
+    renderSession(gateway, true);
+
+    await screen.findByText('mock.stillGoingMessage');
+    expect(
+      screen.queryByRole('region', { name: 'mock.overallTitle' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'mock.practiseQuestionButton' }),
+    ).not.toBeInTheDocument();
   });
 
   it('removes it, asked first, and goes back to Sessions', async () => {

@@ -109,7 +109,9 @@ const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
   [CoverLetterRefusal.MaxLetters]: ProfileErrorCode.MaxLetters,
   [CoverLetterRefusal.CvNotReady]: ProfileErrorCode.CvNotReady,
   [CoverLetterRefusal.NotSaved]: ProfileErrorCode.Invalid,
-  // Mock interviews (D100). The page offers neither an unbuilt way nor feedback before the end.
+  // Mock interviews (D100). The page offers neither an unbuilt way nor feedback before the end,
+  // nor "Try again" on feedback for a turn that wasn't answered (D101). Feedback being written
+  // or there already: the page reads the session again.
   [MockRefusal.SessionLimit]: ProfileErrorCode.MaxMockSessions,
   [MockRefusal.NothingHeard]: ProfileErrorCode.MockNothingHeard,
   [MockRefusal.NotCurrent]: ProfileErrorCode.MockNotCurrent,
@@ -118,6 +120,8 @@ const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
   [MockRefusal.SessionFailed]: ProfileErrorCode.MockSessionFailed,
   [MockRefusal.WayNotBuilt]: ProfileErrorCode.Invalid,
   [MockRefusal.NotEnded]: ProfileErrorCode.Invalid,
+  [MockRefusal.NotAnswered]: ProfileErrorCode.Invalid,
+  [MockRefusal.NotFailed]: ProfileErrorCode.MockFeedbackNotFailed,
 };
 
 /**

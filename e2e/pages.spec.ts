@@ -406,7 +406,7 @@ test('feedback on a typed answer (D94 slice 3): try first, getting feedback, the
   await expectAccessibleAndNotTooWide(page);
 });
 
-test('mock interviews (D100): the setup, Ready, the interviewer speaking and the answer recording, the hints, paused, the end with its feedback card, what was said and Sessions: accessible and no horizontal scroll', async ({
+test('mock interviews (D100): the setup, Ready, the interviewer speaking and the answer recording, the hints, paused, the end with how it went and its feedback card, what was said with an answer’s feedback open, and Sessions: accessible and no horizontal scroll', async ({
   page,
 }) => {
   // A microphone the page records from: a tone into a real audio stream (see mock.spec.ts).
@@ -463,6 +463,13 @@ test('mock interviews (D100): the setup, Ready, the interviewer speaking and the
   await expect(page.getByRole('heading', { name: 'Paused' })).toBeVisible();
   await expectAccessibleAndNotTooWide(page);
   await page.getByRole('button', { name: 'Continue answering' }).click();
+  // Two answers, so how it went is written (D101)
+  for (let answered = 0; answered < 2; answered += 1) {
+    await page.waitForTimeout(1_200);
+    await answer.getByRole('button', { name: 'I’m done' }).click();
+    await expect(answer).toContainText('Sending your answer…');
+    await expect(answer).toContainText('Recording ·', { timeout: 15_000 });
+  }
 
   await page.getByRole('button', { name: 'End interview' }).click();
   const ending = page.getByRole('dialog', { name: 'End the interview?' });
@@ -472,12 +479,18 @@ test('mock interviews (D100): the setup, Ready, the interviewer speaking and the
   await expect(
     page.getByRole('region', { name: 'How did it go?' }),
   ).toBeVisible();
+  const overall = page.getByRole('region', { name: 'How it went' });
+  await expect(overall).toContainText('Preparing your feedback');
+  await expectAccessibleAndNotTooWide(page);
+  await expect(overall).toContainText('What went well', { timeout: 20_000 });
   await expectAccessibleAndNotTooWide(page);
 
-  await page.getByRole('link', { name: 'See the transcript' }).click();
-  await expect(
-    page.getByRole('region', { name: 'What was said' }),
-  ).toBeVisible();
+  await page
+    .getByRole('link', { name: 'See your answers and feedback' })
+    .click();
+  const said = page.getByRole('region', { name: 'What was said' });
+  await said.getByRole('button', { name: 'Show feedback' }).first().click();
+  await expect(said).toContainText('Try this next time');
   await expectAccessibleAndNotTooWide(page);
   await page.getByRole('link', { name: 'Sessions' }).first().click();
   await expect(

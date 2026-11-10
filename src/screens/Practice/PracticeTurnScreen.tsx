@@ -72,6 +72,7 @@ const SOURCE_KEYS = {
   interview: 'practice.sourceInterview',
   brief: 'practice.sourceBrief',
   typed: 'practice.sourceTyped',
+  mock: 'practice.sourceMock',
 } as const satisfies Record<PracticeTurn['question']['source'], string>;
 
 type Loaded =

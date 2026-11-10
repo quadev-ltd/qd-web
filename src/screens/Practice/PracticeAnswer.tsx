@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import FormTextArea from '@/components/FormTextArea';
-import Icon, { type IconName } from '@/components/Icon';
+import Icon from '@/components/Icon';
 import Spinner from '@/components/Spinner';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -17,6 +17,7 @@ import {
   PRACTICE_ATTEMPTS_MAX,
   type PracticeAttempt,
 } from '@/core/profile/practice';
+import FeedbackSections from '@/screens/Practice/FeedbackSections';
 import {
   type PracticeFailure,
   PracticeFailureBanner,
@@ -212,44 +213,6 @@ export const YourAnswerCard: React.FC<{
   );
 };
 
-const TONES = {
-  covered: { icon: 'check', className: 'text-success' },
-  missing: { icon: 'alert', className: 'text-warning' },
-  tip: { icon: 'bulb', className: 'text-primary' },
-} as const satisfies Record<string, { icon: IconName; className: string }>;
-
-const FeedbackList: React.FC<{
-  items: string[];
-  tone: keyof typeof TONES;
-}> = ({ items, tone }) => (
-  <ul className="flex flex-col gap-2.5">
-    {items.map((item, index) => (
-      <li key={`${index}-${item}`} className="flex items-start gap-2.5">
-        <span
-          aria-hidden="true"
-          className={`flex pt-0.5 ${TONES[tone].className}`}>
-          <Icon name={TONES[tone].icon} size={18} />
-        </span>
-        <span className="min-w-0 flex-1 text-[15px] leading-normal wrap-anywhere">
-          {item}
-        </span>
-      </li>
-    ))}
-  </ul>
-);
-
-const FeedbackSection: React.FC<{
-  title: string;
-  children: React.ReactNode;
-}> = ({ title, children }) => (
-  <section className="flex flex-col gap-2 border-t border-border-faint pt-3.5">
-    <h3 className="text-sm leading-normal font-bold tracking-[0.04em] text-muted uppercase">
-      {title}
-    </h3>
-    {children}
-  </section>
-);
-
 export interface FeedbackCardProps {
   attempt: PracticeAttempt;
   number: number;
@@ -295,45 +258,7 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
           {t('practice.tryOfChip', { number, max: PRACTICE_ATTEMPTS_MAX })}
         </Chip>
       </div>
-      {feedback.covered.length > 0 && (
-        <FeedbackSection title={t('practice.coveredTitle')}>
-          <FeedbackList items={feedback.covered} tone="covered" />
-        </FeedbackSection>
-      )}
-      {feedback.missing.length > 0 && (
-        <FeedbackSection title={t('practice.missingTitle')}>
-          <FeedbackList items={feedback.missing} tone="missing" />
-        </FeedbackSection>
-      )}
-      {feedback.structure && (
-        <FeedbackSection title={t('practice.structureTitle')}>
-          <p className="text-[15px] leading-normal wrap-anywhere">
-            {feedback.structure}
-          </p>
-        </FeedbackSection>
-      )}
-      {feedback.clarity && (
-        <FeedbackSection title={t('practice.clarityTitle')}>
-          <p className="text-[15px] leading-normal wrap-anywhere">
-            {feedback.clarity}
-          </p>
-        </FeedbackSection>
-      )}
-      {feedback.suggestions.length > 0 && (
-        <FeedbackSection title={t('practice.suggestionsTitle')}>
-          <FeedbackList items={feedback.suggestions} tone="tip" />
-        </FeedbackSection>
-      )}
-      {feedback.example && (
-        <FeedbackSection title={t('practice.exampleTitle')}>
-          <p className="text-[15px] leading-normal whitespace-pre-line wrap-anywhere">
-            {feedback.example}
-          </p>
-          <p className="text-sm leading-normal text-muted">
-            {t('practice.exampleNote')}
-          </p>
-        </FeedbackSection>
-      )}
+      <FeedbackSections feedback={feedback} />
       {used ? (
         <div className="flex flex-col gap-3 border-t border-border-faint pt-3.5">
           <p className="text-[15px] leading-normal">
