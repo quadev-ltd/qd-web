@@ -38,6 +38,7 @@ import { useInterviewProfile } from '@/core/profile/InterviewProfileProvider';
 import { dailyLimitResetTime } from '@/core/profile/limits';
 import {
   isMockIdle,
+  MOCK_MODEL_VOICE,
   MOCK_SESSIONS_MAX,
   mockOverallOf,
   mockProgress,
@@ -354,12 +355,30 @@ export const MockInterviewScreen: React.FC = () => {
   const { state: read, reload } = useMockSession(sessionId);
   const session: MockSession | null =
     read.status === 'loaded' ? read.session : null;
-  // The way: the session's once there is one, else the setup's (doc 24 §16).
-  const realTime = (session?.way ?? choices.way) === 'real-time';
+  // The way: the session's once there is one, else the setup's (doc 24 §16). Real time and the
+  // voice model both run over the relay.
+  const way = session?.way ?? choices.way;
+  const realTime = way !== 'take-turns';
+  // The voice model's lines carry the turn waiting when they start; the record says whose they
+  // are once their words have come (quadev-backend #72).
+  const turnOfLine = (lineId: string | undefined) =>
+    live.view.way === 'voice-model' && lineId
+      ? session?.turns.find(({ lineIds }) => lineIds?.includes(lineId))?.id
+      : undefined;
+  const liveQuestion = live.view.question && {
+    ...live.view.question,
+    turnId: turnOfLine(live.view.question.lineId) ?? live.view.question.turnId,
+  };
   const current: { phase: string } & Pick<
     MockView,
     'question' | 'answered' | 'sessionId' | 'endReason' | 'startFailure'
-  > = realTime ? live.view : view;
+  > = realTime
+    ? {
+        ...live.view,
+        question: liveQuestion,
+        answered: turnOfLine(live.view.answeredLine) ?? live.view.answered,
+      }
+    : view;
   const { resources } = useInterviewProfile();
   const hints = useMockHints({
     session,
@@ -397,6 +416,13 @@ export const MockInterviewScreen: React.FC = () => {
       reread();
     }
   }, [phase, reread]);
+  // The voice model's record has each line's turn once its words have come.
+  const linesEnded = live.view.way === 'voice-model' ? live.view.linesEnded : 0;
+  useEffect(() => {
+    if (linesEnded > 0) {
+      reload();
+    }
+  }, [linesEnded, reload]);
 
   // Leaving the tab pauses the interview, and its clock (§12).
   useEffect(() => {
@@ -557,10 +583,13 @@ export const MockInterviewScreen: React.FC = () => {
             interview
               ? () =>
                   setupAgain({
-                    way: realTime ? 'real-time' : 'take-turns',
+                    way,
                     lengthMinutes:
                       session?.lengthMinutes ?? choices.lengthMinutes,
-                    voice: session?.voice ?? choices.voice,
+                    voice:
+                      session && session.voice !== MOCK_MODEL_VOICE
+                        ? session.voice
+                        : choices.voice,
                     hints: session?.hintsShown ?? choices.hints,
                   })
               : undefined
@@ -793,9 +822,12 @@ export const MockInterviewScreen: React.FC = () => {
       {breadcrumb}
       {head}
       <MockSummaryCard
-        way={realTime ? 'real-time' : 'take-turns'}
+        way={way}
         lengthMinutes={session?.lengthMinutes ?? choices.lengthMinutes}
-        voice={session?.voice ?? choices.voice}
+        voice={
+          session?.voice ??
+          (way === 'voice-model' ? MOCK_MODEL_VOICE : choices.voice)
+        }
         hints={session?.hintsShown ?? choices.hints}
         onChange={continuing ? undefined : () => setupAgain(choices)}
       />

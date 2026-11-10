@@ -136,6 +136,28 @@ Against the backend's slice 3 (quadev-backend #69, `cf88e08`; the contract in do
 - **No Repeat on this way** (doc 24 §16): "Say it differently" and Skip only; the candidate can ask aloud.
 - **The content policy** lists the relay's address on dev under `connect-src`.
 
+## The voice model (website slice 5, D100, 10 Nov 2026)
+
+Against the backend's slice 5 (quadev-backend #72, `79ad181`): the same relay and messages, and a Gemini Live model
+that listens and speaks in its own voice. Drawn on `Web-X6-RT-States` (canvas versions 70 and 77).
+
+- **The same controller and screens as real time.** The relay's `ready` says the way. The voice model's differences
+  are kept to a few places.
+- **No voice to choose:** the setup says the model speaks in its own voice. None is sent at the start, and Sessions
+  reads the stored `gemini-live` as "The model's own".
+- **Its words come after it speaks:** a `line` comes with no text, and the card shows the level and "Its words
+  appear here when it finishes speaking." until `lineEnd`. A line cut off within its first word gets no words, and
+  the card says the interviewer stopped when the candidate started speaking.
+- **The line with a turn is the one to answer:** the opening asks the first question, and later lines say only
+  "question". A line carries the turn waiting when it starts. The page takes each line's turn from the record's
+  `lineIds` once its words have come, reading the session again at each `lineEnd`, for the hints and the progress
+  line.
+- **No `answerEnd`:** an answer ends when the model speaks or thinks again. That moment stands in for it for "after
+  I answer" hints and the answer's length.
+- **The page still sends `interrupt`** when it hears the candidate: the relay stops sending that line's audio at
+  once, before the model stops by itself.
+- **The stand-in relay** has the voice model's way too, as the backend's fake model behaves.
+
 ## Consequences
 
 - Real time (slice 4) adds a WebSocket and an AudioWorklet next to the recorder; the controller's view and the

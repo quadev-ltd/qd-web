@@ -11,7 +11,7 @@ import {
   type MockHintsShown,
   type MockLength,
   type MockSession,
-  type MockVoice,
+  type MockSessionVoice,
   type MockWay,
 } from '@/core/profile/mockInterviews';
 
@@ -32,7 +32,8 @@ export const WAY_TEXT_KEYS = {
 export const VOICE_KEYS = {
   gemini: 'mock.voiceGemini',
   chirp: 'mock.voiceChirp',
-} as const satisfies Record<MockVoice, string>;
+  'gemini-live': 'mock.voiceModelOwn',
+} as const satisfies Record<MockSessionVoice, string>;
 
 export const LENGTH_SUMMARY_KEYS = {
   10: 'mock.lengthSummary10',
@@ -118,7 +119,7 @@ export const MockPanel: React.FC<{
 export const MockSummaryCard: React.FC<{
   way: MockWay;
   lengthMinutes: MockLength;
-  voice: MockVoice;
+  voice: MockSessionVoice;
   hints: MockHintsShown;
   onChange?: () => void;
 }> = ({ way, lengthMinutes, voice, hints, onChange }) => {

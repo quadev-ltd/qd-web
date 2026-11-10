@@ -2,7 +2,10 @@
 // mock interview in real time with no backend, as the relay's own offline fakes behave. Each line
 // is voiced as a short tone; a frame of the microphone with any sound is speech; "heard" says how
 // long the answer has gone every second of speech; 1.5 seconds of silence after speech, or "I'm
-// done", ends the answer; the preview's interviewer says what comes next. Test and preview only.
+// done", ends the answer; the preview's interviewer says what comes next. The voice model (way 3)
+// as the backend's fake model: a line's words come at its end, the opening asks the first question,
+// an early interruption leaves no words, no `answerEnd`, and the words heard at the answer's end.
+// Test and preview only.
 import {
   type MockLine,
   type MockLines,
@@ -119,6 +122,8 @@ export class PreviewLiveRelay implements LiveSocket {
   onclose: ((event: { code: number }) => void) | null = null;
 
   private session: MockSession | null = null;
+  /** The voice model's way (doc 24 §15, quadev-backend #72). */
+  private voiceModel = false;
   private closed = false;
   private ended = false;
   private phase: 'speaking' | 'listening' | 'thinking' | 'paused' | 'idle' =
@@ -231,6 +236,7 @@ export class PreviewLiveRelay implements LiveSocket {
       return;
     }
     this.session = attached;
+    this.voiceModel = attached.way === 'voice-model';
     this.emit({
       type: 'ready',
       sessionId,
@@ -265,12 +271,17 @@ export class PreviewLiveRelay implements LiveSocket {
     lines.forEach((line, index) => {
       this.later(() => {
         this.speaking = line;
+        // The voice model speaks first and writes its words after; its first line is the opening.
         this.emit({
           type: 'line',
           lineId: line.lineId,
-          kind: line.kind,
+          kind: this.voiceModel
+            ? lineNumber(line.lineId) === 1
+              ? 'opening'
+              : 'question'
+            : line.kind,
           ...(line.turnId ? { turnId: line.turnId } : {}),
-          text: line.text,
+          text: this.voiceModel ? '' : line.text,
         });
         for (
           let at = 0, seq = 0;
@@ -285,12 +296,19 @@ export class PreviewLiveRelay implements LiveSocket {
             ),
           );
         }
-        this.emit({
-          type: 'lineEnd',
-          lineId: line.lineId,
-          text: line.text,
-          durationMs: PREVIEW_LIVE_LINE_MS,
-        });
+        const ended = () =>
+          this.emit({
+            type: 'lineEnd',
+            lineId: line.lineId,
+            text: line.text,
+            durationMs: PREVIEW_LIVE_LINE_MS,
+          });
+        // The voice model's words come once it has said them.
+        if (this.voiceModel) {
+          this.later(ended, PREVIEW_LIVE_LINE_MS);
+        } else {
+          ended();
+        }
       }, index * PREVIEW_LIVE_LINE_MS);
     });
     this.later(
@@ -325,6 +343,10 @@ export class PreviewLiveRelay implements LiveSocket {
       timers: [],
     };
     this.answer = answer;
+    // The voice model notices the end itself: no warning, no 3 minutes.
+    if (this.voiceModel) {
+      return;
+    }
     answer.timers.push(
       setTimeout(() => {
         if (this.answer === answer) {
@@ -347,7 +369,7 @@ export class PreviewLiveRelay implements LiveSocket {
     if (level >= SPEECH_LEVEL) {
       answer.speechFrames += 1;
       answer.silentFrames = 0;
-      if (answer.speechFrames % 10 === 0) {
+      if (!this.voiceModel && answer.speechFrames % 10 === 0) {
         this.emit({
           type: 'heard',
           turnId: answer.turnId,
@@ -392,22 +414,27 @@ export class PreviewLiveRelay implements LiveSocket {
     answer.timers.forEach(timer => clearTimeout(timer));
     this.answer = null;
     const transcript = this.transcript(answer);
-    this.emit({ type: 'answerEnd', turnId: answer.turnId, reason });
+    if (!this.voiceModel) {
+      this.emit({ type: 'answerEnd', turnId: answer.turnId, reason });
+    }
     this.emit({
       type: 'heard',
       turnId: answer.turnId,
       text: transcript,
       final: true,
     });
-    this.state('thinking');
-    this.later(() => {
-      const next = this.store.answer(
-        session,
-        transcript,
-        answer.speechFrames * FRAME_MS,
+    const next = () =>
+      this.say(
+        this.store.answer(session, transcript, answer.speechFrames * FRAME_MS)
+          .lines,
       );
-      this.say(next.lines);
-    }, PREVIEW_LIVE_THINKING_MS);
+    // The voice model answers as it notices the end; "I'm done" makes it think first.
+    if (this.voiceModel && reason !== 'done') {
+      next();
+      return;
+    }
+    this.state('thinking');
+    this.later(next, PREVIEW_LIVE_THINKING_MS);
   }
 
   // ---------- The page's actions ----------
@@ -432,6 +459,21 @@ export class PreviewLiveRelay implements LiveSocket {
         }
         this.stopTimers();
         this.speaking = null;
+        if (this.voiceModel) {
+          // The model stops a little later, with the words it said: none within its first word.
+          this.emit({ type: 'interrupted', lineId: speaking.lineId });
+          this.emit({
+            type: 'lineEnd',
+            lineId: speaking.lineId,
+            text:
+              message.atMs < 300
+                ? ''
+                : `${speaking.text.split(' ').slice(0, 3).join(' ')}…`,
+            durationMs: message.atMs,
+          });
+          this.listen(speaking);
+          return;
+        }
         if (speaking.kind === 'opening') {
           this.say([this.store.againLine(session)]);
           return;

@@ -48,6 +48,7 @@ const view = (change: Partial<LiveView>): LiveView => ({
   rephrased: false,
   nothingHeard: false,
   answerTimeWarn: false,
+  linesEnded: 0,
   question: QUESTION,
   speaking: QUESTION,
   ...change,
@@ -121,6 +122,39 @@ describe('the interviewer, in real time (Web-X6-RT-Speaking, -RT-Listening)', ()
       />,
     );
     expect(screen.getByRole('status')).toHaveTextContent('mock.thinkingText');
+  });
+});
+
+describe('the voice model speaking (Web-X6-RT-States)', () => {
+  it('before its words come: the level, and where they will be', () => {
+    renderProfilePage(
+      <RealTimeInterviewerCard
+        view={view({
+          way: 'voice-model',
+          speaking: { ...QUESTION, text: '' },
+        })}
+        controller={fakeController()}
+      />,
+    );
+    expect(screen.getByText('mock.liveWordsComeText')).toBeVisible();
+  });
+
+  it('cut off within its first word: it stopped when you started speaking', () => {
+    renderProfilePage(
+      <RealTimeInterviewerCard
+        view={view({
+          phase: 'listening',
+          way: 'voice-model',
+          question: { ...QUESTION, text: '' },
+          cutOffLine: 'l2',
+        })}
+        controller={fakeController()}
+      />,
+    );
+    expect(screen.getByText('mock.liveCutOffText')).toBeVisible();
+    expect(
+      screen.queryByText('mock.liveWordsComeText'),
+    ).not.toBeInTheDocument();
   });
 });
 

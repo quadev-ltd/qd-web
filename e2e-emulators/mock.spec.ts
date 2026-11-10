@@ -379,7 +379,7 @@ test('real time (slices 3, 4): over the relay, the opening and the question, an 
     .getByRole('button', { name: 'Practise for this interview' })
     .click();
   const setup = page.getByRole('dialog', { name: 'Mock interview' });
-  await setup.getByRole('radio', { name: 'Real time' }).check();
+  await setup.getByRole('radio', { name: 'Real time', exact: true }).check();
   await setup.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Start the interview' }).click();
 
@@ -436,6 +436,70 @@ test('real time (slices 3, 4): over the relay, the opening and the question, an 
   const said = page.getByRole('region', { name: 'What was said' });
   await expect(said).toContainText(/fake-transcript: \d+ frames of speech\./);
   await expect(page.getByText('Real time', { exact: true })).toBeVisible();
+});
+
+test('the voice model (slices 5, website 5): its words after it speaks, an answer it notices and writes down, the follow-up answered with "I’m done", ended, read in Sessions', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    (window as unknown as { qdMicrophoneVolume: number }).qdMicrophoneVolume =
+      0;
+  });
+  await openInterview(page);
+  await page
+    .getByRole('button', { name: 'Practise for this interview' })
+    .click();
+  const setup = page.getByRole('dialog', { name: 'Mock interview' });
+  await setup.getByRole('radio', { name: 'Real time, voice model' }).check();
+  await setup.getByRole('button', { name: 'Continue' }).click();
+  await expect(
+    page.getByRole('region', { name: 'Your interview' }),
+  ).toContainText('The model’s own');
+  await page.getByRole('button', { name: 'Start the interview' }).click();
+
+  // The opening with the warm-up in one line, its words once said
+  await expect(interviewer(page)).toContainText('fake-warm-up', {
+    timeout: 30_000,
+  });
+  await expect(interviewer(page)).toContainText(/I['’]m an AI interviewer/);
+  await expect(answer(page)).toContainText('Listening ·', { timeout: 15_000 });
+
+  // Speech, then 1.5 seconds of silence: the model notices, and asks its follow-up
+  await setMicrophone(page, 1);
+  await page.waitForTimeout(2_000);
+  await setMicrophone(page, 0);
+  await expect(interviewer(page)).toContainText(
+    'fake-follow-up: what came of it?',
+    { timeout: 15_000 },
+  );
+  await expect(answer(page)).toContainText('Listening ·', { timeout: 15_000 });
+
+  // "I'm done" tells it to go on: the next planned question
+  await setMicrophone(page, 1);
+  await page.waitForTimeout(1_000);
+  await setMicrophone(page, 0);
+  await answer(page).getByRole('button', { name: 'I’m done' }).click();
+  await expect(page.getByText(/Question 2 of 4/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(answer(page)).toContainText('Listening ·', { timeout: 15_000 });
+
+  await page.getByRole('button', { name: 'End interview' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Interview ended' }),
+  ).toBeVisible({ timeout: 15_000 });
+  await page
+    .getByRole('link', { name: 'See your answers and feedback' })
+    .click();
+  await expect(
+    page.getByRole('region', { name: 'What was said' }),
+  ).toContainText(/fake-transcript: \d+ frames of speech\./);
+  await expect(
+    page.getByText('Real time, voice model', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('The model’s own', { exact: true }),
+  ).toBeVisible();
 });
 
 test('mock interview: the backend refuses over the day’s 3, and the page says so', async ({

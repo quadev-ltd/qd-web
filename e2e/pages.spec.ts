@@ -537,7 +537,7 @@ test('mock interviews in real time (doc 24 §16): the setup’s ways, Ready, the
     .getByRole('button', { name: 'Practise for this interview' })
     .click();
   const setup = page.getByRole('dialog', { name: 'Mock interview' });
-  await setup.getByRole('radio', { name: 'Real time' }).check();
+  await setup.getByRole('radio', { name: 'Real time', exact: true }).check();
   await expectAccessibleAndNotTooWide(page);
   await setup.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByText('Use headphones if you can.')).toBeVisible();

@@ -3080,7 +3080,7 @@ describe('previewProfileGateway, a mock interview in real time (doc 24 §15.7)',
     return bytes;
   };
 
-  const connected = async () => {
+  const connected = async (way: 'real-time' | 'voice-model' = 'real-time') => {
     vi.useFakeTimers();
     const context = await setUp();
     const { applicationId } = await context.gateway.createApplication({
@@ -3092,9 +3092,9 @@ describe('previewProfileGateway, a mock interview in real time (doc 24 §15.7)',
     const started = await context.gateway.startMockInterview({
       requestId: 'request-1',
       applicationId,
-      way: 'real-time',
+      way,
       lengthMinutes: 10,
-      voice: 'gemini',
+      ...(way === 'real-time' ? { voice: 'gemini' as const } : {}),
     });
     const socket = context.gateway.openLiveSocket(started.connect!.url);
     const messages: Record<string, unknown>[] = [];
@@ -3227,6 +3227,35 @@ describe('previewProfileGateway, a mock interview in real time (doc 24 §15.7)',
       turnId: 't1',
     });
     expect(messages.length).toBeGreaterThan(0);
+  });
+
+  it('the voice model: one opening line whose words come at its end, no answerEnd, its own voice', async () => {
+    const { messages, speak, read } = await connected('voice-model');
+    expect((await read()).voice).toBe('gemini-live');
+    await vi.advanceTimersByTimeAsync(400);
+    expect(messages.find(({ type }) => type === 'line')).toEqual({
+      type: 'line',
+      lineId: 'l1',
+      kind: 'opening',
+      turnId: 't1',
+      text: '',
+    });
+    await vi.advanceTimersByTimeAsync(600);
+    const ended = messages.find(({ type }) => type === 'lineEnd');
+    expect(ended).toMatchObject({ lineId: 'l1' });
+    expect(String(ended?.text)).toContain(
+      'Tell me about yourself and the work you do now.',
+    );
+    expect(messages.at(-1)).toMatchObject({ state: 'listening' });
+
+    speak(20, 4_000);
+    speak(15, 0);
+    expect(messages.some(({ type }) => type === 'answerEnd')).toBe(false);
+    expect(messages.find(({ type }) => type === 'heard')).toMatchObject({
+      final: true,
+    });
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect((await read()).turns[1]?.lineIds).toEqual(['l2']);
   });
 
   it('ends when asked, and the continue call says where to connect', async () => {

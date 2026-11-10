@@ -1,5 +1,6 @@
 // "Mock interview" set up (Web-X6-Setup, D100): how you'll talk, the ways built so far each in one
-// line (take turns, real time; doc 24 §16), 10 or 20 minutes, Voice 1 or Voice 2 with "Hear it" (a
+// line (take turns, real time, the voice model; doc 24 §16), 10 or 20 minutes, Voice 1 or Voice 2
+// with "Hear it", none for the voice model, which speaks in its own (a
 // sample the backend voiced once, served with the site), when the hints show (slice H2), where the
 // questions come from, and "Continue", which opens the mock interview's page with these choices.
 // The sessions left today are under it.
@@ -170,44 +171,56 @@ export const MockSetupPanel: React.FC<MockSetupPanelProps> = ({
           value={lengthMinutes}
           onChange={setLengthMinutes}
         />
-        <fieldset className="flex min-w-0 flex-col gap-2">
-          <legend className="mb-2 text-sm leading-natural font-medium">
-            {t('mock.voiceLabel')}
-          </legend>
-          <div className="flex flex-col rounded-card border border-border-faint px-3.5 py-1">
-            {MOCK_VOICES.map(option => (
-              <div
-                key={option}
-                className="flex items-center gap-2 border-t border-border-faint py-1 first:border-t-0">
-                <label className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-[16px] leading-natural font-medium has-checked:font-bold has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-(--focus-ring)">
-                  <input
-                    type="radio"
-                    name="mock-voice"
-                    value={option}
-                    checked={voice === option}
-                    onChange={() => setVoice(option)}
-                    className="size-5 flex-none accent-primary"
-                  />
-                  {t(VOICE_KEYS[option])}
-                </label>
-                <Button
-                  variant="quiet"
-                  size="small"
-                  onClick={() => hear(option)}
-                  aria-label={t('mock.hearVoiceButton', {
-                    voice: t(VOICE_KEYS[option]),
-                  })}
-                  className="gap-2">
-                  <Icon name="play" size={18} />
-                  {t('mock.hearItButton')}
-                </Button>
-              </div>
-            ))}
+        {way === 'voice-model' ? (
+          // The voice model speaks in its own voice (Web-X6-RT-States).
+          <div className="flex flex-col gap-1.5">
+            <p className="text-sm leading-natural font-medium">
+              {t('mock.voiceLabel')}
+            </p>
+            <p className="text-sm leading-normal text-muted">
+              {t('mock.voiceModelNote')}
+            </p>
           </div>
-          <p className="text-sm leading-normal text-muted">
-            {t('mock.voiceNote')}
-          </p>
-        </fieldset>
+        ) : (
+          <fieldset className="flex min-w-0 flex-col gap-2">
+            <legend className="mb-2 text-sm leading-natural font-medium">
+              {t('mock.voiceLabel')}
+            </legend>
+            <div className="flex flex-col rounded-card border border-border-faint px-3.5 py-1">
+              {MOCK_VOICES.map(option => (
+                <div
+                  key={option}
+                  className="flex items-center gap-2 border-t border-border-faint py-1 first:border-t-0">
+                  <label className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-[16px] leading-natural font-medium has-checked:font-bold has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-(--focus-ring)">
+                    <input
+                      type="radio"
+                      name="mock-voice"
+                      value={option}
+                      checked={voice === option}
+                      onChange={() => setVoice(option)}
+                      className="size-5 flex-none accent-primary"
+                    />
+                    {t(VOICE_KEYS[option])}
+                  </label>
+                  <Button
+                    variant="quiet"
+                    size="small"
+                    onClick={() => hear(option)}
+                    aria-label={t('mock.hearVoiceButton', {
+                      voice: t(VOICE_KEYS[option]),
+                    })}
+                    className="gap-2">
+                    <Icon name="play" size={18} />
+                    {t('mock.hearItButton')}
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <p className="text-sm leading-normal text-muted">
+              {t('mock.voiceNote')}
+            </p>
+          </fieldset>
+        )}
         <ChoiceChips
           label={t('mock.hintsLabel')}
           options={MOCK_HINTS_SHOWN.map(option => ({

@@ -264,7 +264,7 @@ export const InterviewerCard: React.FC<{
 };
 
 /** Decorative bars beside "Recording": the answer is being heard. */
-const Level: React.FC = () => (
+export const Level: React.FC = () => (
   <span aria-hidden="true" className="flex h-8 items-center gap-1">
     {[8, 14, 22, 12, 26, 18, 10, 20, 28, 16, 9, 18].map((height, index) => (
       <span

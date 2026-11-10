@@ -43,7 +43,11 @@ export const MOCK_OVERALL_MIN_ANSWERS = 2;
 export const MOCK_WAYS = ['take-turns', 'real-time', 'voice-model'] as const;
 export type MockWay = (typeof MOCK_WAYS)[number];
 /** The ways built so far: the setup offers only these. */
-export const MOCK_WAYS_BUILT: readonly MockWay[] = ['take-turns', 'real-time'];
+export const MOCK_WAYS_BUILT: readonly MockWay[] = [
+  'take-turns',
+  'real-time',
+  'voice-model',
+];
 /** The ways spoken over the `live-assist` connection (§15): their steps are messages, not calls. */
 export const MOCK_LIVE_WAYS: readonly MockWay[] = ['real-time', 'voice-model'];
 
@@ -53,6 +57,9 @@ export type MockLength = (typeof MOCK_LENGTHS)[number];
 /** "Voice 1" and "Voice 2" in the setup; the voices' names wait for the backend's check. */
 export const MOCK_VOICES = ['gemini', 'chirp'] as const;
 export type MockVoice = (typeof MOCK_VOICES)[number];
+/** `voice-model` speaks in the model's own voice (§15.5): the setup offers no choice, and the session stores this. */
+export const MOCK_MODEL_VOICE = 'gemini-live';
+export type MockSessionVoice = MockVoice | typeof MOCK_MODEL_VOICE;
 
 export const MOCK_SESSION_STATUSES = ['active', 'ended'] as const;
 export const MOCK_END_REASONS = [
@@ -176,6 +183,8 @@ export const MockTurnSchema = z.object({
   /** As first asked; `rephrased` once "Say it differently" was asked. */
   question: z.string().min(1),
   rephrased: optionalText,
+  /** The lines that asked it: on the voice model, how its lines are matched to their turns. */
+  lineIds: z.array(z.string()).optional().catch(undefined),
   status: z.enum(['open', 'answered', 'skipped']).catch('open'),
   answer: z
     .object({
@@ -296,7 +305,7 @@ export const MockSessionSchema = z.object({
   interviewRemoved: z.literal(true).optional().catch(undefined),
   way: z.enum(MOCK_WAYS).catch('take-turns'),
   lengthMinutes: z.union([z.literal(10), z.literal(20)]).catch(10),
-  voice: z.enum(MOCK_VOICES).catch('gemini'),
+  voice: z.enum([...MOCK_VOICES, MOCK_MODEL_VOICE]).catch('gemini'),
   /** A session started before hints (slice H1) shows them on request. */
   hintsShown: z.enum(MOCK_HINTS_SHOWN).catch(DEFAULT_MOCK_HINTS_SHOWN),
   /** By `mockHintsKey`: `p1`… for planned questions, `t5`… for follow-ups. */
@@ -397,7 +406,8 @@ export interface StartMockInterviewRequest {
   interviewId?: string;
   way: MockWay;
   lengthMinutes: MockLength;
-  voice: MockVoice;
+  /** Needed except for `voice-model`, which speaks in its own voice. */
+  voice?: MockVoice;
   /** `on-request` when left out. */
   hints?: MockHintsShown;
   client?: MockClient;

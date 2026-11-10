@@ -74,6 +74,7 @@ import { browserTimeZone } from './interviewTime';
 import {
   DEFAULT_MOCK_HINTS_SHOWN,
   MOCK_FEEDBACK_SETTLE_MS,
+  MOCK_MODEL_VOICE,
   MOCK_OVERALL_MIN_ANSWERS,
   MOCK_SESSIONS_MAX,
   MOCK_WAYS_BUILT,
@@ -1054,6 +1055,11 @@ export const createPreviewProfileGateway = ({
     const lineId = `l${number}`;
     if (turnId) {
       session.current = { turnId, lineId };
+      // The lines that asked each turn, as the backend keeps them.
+      const turn = session.turns.find(({ id }) => id === turnId);
+      if (turn) {
+        turn.lineIds = [...(turn.lineIds ?? []), lineId];
+      }
     }
     return previewLine(lineId, kind, text, turnId);
   };
@@ -1162,7 +1168,7 @@ export const createPreviewProfileGateway = ({
       if (session.status === 'ended') {
         return 'session-ended';
       }
-      if (session.way !== 'real-time') {
+      if (session.way === 'take-turns') {
         return 'way-mismatch';
       }
       // A dropped connection stopped the clock: it goes on.
@@ -1178,12 +1184,23 @@ export const createPreviewProfileGateway = ({
       const application = currentProfile().applications?.find(
         ({ id }) => id === session.applicationId,
       );
+      const opening = previewOpening(
+        application?.title || 'this',
+        session.lengthMinutes,
+      );
+      // The voice model says the opening and the first question in one line.
+      if (session.way === 'voice-model') {
+        return [
+          previewLine(
+            'l1',
+            'opening',
+            `${opening} ${session.turns[0]!.question}`,
+            't1',
+          ),
+        ];
+      }
       return [
-        previewLine(
-          'l1',
-          'opening',
-          previewOpening(application?.title || 'this', session.lengthMinutes),
-        ),
+        previewLine('l1', 'opening', opening),
         previewLine('l2', 'question', session.turns[0]!.question, 't1'),
       ];
     },
@@ -3745,7 +3762,11 @@ export const createPreviewProfileGateway = ({
       if ((profile.mockSessions ?? []).length >= MOCK_SESSIONS_MAX) {
         throw new ProfileError(ProfileErrorCode.MaxMockSessions);
       }
-      if (!MOCK_WAYS_BUILT.includes(request.way)) {
+      // A voice is needed, except for the voice model, which speaks in its own.
+      if (
+        !MOCK_WAYS_BUILT.includes(request.way) ||
+        (request.way !== 'voice-model' && !request.voice)
+      ) {
         throw new ProfileError(ProfileErrorCode.Invalid);
       }
       const failure = takeMockFailure();
@@ -3770,6 +3791,7 @@ export const createPreviewProfileGateway = ({
         kind: 'planned',
         planId: plan[0]!.id,
         question: plan[0]!.text,
+        lineIds: [request.way === 'voice-model' ? 'l1' : 'l2'],
         status: 'open',
         repeats: 0,
         askedAt: at,
@@ -3790,14 +3812,21 @@ export const createPreviewProfileGateway = ({
           : {}),
         way: request.way,
         lengthMinutes: request.lengthMinutes,
-        voice: request.voice,
+        voice:
+          request.way === 'voice-model'
+            ? MOCK_MODEL_VOICE
+            : (request.voice ?? 'gemini'),
         hintsShown: request.hints ?? DEFAULT_MOCK_HINTS_SHOWN,
         hints: {},
         answerFeedback: {},
         status: 'active',
         plan: { questions: plan },
         turns: [first],
-        current: { turnId: 't1', lineId: 'l2' },
+        // The voice model says the opening and the first question in one line.
+        current: {
+          turnId: 't1',
+          lineId: request.way === 'voice-model' ? 'l1' : 'l2',
+        },
         startedAt: at,
         endedAt: null,
         pausedAt: null,
@@ -3805,13 +3834,13 @@ export const createPreviewProfileGateway = ({
         createdAt: at,
         updatedAt: at,
       };
-      mockLineCounts.set(sessionId, 2);
+      mockLineCounts.set(sessionId, request.way === 'voice-model' ? 1 : 2);
       mockAsked(session, first);
       profile.mockSessions = [...(profile.mockSessions ?? []), session];
       save();
       // The real-time way says nothing here: its relay says the opening once the page connects.
       const result =
-        request.way === 'real-time'
+        request.way !== 'take-turns'
           ? {
               sessionId,
               lines: [],
@@ -3912,8 +3941,8 @@ export const createPreviewProfileGateway = ({
       if (session.status === 'ended' || !session.current) {
         throw new ProfileError(ProfileErrorCode.MockSessionEnded);
       }
-      // The real-time way: where to connect; the relay says the line waiting (quadev-backend #71).
-      if (session.way === 'real-time') {
+      // The real-time ways: where to connect; the relay says the line waiting (quadev-backend #71).
+      if (session.way !== 'take-turns') {
         return {
           lines: [],
           status: 'active',
