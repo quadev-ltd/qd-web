@@ -200,6 +200,40 @@ export const moveMockSessionBack = async (
   );
 };
 
+/**
+ * Marks one answer's feedback (D101) as failed after its two tries, as the trigger leaves it when
+ * the model fails, so the page offers "Try again".
+ */
+export const failMockAnswerFeedback = async (
+  uid: string,
+  sessionId: string,
+  turnId: string,
+) => {
+  await send(
+    'PATCH',
+    `${DOCUMENTS}/users/${uid}/mockSessions/${sessionId}?updateMask.fieldPaths=answerFeedback.${turnId}`,
+    {
+      fields: {
+        answerFeedback: {
+          mapValue: {
+            fields: {
+              [turnId]: {
+                mapValue: {
+                  fields: {
+                    status: { stringValue: 'failed' },
+                    tries: { integerValue: '2' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    OWNER,
+  );
+};
+
 /** Signs in with the form, as a user does, and waits for where the account lands. */
 export const signIn = async (
   page: Page,

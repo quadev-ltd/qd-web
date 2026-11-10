@@ -409,6 +409,8 @@ test('feedback on a typed answer (D94 slice 3): try first, getting feedback, the
 test('mock interviews (D100): the setup, Ready, the interviewer speaking and the answer recording, the hints, paused, the end with how it went and its feedback card, what was said with an answer’s feedback open, and Sessions: accessible and no horizontal scroll', async ({
   page,
 }) => {
+  // Two answers and how it went written, with an accessibility pass at each step.
+  test.slow();
   // A microphone the page records from: a tone into a real audio stream (see mock.spec.ts).
   await page.addInitScript(() => {
     navigator.mediaDevices.getUserMedia = async () => {
