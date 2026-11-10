@@ -76,6 +76,7 @@ import {
   MOCK_FEEDBACK_SETTLE_MS,
   MOCK_OVERALL_MIN_ANSWERS,
   MOCK_SESSIONS_MAX,
+  MOCK_WAYS_BUILT,
   type MockAnswerFeedback,
   type MockLine,
   type MockLines,
@@ -100,6 +101,7 @@ import {
   seedInterviews,
   timesOf,
 } from './previewInterviews';
+import { PreviewLiveRelay, type PreviewRelayStore } from './previewLiveRelay';
 import {
   PREVIEW_FOLLOW_UP,
   previewClosing,
@@ -313,6 +315,13 @@ export interface PreviewProfileControls {
    */
   failNextFeedback(of: 'answer' | 'overall', reason: 'failed' | 'quota'): void;
   /**
+   * The real-time way (doc 24 §15): the connection drops, as the network failing; the next
+   * `refusals` connections then fail before they're ready.
+   */
+  dropLiveConnection(refusals?: number): void;
+  /** Another tab takes the interview: the relay closes this connection as `replaced`. */
+  replaceLiveConnection(): void;
+  /**
    * A version as they were made before D83: edits to the profile's CV (doc 18), made in the
    * background like any other. The pages no longer ask for one; their review stays. Resolves its id.
    */
@@ -334,6 +343,8 @@ export const PREVIEW_HINTS_FOLLOW_UP_MS = 4000;
  * for real).
  */
 export const PREVIEW_FEEDBACK_ANSWER_MS = 2000;
+/** Where the preview's real-time interviews connect: its stand-in relay, never the network. */
+export const PREVIEW_LIVE_URL = 'preview://live-assist';
 export const PREVIEW_FEEDBACK_OVERALL_MS = 2000;
 
 const PREVIEW_WENT_WELL = [
@@ -1035,7 +1046,10 @@ export const createPreviewProfileGateway = ({
     text: string,
     turnId?: string,
   ): MockLine => {
-    const number = (mockLineCounts.get(session.id) ?? 0) + 1;
+    // After a reload, the lines go on from the one waiting.
+    const number =
+      (mockLineCounts.get(session.id) ??
+        Number(session.current?.lineId.slice(1) ?? 0)) + 1;
     mockLineCounts.set(session.id, number);
     const lineId = `l${number}`;
     if (turnId) {
@@ -1084,6 +1098,125 @@ export const createPreviewProfileGateway = ({
     session.updatedAt = at;
     save();
     return { lines: [line], status: session.status, timeLeftMs: left };
+  };
+
+  /** "Say it differently": the other wording, which becomes the line waiting. */
+  const mockRephrase = (session: MockSession): MockLine => {
+    const turn = session.turns.find(
+      ({ id }) => id === session.current?.turnId,
+    )!;
+    const planned = session.plan.questions.find(({ id }) => id === turn.planId);
+    turn.rephrased ??=
+      turn.kind === 'follow-up'
+        ? `Put another way: ${PREVIEW_FOLLOW_UP.charAt(0).toLowerCase()}${PREVIEW_FOLLOW_UP.slice(1)}`
+        : (planned?.rephrased ?? turn.question);
+    const line = mockSay(session, 'rephrase', turn.rephrased, turn.id);
+    session.updatedAt = now();
+    save();
+    return line;
+  };
+
+  /** Stops or starts the session's clock. */
+  const mockPause = (session: MockSession, paused: boolean) => {
+    const at = now();
+    if (paused && session.pausedAt === null) {
+      session.pausedAt = at;
+    } else if (!paused && session.pausedAt !== null) {
+      session.pausedMs += at - session.pausedAt;
+      session.pausedAt = null;
+    }
+    session.updatedAt = at;
+    save();
+  };
+
+  /** The line waiting for an answer, said again as a new line (the relay's way, §15.5). */
+  const mockSayAgain = (session: MockSession): MockLine => {
+    const turn = session.turns.find(
+      ({ id }) => id === session.current?.turnId,
+    )!;
+    return mockSay(
+      session,
+      turn.rephrased
+        ? 'rephrase'
+        : turn.kind === 'follow-up'
+          ? 'follow-up'
+          : 'question',
+      turn.rephrased ?? turn.question,
+      turn.id,
+    );
+  };
+
+  /** Sessions whose opening the stand-in relay has said. */
+  const liveOpened = new Set<string>();
+  let liveRelay: PreviewLiveRelay | null = null;
+  let liveRefusals = 0;
+
+  const relayStore: PreviewRelayStore = {
+    attach: sessionId => {
+      const session = currentProfile().mockSessions?.find(
+        ({ id }) => id === sessionId,
+      );
+      if (!session) {
+        return 'no-session';
+      }
+      if (session.status === 'ended') {
+        return 'session-ended';
+      }
+      if (session.way !== 'real-time') {
+        return 'way-mismatch';
+      }
+      // A dropped connection stopped the clock: it goes on.
+      mockPause(session, false);
+      return session;
+    },
+    firstLines: session => {
+      const first = !liveOpened.has(session.id) && session.turns.length === 1;
+      liveOpened.add(session.id);
+      if (!first) {
+        return [mockSayAgain(session)];
+      }
+      const application = currentProfile().applications?.find(
+        ({ id }) => id === session.applicationId,
+      );
+      return [
+        previewLine(
+          'l1',
+          'opening',
+          previewOpening(application?.title || 'this', session.lengthMinutes),
+        ),
+        previewLine('l2', 'question', session.turns[0]!.question, 't1'),
+      ];
+    },
+    againLine: session => mockSayAgain(session),
+    answer: (session, transcript, spokenMs) => {
+      const turn = session.turns.find(
+        ({ id }) => id === session.current?.turnId,
+      )!;
+      turn.status = 'answered';
+      turn.answer = { transcript, spokenMs, words: 5 };
+      turn.answeredAt = now();
+      mockAnswered(session, turn);
+      return mockNext(session, turn, true);
+    },
+    skip: session => {
+      const turn = session.turns.find(
+        ({ id }) => id === session.current?.turnId,
+      )!;
+      turn.status = 'skipped';
+      return mockNext(session, turn, false);
+    },
+    rephrase: session => mockRephrase(session),
+    pause: (session, paused) => mockPause(session, paused),
+    end: session => {
+      mockEnd(session, 'ended');
+      save();
+    },
+    timeLeft: session => mockTimeLeft(session),
+    detach: session => {
+      if (session.status === 'active') {
+        mockPause(session, true);
+      }
+    },
   };
 
   /** A letter that can change: there, and written (`not-ready` otherwise, read as Invalid). */
@@ -1845,6 +1978,13 @@ export const createPreviewProfileGateway = ({
     },
     failNextFeedback: (of, reason) => {
       nextFeedbackFailure[of] = reason;
+    },
+    dropLiveConnection: (refusals = 0) => {
+      liveRefusals = refusals;
+      liveRelay?.drop();
+    },
+    replaceLiveConnection: () => {
+      liveRelay?.replace();
     },
     // Set once the gateway exists, below: it asks the gateway for the version.
     createEditVersion: () => Promise.reject(new Error('Not ready')),
@@ -3605,6 +3745,9 @@ export const createPreviewProfileGateway = ({
       if ((profile.mockSessions ?? []).length >= MOCK_SESSIONS_MAX) {
         throw new ProfileError(ProfileErrorCode.MaxMockSessions);
       }
+      if (!MOCK_WAYS_BUILT.includes(request.way)) {
+        throw new ProfileError(ProfileErrorCode.Invalid);
+      }
       const failure = takeMockFailure();
       const today = profile.mockToday ?? 0;
       if (failure === 'quota' || today >= mockDailyLimit(profile)) {
@@ -3666,19 +3809,32 @@ export const createPreviewProfileGateway = ({
       mockAsked(session, first);
       profile.mockSessions = [...(profile.mockSessions ?? []), session];
       save();
-      const result = {
-        sessionId,
-        lines: [
-          previewLine(
-            'l1',
-            'opening',
-            previewOpening(application.title || 'this', request.lengthMinutes),
-          ),
-          previewLine('l2', 'question', first.question, 't1'),
-        ],
-        status: 'active' as const,
-        timeLeftMs: mockTimeLeft(session),
-      };
+      // The real-time way says nothing here: its relay says the opening once the page connects.
+      const result =
+        request.way === 'real-time'
+          ? {
+              sessionId,
+              lines: [],
+              status: 'active' as const,
+              timeLeftMs: mockTimeLeft(session),
+              connect: { url: PREVIEW_LIVE_URL },
+            }
+          : {
+              sessionId,
+              lines: [
+                previewLine(
+                  'l1',
+                  'opening',
+                  previewOpening(
+                    application.title || 'this',
+                    request.lengthMinutes,
+                  ),
+                ),
+                previewLine('l2', 'question', first.question, 't1'),
+              ],
+              status: 'active' as const,
+              timeLeftMs: mockTimeLeft(session),
+            };
       mockDone.set(request.requestId, result);
       return structuredClone(result);
     },
@@ -3721,19 +3877,7 @@ export const createPreviewProfileGateway = ({
         return structuredClone(done) as MockLines;
       }
       const session = activeMockSession(request.sessionId, request.lineId);
-      const turn = session.turns.find(
-        ({ id }) => id === session.current?.turnId,
-      )!;
-      const planned = session.plan.questions.find(
-        ({ id }) => id === turn.planId,
-      );
-      turn.rephrased ??=
-        turn.kind === 'follow-up'
-          ? `Put another way: ${PREVIEW_FOLLOW_UP.charAt(0).toLowerCase()}${PREVIEW_FOLLOW_UP.slice(1)}`
-          : (planned?.rephrased ?? turn.question);
-      const line = mockSay(session, 'rephrase', turn.rephrased, turn.id);
-      session.updatedAt = now();
-      save();
+      const line = mockRephrase(session);
       const result = { lines: [line], status: 'active' as const };
       mockDone.set(request.requestId, result);
       return structuredClone(result);
@@ -3760,21 +3904,23 @@ export const createPreviewProfileGateway = ({
       if (session.status === 'ended') {
         throw new ProfileError(ProfileErrorCode.MockSessionEnded);
       }
-      const at = now();
-      if (paused && session.pausedAt === null) {
-        session.pausedAt = at;
-      } else if (!paused && session.pausedAt !== null) {
-        session.pausedMs += at - session.pausedAt;
-        session.pausedAt = null;
-      }
-      session.updatedAt = at;
-      save();
+      mockPause(session, paused);
       return { paused, timeLeftMs: mockTimeLeft(session) };
     },
     resumeMockInterview: async sessionId => {
       const session = mockSessionOf(sessionId);
       if (session.status === 'ended' || !session.current) {
         throw new ProfileError(ProfileErrorCode.MockSessionEnded);
+      }
+      // The real-time way: where to connect; the relay says the line waiting (quadev-backend #71).
+      if (session.way === 'real-time') {
+        return {
+          lines: [],
+          status: 'active',
+          paused: session.pausedAt !== null,
+          timeLeftMs: mockTimeLeft(session),
+          connect: { url: PREVIEW_LIVE_URL },
+        };
       }
       const turn = session.turns.find(
         ({ id }) => id === session.current?.turnId,
@@ -3868,6 +4014,19 @@ export const createPreviewProfileGateway = ({
       save();
     },
     getMockInterviewsToday: async uid => read(uid).mockToday ?? 0,
+    getLiveTokens: async () => ({
+      idToken: 'preview-id-token',
+      appCheckToken: 'preview-app-check-token',
+    }),
+    openLiveSocket: url => {
+      if (url !== PREVIEW_LIVE_URL) {
+        throw new ProfileError(ProfileErrorCode.Network);
+      }
+      const fails = liveRefusals > 0;
+      liveRefusals = Math.max(0, liveRefusals - 1);
+      liveRelay = new PreviewLiveRelay(relayStore, fails);
+      return liveRelay;
+    },
   };
   controls.createEditVersion = async (target = { kind: 'general' }) => {
     // The newest CV with its text, as the pages offered first.

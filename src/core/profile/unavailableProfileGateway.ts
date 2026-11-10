@@ -72,6 +72,10 @@ export const unavailableProfileGateway: ProfileGateway = {
   retryMockFeedback: unavailable,
   removeMockSession: unavailable,
   getMockInterviewsToday: unavailable,
+  getLiveTokens: unavailable,
+  openLiveSocket: () => {
+    throw new ProfileError(ProfileErrorCode.Unavailable);
+  },
   removePracticeTurn: unavailable,
   getPracticeToday: unavailable,
   getCvVersions: unavailable,

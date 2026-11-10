@@ -15,6 +15,7 @@ import ChoiceChips from '@/components/ui/ChoiceChips';
 import { logProfileError } from '@/core/profile/errors';
 import { dailyLimitResetTime } from '@/core/profile/limits';
 import {
+  MOCK_CUT_OFF,
   MOCK_FEEDBACK_COMMENT_MAX_CHARS,
   MOCK_FEEL,
   MOCK_WAIT,
@@ -34,6 +35,12 @@ const WAIT_KEYS = {
   'a-bit-long': 'mock.waitBitLong',
   'too-long': 'mock.waitTooLong',
 } as const satisfies Record<(typeof MOCK_WAIT)[number], string>;
+
+const CUT_OFF_KEYS = {
+  no: 'mock.cutOffNo',
+  once: 'mock.cutOffOnce',
+  more: 'mock.cutOffMore',
+} as const satisfies Record<(typeof MOCK_CUT_OFF)[number], string>;
 
 export const MockEndPanel: React.FC<{
   ending: MockEnding;
@@ -151,12 +158,16 @@ export const MockEndPanel: React.FC<{
   }
 };
 
-/** "How did it go?": how it felt, the wait, and anything else. Sending again replaces it. */
+/**
+ * "How did it go?": how it felt, the wait, whether the interviewer cut them off or heard itself
+ * (real time, Web-X6-RT-States), and anything else. Sending again replaces it.
+ */
 export const MockFeedbackCard: React.FC<{
   sessionId: string;
   /** What was sent before, if anything. */
   sent?: MockSession['feedback'];
-}> = ({ sessionId, sent }) => {
+  realTime?: boolean;
+}> = ({ sessionId, sent, realTime = false }) => {
   const { t } = useTranslation();
   const gateway = useProfileGateway();
   const uid = useSessionUser()?.uid;
@@ -164,14 +175,19 @@ export const MockFeedbackCard: React.FC<{
   const [wait, setWait] = useState<(typeof MOCK_WAIT)[number] | null>(
     sent?.wait ?? null,
   );
+  const [cutOff, setCutOff] = useState<(typeof MOCK_CUT_OFF)[number] | null>(
+    sent?.cutOff ?? null,
+  );
   const [comment, setComment] = useState(sent?.comment ?? '');
+  const unanswered =
+    feel === null || wait === null || (realTime && cutOff === null);
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'failed'>(
     'idle',
   );
   const tooLong = comment.trim().length > MOCK_FEEDBACK_COMMENT_MAX_CHARS;
 
   const send = async () => {
-    if (feel === null || wait === null) {
+    if (feel === null || wait === null || unanswered) {
       return;
     }
     setState('sending');
@@ -180,6 +196,7 @@ export const MockFeedbackCard: React.FC<{
         sessionId,
         feel,
         wait,
+        ...(realTime && cutOff ? { cutOff } : {}),
         ...(comment.trim() ? { comment: comment.trim() } : {}),
       });
       setState('sent');
@@ -226,6 +243,18 @@ export const MockFeedbackCard: React.FC<{
             onChange={setWait}
             disabled={state === 'sending'}
           />
+          {realTime && (
+            <ChoiceChips
+              label={t('mock.cutOffLabel')}
+              options={MOCK_CUT_OFF.map(value => ({
+                value,
+                label: t(CUT_OFF_KEYS[value]),
+              }))}
+              value={cutOff}
+              onChange={setCutOff}
+              disabled={state === 'sending'}
+            />
+          )}
           <FormTextArea
             name="comment"
             rows={3}
@@ -252,9 +281,7 @@ export const MockFeedbackCard: React.FC<{
           <Button
             size="small"
             onClick={() => void send()}
-            disabled={
-              feel === null || wait === null || tooLong || state === 'sending'
-            }
+            disabled={unanswered || tooLong || state === 'sending'}
             aria-busy={state === 'sending'}
             className="gap-2 self-start">
             {state === 'sending' && <Spinner size="small" decorative />}

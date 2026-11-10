@@ -38,12 +38,24 @@ export const useTicking = (on: boolean) => {
   }, [on]);
 };
 
+/** The phases in which the clock stops: paused, over, or the connection down (real time). */
+const CLOCK_STOPPED: ReadonlySet<string> = new Set([
+  'paused',
+  'ended',
+  'reconnecting',
+  'disconnected',
+  'replaced',
+]);
+
+/** What the progress line needs of either way's view. */
+export type ProgressView = Pick<MockView, 'timeLeft'> & { phase: string };
+
 /** The time left as the controller last heard it, run down while the interview runs. */
-export const timeLeftOf = (view: MockView): number | null => {
+export const timeLeftOf = (view: ProgressView): number | null => {
   if (!view.timeLeft) {
     return null;
   }
-  const running = view.phase !== 'paused' && view.phase !== 'ended';
+  const running = !CLOCK_STOPPED.has(view.phase);
   return Math.max(
     0,
     view.timeLeft.ms - (running ? mockNow() - view.timeLeft.at : 0),
@@ -51,7 +63,7 @@ export const timeLeftOf = (view: MockView): number | null => {
 };
 
 export const MockProgress: React.FC<{
-  view: MockView;
+  view: ProgressView;
   progress: { number: number; of: number } | null;
   onPause: () => void;
   onEnd: () => void;
@@ -65,7 +77,10 @@ export const MockProgress: React.FC<{
   ]
     .filter(Boolean)
     .join(' · ');
-  const canPause = view.phase === 'speaking' || view.phase === 'answering';
+  const canPause =
+    view.phase === 'speaking' ||
+    view.phase === 'answering' ||
+    view.phase === 'listening';
   return (
     <div className="flex flex-wrap items-center gap-2.5">
       <Chip tone="brand" icon="wave">

@@ -149,7 +149,7 @@ afterEach(() => {
 });
 
 describe('setting up a mock interview (Web-X6-Setup)', () => {
-  it('opens the mock interview with the length, the voice and the hints chosen', async () => {
+  it('opens the mock interview with the way, the length, the voice and the hints chosen', async () => {
     const user = userEvent.setup();
     const gateway = createMockProfileGateway();
     gateway.getMockInterviewsToday.mockResolvedValue(1);
@@ -167,10 +167,19 @@ describe('setting up a mock interview (Web-X6-Setup)', () => {
     );
 
     const panel = screen.getByRole('dialog', { name: 'mock.setupTitle' });
-    expect(panel).toHaveTextContent('mock.wayTakeTurns');
     expect(await within(panel).findByText('mock.left')).toBeVisible();
-    await user.click(within(panel).getAllByRole('radio')[1]!);
+    // The ways built so far, taking turns first (doc 24 §16)
+    const ways = within(panel).getByRole('group', { name: 'mock.wayLabel' });
+    expect(
+      within(ways).getByRole('radio', { name: 'mock.wayTakeTurnsName' }),
+    ).toBeChecked();
+    expect(within(ways).getAllByRole('radio')).toHaveLength(2);
+    await user.click(
+      within(ways).getByRole('radio', { name: 'mock.wayRealTimeName' }),
+    );
+    // 20 minutes, Voice 2
     await user.click(within(panel).getAllByRole('radio')[3]!);
+    await user.click(within(panel).getAllByRole('radio')[5]!);
     // Hints: "When I ask" first chosen, then "After I answer"
     expect(
       within(panel).getByRole('radio', { name: 'mock.hintsOnRequest' }),
@@ -184,7 +193,7 @@ describe('setting up a mock interview (Web-X6-Setup)', () => {
 
     expect(
       screen.getByText(
-        'now at /applications/a1/interviews/i1/mock?length=20&voice=chirp&hints=after-answer',
+        'now at /applications/a1/interviews/i1/mock?length=20&voice=chirp&hints=after-answer&way=real-time',
       ),
     ).toBeInTheDocument();
   });
@@ -245,10 +254,51 @@ describe('a mock interview’s page (Web-X6-Ready, -End, -CantRecord)', () => {
     );
     expect(
       screen.getByText(
-        'now at /applications/a1/interviews/i1?length=10&voice=gemini&hints=on-request&mock=setup',
+        'now at /applications/a1/interviews/i1?length=10&voice=gemini&hints=on-request&way=take-turns&mock=setup',
       ),
     ).toBeInTheDocument();
     expect(gateway.countMockSessions).toHaveBeenCalled();
+  });
+
+  it('Ready in real time: the way in the summary, and headphones suggested (Web-X6-RT-Ready)', async () => {
+    // A browser that can stream the microphone, as far as the page asks.
+    vi.stubGlobal('AudioWorkletNode', class {});
+    renderMock(
+      '/applications/a1/interviews/i1/mock?length=10&voice=gemini&hints=on-request&way=real-time',
+    );
+    const summary = await screen.findByRole('region', {
+      name: 'mock.summaryTitle',
+    });
+    expect(summary).toHaveTextContent('mock.wayRealTimeName');
+    expect(screen.getByText('mock.headphonesMessage')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'mock.startButton' }),
+    ).toBeEnabled();
+  });
+
+  it('a real-time interview ended: the card also asks whether it cut you off or heard itself', async () => {
+    const user = userEvent.setup();
+    const gateway = createMockProfileGateway();
+    gateway.getMockSession.mockResolvedValue(session({ way: 'real-time' }));
+    renderMock('/applications/a1/interviews/i1/mock/s1', gateway);
+
+    const card = await screen.findByRole('region', {
+      name: 'mock.feedbackTitle',
+    });
+    await user.click(within(card).getByRole('radio', { name: '4' }));
+    await user.click(within(card).getByRole('radio', { name: 'mock.waitOk' }));
+    const send = within(card).getByRole('button', { name: 'mock.sendButton' });
+    expect(send).toBeDisabled();
+    await user.click(
+      within(card).getByRole('radio', { name: 'mock.cutOffOnce' }),
+    );
+    await user.click(send);
+    expect(gateway.sendMockFeedback).toHaveBeenCalledWith({
+      sessionId: 's1',
+      feel: 4,
+      wait: 'ok',
+      cutOff: 'once',
+    });
   });
 
   it('a session still going, opened again: "Continue the interview"', async () => {

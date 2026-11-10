@@ -1,7 +1,8 @@
-// "Mock interview" set up (Web-X6-Setup, D100): the way in one line (only take turns is built),
-// 10 or 20 minutes, Voice 1 or Voice 2 with "Hear it" (a sample the backend voiced once, served
-// with the site), when the hints show (slice H2), where the questions come from, and "Continue",
-// which opens the mock interview's page with these choices. The sessions left today are under it.
+// "Mock interview" set up (Web-X6-Setup, D100): how you'll talk, the ways built so far each in one
+// line (take turns, real time; doc 24 §16), 10 or 20 minutes, Voice 1 or Voice 2 with "Hear it" (a
+// sample the backend voiced once, served with the site), when the hints show (slice H2), where the
+// questions come from, and "Continue", which opens the mock interview's page with these choices.
+// The sessions left today are under it.
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -17,32 +18,48 @@ import {
   MOCK_HINTS_SHOWN,
   MOCK_LENGTHS,
   MOCK_VOICES,
+  MOCK_WAYS_BUILT,
   type MockHintsShown,
   type MockLength,
   type MockVoice,
+  type MockWay,
 } from '@/core/profile/mockInterviews';
 import { applicationInterviewMockPath } from '@/core/profile/paths';
 import { useMockLeft } from '@/core/profile/useMockInterviews';
-import { HINTS_SHOWN_KEYS, VOICE_KEYS } from '@/screens/Mock/mockParts';
+import {
+  HINTS_SHOWN_KEYS,
+  VOICE_KEYS,
+  WAY_KEYS,
+  WAY_TEXT_KEYS,
+} from '@/screens/Mock/mockParts';
 
 export interface MockChoices {
+  way: MockWay;
   lengthMinutes: MockLength;
   voice: MockVoice;
   hints: MockHintsShown;
 }
 
 export const DEFAULT_MOCK_CHOICES: MockChoices = {
+  way: 'take-turns',
   lengthMinutes: 10,
   voice: 'gemini',
   hints: DEFAULT_MOCK_HINTS_SHOWN,
 };
 
-/** The choices an address carries (`?length=20&voice=chirp&hints=after-answer`), the defaults otherwise. */
+/**
+ * The choices an address carries (`?length=20&voice=chirp&hints=after-answer&way=real-time`), the
+ * defaults otherwise. Only a way built so far.
+ */
 export const mockChoicesOf = (search: URLSearchParams): MockChoices => {
   const length = Number(search.get('length'));
   const voice = search.get('voice');
   const hints = search.get('hints');
+  const way = search.get('way');
   return {
+    way: MOCK_WAYS_BUILT.includes(way as MockWay)
+      ? (way as MockWay)
+      : DEFAULT_MOCK_CHOICES.way,
     lengthMinutes: (MOCK_LENGTHS as readonly number[]).includes(length)
       ? (length as MockLength)
       : DEFAULT_MOCK_CHOICES.lengthMinutes,
@@ -56,10 +73,12 @@ export const mockChoicesOf = (search: URLSearchParams): MockChoices => {
 };
 
 export const mockChoicesSearch = ({
+  way,
   lengthMinutes,
   voice,
   hints,
-}: MockChoices) => `?length=${lengthMinutes}&voice=${voice}&hints=${hints}`;
+}: MockChoices) =>
+  `?length=${lengthMinutes}&voice=${voice}&hints=${hints}&way=${way}`;
 
 /** Each voice saying the same line (doc 24 §13.8): "Hello, I'm an AI interviewer. …". */
 export const VOICE_SAMPLES = {
@@ -86,6 +105,7 @@ export const MockSetupPanel: React.FC<MockSetupPanelProps> = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { left } = useMockLeft();
+  const [way, setWay] = useState(initial.way);
   const [lengthMinutes, setLengthMinutes] = useState(initial.lengthMinutes);
   const [voice, setVoice] = useState(initial.voice);
   const [hints, setHints] = useState(initial.hints);
@@ -108,12 +128,39 @@ export const MockSetupPanel: React.FC<MockSetupPanelProps> = ({
       description={description}
       onClose={onClose}>
       <div className="flex flex-col gap-5">
-        <p className="flex items-start gap-2.5 rounded-[14px] bg-tint px-3.5 py-3 text-[15px] leading-normal">
-          <span aria-hidden="true" className="flex pt-0.5 text-primary">
-            <Icon name="wave" size={20} />
-          </span>
-          <span className="min-w-0 flex-1">{t('mock.wayTakeTurns')}</span>
-        </p>
+        <fieldset className="flex min-w-0 flex-col gap-2">
+          <legend className="mb-2 text-sm leading-natural font-medium">
+            {t('mock.wayLabel')}
+          </legend>
+          <div className="flex flex-col rounded-card border border-border-faint px-3.5 py-1">
+            {MOCK_WAYS_BUILT.map(option => (
+              <div
+                key={option}
+                className="flex flex-col border-t border-border-faint py-1.5 first:border-t-0">
+                <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-[16px] leading-natural font-medium has-checked:font-bold has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-(--focus-ring)">
+                  <input
+                    type="radio"
+                    name="mock-way"
+                    value={option}
+                    checked={way === option}
+                    onChange={() => setWay(option)}
+                    aria-describedby={`mock-way-${option}`}
+                    className="size-5 flex-none accent-primary"
+                  />
+                  {t(WAY_KEYS[option])}
+                </label>
+                <p
+                  id={`mock-way-${option}`}
+                  className="pb-1 pl-7.5 text-sm leading-normal text-muted">
+                  {t(WAY_TEXT_KEYS[option])}
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm leading-normal text-muted">
+            {t('mock.waysNote')}
+          </p>
+        </fieldset>
         <ChoiceChips
           label={t('mock.lengthLabel')}
           options={MOCK_LENGTHS.map(minutes => ({
@@ -187,7 +234,7 @@ export const MockSetupPanel: React.FC<MockSetupPanelProps> = ({
             onClick={() =>
               navigate(
                 applicationInterviewMockPath(applicationId, interviewId) +
-                  mockChoicesSearch({ lengthMinutes, voice, hints }),
+                  mockChoicesSearch({ way, lengthMinutes, voice, hints }),
               )
             }>
             {t('mock.continueButton')}

@@ -105,6 +105,12 @@ export const createMockProfileGateway = (): Mocked<ProfileGateway> => ({
   endMockInterview: vi.fn(() => Promise.resolve()),
   sendMockFeedback: vi.fn(() => Promise.resolve()),
   retryMockFeedback: vi.fn(() => Promise.resolve()),
+  getLiveTokens: vi.fn(() =>
+    Promise.resolve({ idToken: 'id-token', appCheckToken: 'app-check-token' }),
+  ),
+  openLiveSocket: vi.fn(() => {
+    throw new Error('No relay in this test');
+  }),
   removeMockSession: vi.fn(() => Promise.resolve()),
   getMockInterviewsToday: vi.fn(() => Promise.resolve(0)),
   getCvVersions: vi.fn(() => Promise.resolve([])),

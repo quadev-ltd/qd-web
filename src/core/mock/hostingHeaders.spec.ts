@@ -41,6 +41,12 @@ describe('the hosting headers (firebase.json)', () => {
     ]);
   });
 
+  it('let a mock interview in real time reach the backend’s relay on dev (doc 24 §15.2)', () => {
+    expect(headerValue('Content-Security-Policy-Report-Only')).toMatch(
+      /connect-src [^;]* wss:\/\/live-assist-476492543939\.europe-west1\.run\.app[ ;]/,
+    );
+  });
+
   it('let the site play its own sounds, in the content policy waiting to be enforced', () => {
     expect(headerValue('Content-Security-Policy-Report-Only')).toContain(
       "media-src 'self';",

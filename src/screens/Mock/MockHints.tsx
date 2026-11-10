@@ -107,7 +107,8 @@ export const useMockHints = ({
   reload,
 }: {
   session: MockSession | null;
-  view: MockView;
+  /** Either way's view: the question on screen, and the one just answered. */
+  view: Pick<MockView, 'question' | 'answered'>;
   shown: MockHintsShown;
   reload: () => void;
 }) => {

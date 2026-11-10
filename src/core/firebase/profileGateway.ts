@@ -66,6 +66,7 @@ import {
   countMockSessions,
   endMockInterview,
   getMockInterviewsToday,
+  getLiveTokens,
   getMockSession,
   getMockSessions,
   pauseMockInterview,
@@ -91,6 +92,7 @@ import {
 } from './practice';
 import { getUsageLimits } from './usageLimits';
 
+import { openBrowserLiveSocket } from '@/core/mock/liveSocket';
 import { type ProfileGateway } from '@/core/profile/gateway';
 
 /**
@@ -165,6 +167,8 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   retryMockFeedback,
   removeMockSession,
   getMockInterviewsToday,
+  getLiveTokens,
+  openLiveSocket: openBrowserLiveSocket,
   getPracticeToday,
   getCvVersions,
   getCvVersion,

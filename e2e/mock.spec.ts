@@ -13,7 +13,9 @@ import { openApplications, seedApplications } from './support';
 /**
  * A microphone for the browser: a tone played into a real audio stream, which the page records
  * as it would a microphone. Chromium's fake devices wait on the system's own microphone
- * permission on a Mac, which a headless run never gets. `refuse` blocks it instead.
+ * permission on a Mac, which a headless run never gets. `refuse` blocks it instead. Its volume
+ * (`setMicrophone`) is the candidate speaking or not, for the real-time way; it starts at
+ * `window.qdMicrophoneVolume`, else 1.
  */
 const microphone = (page: Page, refuse = false) =>
   page.addInitScript(blocked => {
@@ -23,12 +25,32 @@ const microphone = (page: Page, refuse = false) =>
       }
       const context = new AudioContext();
       const tone = context.createOscillator();
+      const gain = context.createGain();
+      const known = window as unknown as {
+        qdMicrophone: GainNode;
+        qdMicrophoneVolume?: number;
+      };
+      gain.gain.value = known.qdMicrophoneVolume ?? 1;
       const destination = context.createMediaStreamDestination();
-      tone.connect(destination);
+      tone.connect(gain).connect(destination);
       tone.start();
+      known.qdMicrophone = gain;
       return destination.stream;
     };
   }, refuse);
+
+/** The candidate speaking (1) or silent (0), on the real-time way. */
+const setMicrophone = (page: Page, volume: number) =>
+  page.evaluate(level => {
+    const known = window as unknown as {
+      qdMicrophone?: GainNode;
+      qdMicrophoneVolume?: number;
+    };
+    known.qdMicrophoneVolume = level;
+    if (known.qdMicrophone) {
+      known.qdMicrophone.gain.value = level;
+    }
+  }, volume);
 
 test.beforeEach(async ({ page }) => {
   await microphone(page);
@@ -107,7 +129,7 @@ test('a mock interview taken in turns: set up, started, answered, a follow-up, s
     .getByRole('button', { name: 'Practise for this interview' })
     .click();
   const setup = page.getByRole('dialog', { name: 'Mock interview' });
-  await expect(setup).toContainText('You’ll take turns');
+  await expect(setup.getByRole('radio', { name: 'Take turns' })).toBeChecked();
   await expect(setup).toContainText('3 of 3 mock interviews left today');
   await setup.getByText('20 minutes').click();
   await setup.getByText('Voice 2').click();
@@ -115,7 +137,7 @@ test('a mock interview taken in turns: set up, started, answered, a follow-up, s
 
   // Ready: the choices in short, and the notice before the first one
   await expect(page).toHaveURL(
-    /\/interviews\/[^/]+\/mock\?length=20&voice=chirp&hints=on-request$/,
+    /\/interviews\/[^/]+\/mock\?length=20&voice=chirp&hints=on-request&way=take-turns$/,
   );
   const summary = page.getByRole('region', { name: 'Your interview' });
   await expect(summary).toContainText('About 20 minutes, 6 to 8 questions');
@@ -429,6 +451,103 @@ test('an answer’s feedback that failed is asked for again in Sessions; one ans
   await expect(
     first.getByRole('button', { name: 'Show feedback' }),
   ).toBeVisible({ timeout: 15_000 });
+});
+
+test('real time (doc 24 §16): set up, the opening and the question, an answer ended by a pause, "I’m done" with nothing heard, a lost connection, another tab, skipped and ended', async ({
+  page,
+}) => {
+  // Silent until the candidate speaks: any sound would interrupt the interviewer.
+  await page.addInitScript(() => {
+    (window as unknown as { qdMicrophoneVolume: number }).qdMicrophoneVolume =
+      0;
+  });
+  await openInterview(page);
+
+  // The setup: real time
+  await page
+    .getByRole('button', { name: 'Practise for this interview' })
+    .click();
+  const setup = page.getByRole('dialog', { name: 'Mock interview' });
+  await expect(
+    setup.getByRole('group', { name: 'How you’ll talk' }),
+  ).toContainText(
+    'Like a call: it notices when you’ve finished, and you can interrupt it.',
+  );
+  await setup.getByRole('radio', { name: 'Real time' }).check();
+  await setup.getByRole('button', { name: 'Continue' }).click();
+  await expect(page).toHaveURL(/&way=real-time$/);
+  await expect(
+    page.getByRole('region', { name: 'Your interview' }),
+  ).toContainText('Real time');
+  await expect(page.getByText('Use headphones if you can.')).toBeVisible();
+
+  // Started: the opening and the question over the connection, then your turn
+  await page.getByRole('button', { name: 'Start the interview' }).click();
+  await expect(interviewer(page)).toContainText(
+    'Tell me about an incident you led from alert to fix.',
+    { timeout: 15_000 },
+  );
+  await expect(answer(page)).toContainText('Listening ·', { timeout: 10_000 });
+  await expect(page).toHaveURL(/\/mock\/[^/?]+$/);
+  await expect(
+    interviewer(page).getByRole('button', { name: 'Repeat' }),
+  ).toHaveCount(0);
+
+  // An answer: two seconds of speech, the words heard, then a pause ends it
+  await setMicrophone(page, 1);
+  await expect(answer(page)).toContainText('I answered for about', {
+    timeout: 5_000,
+  });
+  await page.waitForTimeout(1_000);
+  await setMicrophone(page, 0);
+  await expect(interviewer(page)).toContainText(
+    'What was your own part in it',
+    { timeout: 10_000 },
+  );
+  await expect(answer(page)).toContainText('Listening ·', { timeout: 10_000 });
+
+  // "I'm done" with nothing heard: still listening
+  await answer(page).getByRole('button', { name: 'I’m done' }).click();
+  await expect(answer(page)).toContainText('We didn’t hear anything yet.');
+
+  // The connection lost: reconnecting, then the question said again
+  await page.evaluate(() => window.qdPreviewProfile?.dropLiveConnection(2));
+  await expect(page.getByText('Reconnecting…')).toBeVisible();
+  await expect(page.getByText('Reconnecting…')).toBeHidden({ timeout: 15_000 });
+  await expect(answer(page)).toContainText('Listening ·', { timeout: 10_000 });
+
+  // Taken over in another tab: "Continue here" takes it back
+  await page.evaluate(() => window.qdPreviewProfile?.replaceLiveConnection());
+  const replaced = page.getByRole('alert').filter({
+    hasText: 'This interview is open in another tab',
+  });
+  await expect(replaced).toContainText('the other one then stops');
+  await replaced.getByRole('button', { name: 'Continue here' }).click();
+  await expect(answer(page)).toContainText('Listening ·', { timeout: 10_000 });
+
+  // Skip, then the end, with the card's third question
+  await interviewer(page).getByRole('button', { name: 'Skip' }).click();
+  await expect(page.getByText(/Question 2 of 4/)).toBeVisible({
+    timeout: 10_000,
+  });
+  await page.getByRole('button', { name: 'End interview' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Interview ended' }),
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(
+    page
+      .getByRole('region', { name: 'How did it go?' })
+      .getByText('Did the interviewer cut you off, or hear itself?'),
+  ).toBeVisible();
+
+  // In Sessions: the way
+  await page
+    .getByRole('link', { name: 'See your answers and feedback' })
+    .click();
+  await expect(page.getByText('Real time', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'What was said' }),
+  ).toContainText(/I answered for about \d+ seconds\./);
 });
 
 test('none left today: the setup says so and can’t continue', async ({

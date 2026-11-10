@@ -38,7 +38,12 @@ import {
   interviewTitle,
   useNow,
 } from '@/screens/Applications/interviews/interviewText';
-import { mockCounts, mockMinutes, mockTitle } from '@/screens/Mock/mockParts';
+import {
+  mockCounts,
+  mockMinutes,
+  mockTitle,
+  WAY_KEYS,
+} from '@/screens/Mock/mockParts';
 import { PROFILE_MAIN } from '@/screens/Profile/ProfileRoutes';
 import { formatDay } from '@/screens/Profile/Resource/resourceMeta';
 
@@ -198,7 +203,7 @@ const MockRow: React.FC<{ session: MockSession }> = ({ session }) => {
   const { questions } = mockCounts(session);
   const going = session.status === 'active';
   const meta = [
-    t('mock.wayName'),
+    t(WAY_KEYS[session.way]),
     t('sessions.questions', { count: questions }),
     going
       ? isMockIdle(session, now)

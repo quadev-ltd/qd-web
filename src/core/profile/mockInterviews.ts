@@ -43,7 +43,9 @@ export const MOCK_OVERALL_MIN_ANSWERS = 2;
 export const MOCK_WAYS = ['take-turns', 'real-time', 'voice-model'] as const;
 export type MockWay = (typeof MOCK_WAYS)[number];
 /** The ways built so far: the setup offers only these. */
-export const MOCK_WAYS_BUILT: readonly MockWay[] = ['take-turns'];
+export const MOCK_WAYS_BUILT: readonly MockWay[] = ['take-turns', 'real-time'];
+/** The ways spoken over the `live-assist` connection (§15): their steps are messages, not calls. */
+export const MOCK_LIVE_WAYS: readonly MockWay[] = ['real-time', 'voice-model'];
 
 export const MOCK_LENGTHS = [10, 20] as const;
 export type MockLength = (typeof MOCK_LENGTHS)[number];
@@ -459,8 +461,14 @@ const timeLeftMs = z.number().catch(0);
 
 export const StartMockInterviewResponseSchema = z.object({
   sessionId: documentId,
-  lines: z.array(MockLineSchema).min(1),
+  /** Empty on the real-time ways: the opening is spoken over the connection. */
+  lines: z.array(MockLineSchema),
   timeLeftMs,
+  /** The real-time ways: where to connect (§15.2), never written into the page. */
+  connect: z
+    .object({ url: z.string().min(1) })
+    .optional()
+    .catch(undefined),
 });
 export const AnswerMockQuestionResponseSchema = z.object({
   sessionId: documentId,
@@ -487,9 +495,15 @@ export const PauseMockInterviewResponseSchema = z.object({
 });
 export const ResumeMockInterviewResponseSchema = z.object({
   sessionId: documentId,
-  lines: z.array(MockLineSchema).min(1),
+  /** Empty on the real-time ways: the relay says the line waiting once the page connects. */
+  lines: z.array(MockLineSchema),
   paused: z.boolean(),
   timeLeftMs,
+  /** The real-time ways: where to connect (quadev-backend #71). */
+  connect: z
+    .object({ url: z.string().min(1) })
+    .optional()
+    .catch(undefined),
 });
 export const EndMockInterviewResponseSchema = z.object({
   sessionId: documentId,

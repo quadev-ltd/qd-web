@@ -10,7 +10,9 @@
 #
 # What it does: builds the backend's functions, starts the Auth, Firestore, Functions and
 # Storage emulators with the project demo-quadev (which can reach no real Google service
-# and no model), runs Playwright with playwright.emulators.config.ts, and stops them.
+# and no model) and, when the backend has it, the `live-assist` relay of mock interviews in
+# real time at ws://localhost:8090 (scripts/e2e-emulators-run.sh); runs Playwright with
+# playwright.emulators.config.ts, and stops them.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -43,7 +45,7 @@ firebase_tools="$(node -p "require('$root/package.json').scripts.firebase.split(
 echo "Building the functions of quadev-backend (${actual:0:7})..."
 (cd "$backend" && npm run build)
 
-playwright=(yarn --cwd "$root" playwright test -c playwright.emulators.config.ts "$@")
+playwright=("$root/scripts/e2e-emulators-run.sh" yarn --cwd "$root" playwright test -c playwright.emulators.config.ts "$@")
 command="$(printf '%q ' "${playwright[@]}")"
 
 cd "$backend"
