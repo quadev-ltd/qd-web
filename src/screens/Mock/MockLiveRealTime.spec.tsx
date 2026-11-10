@@ -242,7 +242,7 @@ describe('the connection, in real time (Web-X6-RT-States)', () => {
     renderProfilePage(
       <RealTimePausedPanel controller={controller} byYou={false} />,
     );
-    expect(screen.getByText('mock.pausedTabText')).toBeVisible();
+    expect(screen.getByText('mock.livePausedTabText')).toBeVisible();
     await user.click(
       screen.getByRole('button', { name: 'mock.hearAgainButton' }),
     );

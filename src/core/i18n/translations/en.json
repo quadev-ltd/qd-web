@@ -1742,6 +1742,8 @@
     "cutOffLabel": "Did the interviewer cut you off, or hear itself?",
     "cutOffNo": "No",
     "cutOffOnce": "Once",
-    "cutOffMore": "More"
+    "cutOffMore": "More",
+    "livePausedByYouText": "The clock stopped. When you continue, the interviewer asks the question again and your answer starts over. It ends by itself after 30 minutes paused.",
+    "livePausedTabText": "You left the page, so the interview paused and the clock stopped. When you continue, the interviewer asks the question again and your answer starts over. It ends by itself after 30 minutes paused."
   }
 }

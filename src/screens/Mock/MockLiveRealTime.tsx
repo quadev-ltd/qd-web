@@ -209,15 +209,16 @@ export const RealTimeAnswerCard: React.FC<{
           </Banner>
         ) : (
           view.heard && (
-            // The end of what was heard, in one line; not read out while it changes.
+            // What was heard, in one line from the label: a line too long loses its start, not its
+            // end ("…" on the left, as the right-to-left box clips). Not read out while it changes.
             <p className="flex items-baseline gap-2.5 rounded-xl bg-tint px-3 py-2.5">
               <span className="flex-none text-[13px] leading-normal font-bold tracking-[0.04em] text-muted uppercase">
                 {t('mock.heardLabel')}
               </span>
-              <span className="flex min-w-0 flex-1 justify-end overflow-hidden">
-                <span className="text-[15px] leading-normal whitespace-nowrap">
-                  {view.heard}
-                </span>
+              <span
+                dir="rtl"
+                className="min-w-0 flex-1 overflow-hidden text-left text-[15px] leading-normal text-ellipsis whitespace-nowrap">
+                <span dir="ltr">{view.heard}</span>
               </span>
             </p>
           )
@@ -341,7 +342,7 @@ export const RealTimeConnectionPanel: React.FC<{
   }
 };
 
-/** Paused: back, the interviewer asks the question again and the answer starts after it. */
+/** Paused (Web-X6-RT-States): back, the interviewer asks the question again and the answer starts over. */
 export const RealTimePausedPanel: React.FC<{
   controller: LiveInterviewController;
   /** The candidate pressed Pause, rather than leaving the tab. */
@@ -362,9 +363,7 @@ export const RealTimePausedPanel: React.FC<{
         </Button>
       }>
       <p>
-        {byYou
-          ? t('mock.pausedByYouText', { kept: '' })
-          : t('mock.pausedTabText', { kept: '' })}
+        {byYou ? t('mock.livePausedByYouText') : t('mock.livePausedTabText')}
       </p>
     </MockPanel>
   );
