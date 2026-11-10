@@ -187,8 +187,12 @@ test('mock interview (D100 slice 1): started, answered, followed up, said differ
   await expect(said).toContainText(
     /fake-transcript: \d+ bytes of audio\/webm\./,
   );
-  // The follow-up as last said, in other words, and skipped
+  // The follow-up as last said, in other words, with the first wording under it, and skipped
   await expect(said).toContainText('fake-rephrased: what was the result?');
+  await expect(said).toContainText('Said differently');
+  await expect(said).toContainText(
+    'First asked: “fake-follow-up: what came of it?”',
+  );
   await expect(said).toContainText('Skipped');
   await expect(
     page.getByText('4 of 5 · the wait was a bit long'),

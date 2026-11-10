@@ -368,6 +368,28 @@ describe('a mock interview in Sessions (Web-R2-Mock)', () => {
     expect(screen.getByText('mock.rating')).toBeVisible();
   });
 
+  it('a question said differently: the wording heard last, marked, with the first one under it', async () => {
+    const gateway = createMockProfileGateway();
+    const said = session();
+    gateway.getMockSession.mockResolvedValue({
+      ...said,
+      turns: said.turns.map(turn =>
+        turn.id === 't2' ? { ...turn, rephrased: 'What came of it?' } : turn,
+      ),
+    });
+    renderSession(gateway);
+
+    const region = await screen.findByRole('region', {
+      name: 'mock.saidTitle',
+    });
+    const turns = within(region).getAllByRole('listitem');
+    expect(turns[1]).toHaveTextContent('mock.saidDifferentlyChip');
+    expect(turns[1]).toHaveTextContent('What came of it?');
+    expect(turns[1]).toHaveTextContent('mock.firstAsked');
+    expect(turns[0]).not.toHaveTextContent('mock.saidDifferentlyChip');
+    expect(turns[0]).not.toHaveTextContent('mock.firstAsked');
+  });
+
   it('removes it, asked first, and goes back to Sessions', async () => {
     const user = userEvent.setup();
     const gateway = createMockProfileGateway();
