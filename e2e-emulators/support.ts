@@ -254,3 +254,33 @@ export const openProfile = async (page: Page) => {
     .click();
   await expect(page).toHaveURL('/profile');
 };
+
+/**
+ * A microphone for the browser: a tone played into a real audio stream, which the page records
+ * as it would a microphone (Chromium's fake devices wait on the Mac's own permission).
+ * `window.qdMicrophone.gain` silences it, so a short answer is "nothing heard".
+ */
+export const microphone = (page: Page) =>
+  page.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = async () => {
+      const context = new AudioContext();
+      const tone = context.createOscillator();
+      const gain = context.createGain();
+      const known = window as unknown as {
+        qdMicrophone: GainNode;
+        qdMicrophoneVolume?: number;
+      };
+      gain.gain.value = known.qdMicrophoneVolume ?? 1;
+      const destination = context.createMediaStreamDestination();
+      tone.connect(gain).connect(destination);
+      tone.start();
+      known.qdMicrophone = gain;
+      return destination.stream;
+    };
+  });
+
+export const setMicrophone = (page: Page, volume: number) =>
+  page.evaluate(level => {
+    (window as unknown as { qdMicrophone: GainNode }).qdMicrophone.gain.value =
+      level;
+  }, volume);

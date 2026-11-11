@@ -160,6 +160,8 @@ export type PracticeTurn = z.infer<typeof PracticeTurnSchema>;
 export const START_PRACTICE_TURN = 'startPracticeTurn';
 export const ANSWER_PRACTICE_TURN = 'answerPracticeTurn';
 export const REMOVE_PRACTICE_TURN = 'removePracticeTurn';
+/** A recording of an answer turned into text, for the candidate to check (D102, doc 25 §3). */
+export const DICTATE_PRACTICE_ANSWER = 'dictatePracticeAnswer';
 /** Every turn of one application (D99), whether the application is still there or not. */
 export const REMOVE_APPLICATION_PRACTICE = 'removeApplicationPractice';
 
@@ -180,6 +182,21 @@ export interface AnswerPracticeTurnRequest {
   turnId: string;
   /** Trimmed, 1 to PRACTICE_ANSWER_MAX_CHARS characters. */
   answer: string;
+  /** How many dictations went into it (D102), for `practice.turn.answered` only. */
+  dictations?: number;
+}
+
+/** The most `dictations` an answer is counted with. */
+export const PRACTICE_DICTATIONS_MAX = 100;
+
+/**
+ * Up to DICTATION_MAX_MS of speech, as mock interviews record it. Nothing is stored: the text comes
+ * back for the page to add to the answer.
+ */
+export interface DictatePracticeAnswerRequest {
+  turnId: string;
+  audio: { mimeType: string; base64: string };
+  durationMs: number;
 }
 
 export interface StartPracticeTurnRequest {
@@ -201,6 +218,11 @@ export const StartPracticeTurnResponseSchema = z.object({
 export const AnswerPracticeTurnResponseSchema = z.object({
   turnId: documentId,
   attempts: z.number().int().positive(),
+});
+/** The words heard, trimmed and with their spaces collapsed, and how many there are. */
+export const DictatePracticeAnswerResponseSchema = z.object({
+  text: z.string(),
+  words: z.number().int().nonnegative(),
 });
 export const RemovePracticeTurnResponseSchema = z.object({
   turnId: documentId,

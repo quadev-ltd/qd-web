@@ -2,11 +2,13 @@
 // questions and the brief's, the key points of each from the profile, "Practise again" on a
 // practised question, a question of the candidate's own, and removing a practice. Slice 3: the
 // typed answer and its feedback, "Try first", answering again and the tries compared, the 5 tries
-// used and "Start again with new key points", and a failed answer kept. The preview's backend
-// writes the key points and the feedback as the backend's offline fakes do.
+// used and "Start again with new key points", and a failed answer kept. Dictation (D102): the
+// answer dictated through a stand-in microphone, added with Undo, and its states. The preview's
+// backend writes the key points and the feedback as the backend's offline fakes do, and hears the
+// sentence of Web-X7-Dictated in any recording.
 import { expect, type Page, test } from '@playwright/test';
 
-import { openApplications, seedApplications } from './support';
+import { microphone, openApplications, seedApplications } from './support';
 
 const QUESTION = 'Tell me about an incident you led from alert to fix.';
 
@@ -362,4 +364,101 @@ test('a failed answer keeps what was typed and can be sent again; none left toda
   await expect(
     page.getByRole('button', { name: 'Get feedback' }),
   ).toBeDisabled();
+});
+
+test('an answer dictated (D102): added at the end with Undo, nothing heard, a failure sent again, today’s limit', async ({
+  page,
+}) => {
+  await microphone(page);
+  const questions = await openWrittenList(page);
+  await questions
+    .getByRole('listitem')
+    .first()
+    .getByRole('button', { name: 'Practise' })
+    .click();
+  await expect(
+    page.getByRole('heading', { level: 1, name: QUESTION }),
+  ).toBeVisible();
+  const field = answerField(page);
+  const dictate = page.getByRole('button', { name: 'Dictate' });
+  const feedback = page.getByRole('button', { name: 'Get feedback' });
+  const stopButton = page.getByRole('button', { name: 'Stop and add' });
+  // A second of the stand-in's tone: a recording stopped at once is empty, so nothing is heard.
+  const stop = {
+    click: async () => {
+      await page.waitForTimeout(1_200);
+      await stopButton.click();
+    },
+  };
+  await expect(
+    page.getByText('Say it instead of typing, up to 3 minutes at a time.', {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('Typed answers only for now')).toHaveCount(0);
+
+  await field.fill('We rolled it back.');
+  await dictate.click();
+  await expect(page.getByText(/^Listening · 0:0\d$/)).toBeVisible();
+  await expect(field).not.toBeEditable();
+  await expect(feedback).toBeDisabled();
+  await expect(stopButton).toBeFocused();
+  await stop.click();
+  await expect(
+    page.getByText('Turning what you said into text…'),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'Added 18 words at the end. Check them before you get feedback',
+      {
+        exact: false,
+      },
+    ),
+  ).toBeVisible();
+  const dictated =
+    'We rolled it back. While we worked on it, I updated the support team every 15 minutes, so they could answer customers.';
+  await expect(field).toHaveValue(dictated);
+  await expect(field).toBeEditable();
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(field).toHaveValue('We rolled it back.');
+
+  // Nothing heard: nothing added
+  await page.evaluate(() =>
+    window.qdPreviewProfile?.failNextDictation('nothing-heard'),
+  );
+  await dictate.click();
+  await stop.click();
+  await expect(page.getByRole('alert')).toContainText(
+    'We didn’t hear anything, so nothing was added.',
+  );
+  await expect(field).toHaveValue('We rolled it back.');
+
+  // Couldn't turn it into text: the same recording sent again
+  await page.evaluate(() =>
+    window.qdPreviewProfile?.failNextDictation('failed'),
+  );
+  await dictate.click();
+  await stop.click();
+  await expect(page.getByRole('alert')).toContainText(
+    'The recording is still here, on this page only.',
+  );
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect(field).toHaveValue(dictated);
+
+  // The answer dictated goes for feedback as a typed one does
+  await feedback.click();
+  await expect(page.getByRole('region', { name: 'Your answer' })).toContainText(
+    'so they could answer customers.',
+  );
+
+  // Today's dictations used: said before recording, and typing still works
+  await page.evaluate(() => window.qdPreviewProfile?.setDictationsToday(30));
+  await page.getByRole('button', { name: 'Answer again' }).click();
+  await expect(page.getByRole('alert')).toContainText(
+    'You’ve reached today’s limit for dictation.',
+  );
+  await expect(dictate).toBeDisabled();
+  await answerField(page).fill('Typed instead.');
+  await expect(feedback).toBeEnabled();
 });

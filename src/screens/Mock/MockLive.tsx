@@ -3,15 +3,16 @@
 // question spoken, your turn, thinking, held back by the browser), the answer's card (microphone
 // off, recording with its time and the warning at 2:30, sending, and what to put right), and the
 // paused panel. One column until hints (slice H2) take the side.
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Icon from '@/components/Icon';
+import RecordingLevel from '@/components/RecordingLevel';
 import Spinner from '@/components/Spinner';
 import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
+import { clockTime, useTicking } from '@/core/audio/clock';
 import {
   type MockInterviewController,
   type MockView,
@@ -19,24 +20,6 @@ import {
 import { MOCK_ANSWER_WARN_MS } from '@/core/profile/mockInterviews';
 import { MockPanel } from '@/screens/Mock/mockParts';
 import { mockNow } from '@/screens/Mock/useMockController';
-
-/** "1:12". */
-export const clockTime = (ms: number) => {
-  const seconds = Math.floor(ms / 1_000);
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-};
-
-/** Re-renders every half second while `on`, for the times that run. */
-export const useTicking = (on: boolean) => {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!on) {
-      return undefined;
-    }
-    const timer = setInterval(() => setTick(tick => tick + 1), 500);
-    return () => clearInterval(timer);
-  }, [on]);
-};
 
 /** The phases in which the clock stops: paused, over, or the connection down (real time). */
 const CLOCK_STOPPED: ReadonlySet<string> = new Set([
@@ -263,19 +246,6 @@ export const InterviewerCard: React.FC<{
   );
 };
 
-/** Decorative bars beside "Recording": the answer is being heard. */
-export const Level: React.FC = () => (
-  <span aria-hidden="true" className="flex h-8 items-center gap-1">
-    {[8, 14, 22, 12, 26, 18, 10, 20, 28, 16, 9, 18].map((height, index) => (
-      <span
-        key={index}
-        className="w-1 animate-pulse rounded-[2px] bg-primary motion-reduce:animate-none"
-        style={{ height, animationDelay: `${index * 90}ms` }}
-      />
-    ))}
-  </span>
-);
-
 const SENDING_KEYS = {
   answer: 'mock.sendingAnswer',
   skip: 'mock.sendingSkip',
@@ -304,7 +274,7 @@ export const AnswerCard: React.FC<{
           <span className="text-[16px] leading-normal font-bold text-danger">
             {t('mock.recording', { time: clockTime(elapsed) })}
           </span>
-          <Level />
+          <RecordingLevel />
         </p>
         {elapsed >= MOCK_ANSWER_WARN_MS && (
           <Banner tone="warning" role="alert">

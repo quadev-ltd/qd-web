@@ -8,36 +8,7 @@
 // backend's part.
 import { expect, type Page, test } from '@playwright/test';
 
-import { openApplications, seedApplications } from './support';
-
-/**
- * A microphone for the browser: a tone played into a real audio stream, which the page records
- * as it would a microphone. Chromium's fake devices wait on the system's own microphone
- * permission on a Mac, which a headless run never gets. `refuse` blocks it instead. Its volume
- * (`setMicrophone`) is the candidate speaking or not, for the real-time way; it starts at
- * `window.qdMicrophoneVolume`, else 1.
- */
-const microphone = (page: Page, refuse = false) =>
-  page.addInitScript(blocked => {
-    navigator.mediaDevices.getUserMedia = async () => {
-      if (blocked) {
-        throw new DOMException('Blocked', 'NotAllowedError');
-      }
-      const context = new AudioContext();
-      const tone = context.createOscillator();
-      const gain = context.createGain();
-      const known = window as unknown as {
-        qdMicrophone: GainNode;
-        qdMicrophoneVolume?: number;
-      };
-      gain.gain.value = known.qdMicrophoneVolume ?? 1;
-      const destination = context.createMediaStreamDestination();
-      tone.connect(gain).connect(destination);
-      tone.start();
-      known.qdMicrophone = gain;
-      return destination.stream;
-    };
-  }, refuse);
+import { microphone, openApplications, seedApplications } from './support';
 
 /** The candidate speaking (1) or silent (0), on the real-time way. */
 const setMicrophone = (page: Page, volume: number) =>

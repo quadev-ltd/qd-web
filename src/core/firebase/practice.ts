@@ -24,6 +24,9 @@ import {
   ANSWER_PRACTICE_TURN,
   type AnswerPracticeTurnRequest,
   AnswerPracticeTurnResponseSchema,
+  DICTATE_PRACTICE_ANSWER,
+  type DictatePracticeAnswerRequest,
+  DictatePracticeAnswerResponseSchema,
   type PracticeTurn,
   PracticeTurnSchema,
   practiceTurnsPath,
@@ -195,5 +198,29 @@ export const getPracticeToday = (uid: string): Promise<number> =>
     const snapshot = await getDoc(doc(db(), usageDayPath(uid, new Date())));
     const calls: unknown =
       snapshot.data()?.services?.[USAGE_SERVICES.practice]?.calls;
+    return typeof calls === 'number' && calls > 0 ? calls : 0;
+  });
+
+/**
+ * Turns a recorded answer into its words (D102, doc 25 §3): one model call in the EU, a few
+ * seconds. The recording and the words are not stored.
+ */
+export const dictatePracticeAnswer = async (
+  request: DictatePracticeAnswerRequest,
+): Promise<{ text: string; words: number }> => {
+  const { text, words } = await call(
+    DICTATE_PRACTICE_ANSWER,
+    DictatePracticeAnswerResponseSchema,
+    request,
+  );
+  return { text, words };
+};
+
+/** How many dictations the backend made for this user today (UTC). */
+export const getDictationsToday = (uid: string): Promise<number> =>
+  mapped(async () => {
+    const snapshot = await getDoc(doc(db(), usageDayPath(uid, new Date())));
+    const calls: unknown =
+      snapshot.data()?.services?.[USAGE_SERVICES.dictation]?.calls;
     return typeof calls === 'number' && calls > 0 ? calls : 0;
   });

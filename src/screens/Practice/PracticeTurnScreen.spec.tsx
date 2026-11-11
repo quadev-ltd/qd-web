@@ -1,6 +1,5 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
 
 import {
   BriefPracticeScreen,
@@ -29,41 +28,39 @@ const setUp = ({
   gateway.getItems.mockResolvedValue([
     itemFixture({ id: 'item-1', kind: 'achievement', resourceId: 'r1' }),
   ]);
-  renderProfilePage(
-    <Routes>
-      <Route
-        path="/applications/:applicationId/interviews/:interviewId/practice/:turnId"
-        element={<InterviewPracticeScreen />}
-      />
-      <Route
-        path="/applications/:applicationId/practice/:turnId"
-        element={<BriefPracticeScreen />}
-      />
-      <Route
-        path="/applications/:applicationId/interviews/:interviewId"
-        element={<p>the interview</p>}
-      />
-      <Route path="/applications/:applicationId" element={<p>the brief</p>} />
-      <Route path="/sessions/:turnId" element={<SessionPracticeScreen />} />
-      <Route path="/sessions" element={<p>sessions</p>} />
-    </Routes>,
-    {
-      gateway,
-      route,
-      interviewProfile: {
-        uid: 'uid-1',
-        status: 'loaded',
-        resources: [resourceFixture()],
+  renderProfilePage(<></>, {
+    gateway,
+    routes: [
+      {
+        path: '/applications/:applicationId/interviews/:interviewId/practice/:turnId',
+        element: <InterviewPracticeScreen />,
       },
-      applications: {
-        uid: 'uid-1',
-        status: 'loaded',
-        applications: [applicationFixture()],
-        profileRevision: 3,
+      {
+        path: '/applications/:applicationId/practice/:turnId',
+        element: <BriefPracticeScreen />,
       },
-      flags: { textPractice: true },
+      {
+        path: '/applications/:applicationId/interviews/:interviewId',
+        element: <p>the interview</p>,
+      },
+      { path: '/applications/:applicationId', element: <p>the brief</p> },
+      { path: '/sessions/:turnId', element: <SessionPracticeScreen /> },
+      { path: '/sessions', element: <p>sessions</p> },
+    ],
+    route,
+    interviewProfile: {
+      uid: 'uid-1',
+      status: 'loaded',
+      resources: [resourceFixture()],
     },
-  );
+    applications: {
+      uid: 'uid-1',
+      status: 'loaded',
+      applications: [applicationFixture()],
+      profileRevision: 3,
+    },
+    flags: { textPractice: true },
+  });
   return { gateway };
 };
 

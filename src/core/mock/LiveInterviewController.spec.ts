@@ -1,4 +1,3 @@
-import { MicrophoneError } from './audio';
 import {
   type LiveDeps,
   LiveInterviewController,
@@ -13,6 +12,7 @@ import {
   type LiveSocket,
 } from './liveProtocol';
 
+import { MicrophoneError } from '@/core/audio/recording';
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';
 

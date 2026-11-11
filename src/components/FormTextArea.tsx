@@ -49,7 +49,7 @@ export const FormTextArea: React.FC<FormTextAreaProps> = ({
         rows={rows}
         aria-invalid={message ? true : undefined}
         aria-describedby={describedBy}
-        className={`min-w-0 resize-y rounded-control border bg-surface px-3.5 py-3 text-base leading-normal text-text placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`min-w-0 resize-y rounded-control border bg-surface px-3.5 py-3 text-base leading-normal text-text placeholder:text-muted read-only:bg-surface-locked disabled:cursor-not-allowed disabled:opacity-60 ${
           message ? 'border-danger' : 'border-border-strong'
         }`}
         {...textAreaProps}

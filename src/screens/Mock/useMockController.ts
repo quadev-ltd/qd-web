@@ -6,9 +6,9 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import {
   AnswerRecorder,
   blobToBase64,
-  LinePlayer,
   openMicrophone,
-} from '@/core/mock/audio';
+} from '@/core/audio/recording';
+import { LinePlayer } from '@/core/mock/audio';
 import { mockClient } from '@/core/mock/client';
 import { LiveAudio } from '@/core/mock/liveAudio';
 import { LiveInterviewController } from '@/core/mock/LiveInterviewController';

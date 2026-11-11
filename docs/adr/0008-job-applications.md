@@ -5,7 +5,8 @@
   page of an application (its details, the job, "Edit", "Remove"), its brief (slice 7), and the job
   as its text, a file or a link, read and named by the backend (slice 8, research doc 17), and its
   interviews (slice 22, D89), their likely questions (slice 23, D94), practising a question
-  (slice 26, D94), and Sessions with removing kept practice (slice 27, D99).
+  (slice 26, D94), Sessions with removing kept practice (slice 27, D99), and dictating a
+  practice answer (D102, research doc 25 W1).
 - **Scope:** `src/core/profile/applications.ts`, `src/core/profile/ApplicationsProvider.tsx`, the
   `applications` slice of the store, `src/core/firebase/applications.ts`, `src/screens/Applications/`
   and `src/screens/Home/InterviewHome.tsx`
@@ -276,6 +277,41 @@ Built against the backend's contract for `answerPracticeTurn` (slice 3, sent 9 N
   is the same one. A `question-changed` refusal hides it.
 - **A new error code, `profile/max-practice-attempts`,** for `attempt-limit`: the page reads the turn
   again, which then shows its 5 tries.
+
+## Dictating an answer (D102, research doc 25 W1, 11 Nov 2026)
+
+Built against the backend's `dictatePracticeAnswer` (B1, quadev-backend #74), from `Web-X7-Dictating`,
+`-Dictated` and `-Dictation-States` (canvas version 68, with version 80's wording for the limit),
+research doc 13 §31.
+
+- **The recorder is shared, not copied.** Mock interviews' microphone and `AnswerRecorder` (#70) move
+  to `src/core/audio/recording.ts`, with `microphoneFailureOf`, which both mock controllers use now.
+  `clockTime` and `useTicking` move to `src/core/audio/clock.ts`, and the level bars to
+  `RecordingLevel`. Dictation records with `useRecorder`, a hook for a page that records now and
+  then: it asks for the microphone on the press, stops at the longest, and lets the microphone go when
+  it stops, so the browser's recording mark goes off. The mock controllers keep the microphone for the
+  whole interview, in their classes.
+- **Where the words go** is worked out in `src/core/profile/dictation.ts` (`insertDictation`), apart
+  from the page: the last cursor position from the box's `select` events, after a selection, or the
+  end if the box was never clicked. A space goes before them unless there is one, a new line or an
+  opening bracket. One goes after them only when a word follows, not before punctuation. "Answer
+  again" puts the cursor at the end of the draft, so focusing the box doesn't send the words to its
+  start.
+- **Undo keeps the answer as it was before the words,** and goes when the candidate types or dictates
+  again. The count of dictations kept goes with the answer as `dictations`, capped at 100, for the
+  backend's event only.
+- **Today's limit is read before recording,** from `usage`'s `dictation` service and its override,
+  when the page opens and after each dictation. So "Dictate" is off before anyone speaks for 3
+  minutes into a refusal. The $0.20 cap is known only from the refusal, which shows the same state.
+  The last dictation of the day still shows its line with Undo.
+- **The recording stays in the page's memory until its text comes back,** so "Try again" resends the
+  same one after a failure. Nothing heard and the day's limit drop it. A removed turn makes the page
+  read it again.
+- **Leaving while recording asks first:** the browser's own prompt for closing or reloading, and a
+  "Leave while dictating?" dialog for the site's links (`useBlocker`). The practice specs now render
+  in a data router for that.
+- **A read-only answer is greyed** (`surface-locked`, #f7f7fa, as the board draws it) while dictation
+  records or the text is on its way, and while feedback is being written.
 
 ## Consequences
 

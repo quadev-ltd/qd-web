@@ -1,8 +1,9 @@
 // A question practised (X7, D94, research doc 21 §3): the way there (D96), the question with its
 // kind and where it came from, and its 3 to 5 key points, each with its profile item and the
 // resource it came from, or "Advice". Before the first try, "How you practise": the key points
-// shown, or hidden until the feedback ("Try first"). The typed answer, its feedback and the tries
-// (slice 3, research doc 13 §30) are in PracticeAnswer. Then "Remove this practice".
+// shown, or hidden until the feedback ("Try first"). The answer, typed or dictated (D102), its
+// feedback and the tries (slice 3, research doc 13 §30) are in PracticeAnswer. Then "Remove this
+// practice".
 //
 // The same page opens under an interview (its likely questions, or its own question), under an
 // application (its brief's questions) and from Sessions, so the way back leads where the candidate
@@ -236,10 +237,10 @@ const PractiseTurn: React.FC<{
   const shown = Math.min(picked ?? tries - 1, tries - 1);
   const attempt = tries > 0 ? turn.attempts[shown] : undefined;
 
-  const submit = async (text: string) => {
+  const submit = async (text: string, dictations: number) => {
     setFailure(null);
     try {
-      const { attempts } = await answer(text);
+      const { attempts } = await answer(text, dictations);
       setExpected(attempts);
       setAgain(false);
       setPicked(null);
@@ -303,6 +304,7 @@ const PractiseTurn: React.FC<{
         <div className="flex min-w-0 flex-[1_1_380px] flex-col gap-5">
           {answeringNow && (
             <AnswerCard
+              turnId={turn.id}
               initial={answering ?? draft ?? ''}
               busy={busy}
               left={left}
@@ -316,6 +318,7 @@ const PractiseTurn: React.FC<{
                     }
                   : undefined
               }
+              onGone={reload}
             />
           )}
           {attempt && (

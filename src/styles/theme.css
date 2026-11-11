@@ -35,6 +35,8 @@
   --color-border-subtle: #dcdde8;
   --color-border-faint: #e4e4ec;
   --color-tint: #ececfa;
+  /* A field that can't be changed for now: an answer while it is dictated or read. */
+  --color-surface-locked: #f7f7fa;
 
   /* Text on the sky blue (the initials in the account menu button). */
   --color-on-sky: #1e1f5c;
