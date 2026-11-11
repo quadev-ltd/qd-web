@@ -26,15 +26,17 @@ export interface ButtonStyleProps {
 const BASE =
   'box-border inline-flex cursor-pointer items-center justify-center leading-natural font-bold no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-60';
 
+// A button that is off keeps one look: the pointer over it doesn't darken it.
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-primary text-white hover:bg-primary-dark',
-  secondary: 'border border-primary bg-surface text-link hover:bg-tint',
-  danger: 'bg-danger text-white hover:bg-danger-dark',
-  inverse: 'bg-white text-primary-dark hover:bg-tint',
-  outline: 'border-2 border-white text-white hover:bg-white/10',
-  text: 'text-white hover:bg-white/10',
-  quiet: 'text-link hover:bg-tint',
-  quietDanger: 'text-danger hover:bg-danger-tint',
+  primary: 'bg-primary text-white not-disabled:hover:bg-primary-dark',
+  secondary:
+    'border border-primary bg-surface text-link not-disabled:hover:bg-tint',
+  danger: 'bg-danger text-white not-disabled:hover:bg-danger-dark',
+  inverse: 'bg-white text-primary-dark not-disabled:hover:bg-tint',
+  outline: 'border-2 border-white text-white not-disabled:hover:bg-white/10',
+  text: 'text-white not-disabled:hover:bg-white/10',
+  quiet: 'text-link not-disabled:hover:bg-tint',
+  quietDanger: 'text-danger not-disabled:hover:bg-danger-tint',
 };
 
 const SIZES: Record<ButtonSize, string> = {

@@ -21,7 +21,11 @@ import {
   PRACTICE_ATTEMPTS_MAX,
   type PracticeAttempt,
 } from '@/core/profile/practice';
-import { DictationArea, useDictation } from '@/screens/Practice/Dictation';
+import {
+  DictationArea,
+  scrollToWords,
+  useDictation,
+} from '@/screens/Practice/Dictation';
 import FeedbackSections from '@/screens/Practice/FeedbackSections';
 import {
   type PracticeFailure,
@@ -152,6 +156,15 @@ export const AnswerCard: React.FC<AnswerCardProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The words just added are scrolled into view, at any width.
+  const added = dictation.added;
+  useEffect(() => {
+    const box = field.current?.querySelector('textarea');
+    if (added && box) {
+      scrollToWords(box, added.range);
+    }
+  }, [added]);
+
   // Leaving while it records asks first, and then adds nothing.
   const recording = dictation.view === 'recording';
   const blocker = useBlocker(
@@ -175,7 +188,11 @@ export const AnswerCard: React.FC<AnswerCardProps> = ({
           rows={9}
           label={t('practice.answerField')}
           hint={t('practice.answerHint')}
-          placeholder={t('practice.answerPlaceholder')}
+          placeholder={
+            dictation.view === 'unsupported'
+              ? t('practice.answerHint')
+              : t('practice.answerPlaceholder')
+          }
           value={text}
           onChange={event => {
             setText(event.target.value);

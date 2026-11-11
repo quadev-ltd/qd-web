@@ -312,6 +312,12 @@ research doc 13 §31.
   in a data router for that.
 - **A read-only answer is greyed** (`surface-locked`, #f7f7fa, as the board draws it) while dictation
   records or the text is on its way, and while feedback is being written.
+- **After the design check (11 Nov 2026):**
+  - The box scrolls to the words just added (`scrollToWords`), because a textarea can't say where a
+    character is. The box's height up to each end of the words is measured with its text cut there.
+  - A browser that can't record drops "or dictate it" from the placeholder.
+  - A button that is off no longer takes its hover colour (`not-disabled:hover:` in `buttonStyles`),
+    so it keeps one look when the pointer is over it, everywhere on the site.
 
 ## Consequences
 

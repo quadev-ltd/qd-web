@@ -36,13 +36,17 @@ import { useSessionUser } from '@/core/session/hooks';
 type DictationStep =
   | { step: 'idle' }
   | { step: 'turning' }
-  /** `before` is the answer as it was, for Undo; `cursor` where the words went. */
+  /**
+   * `before` is the answer as it was, and `cursor` where the cursor was, for Undo; `range` where the
+   * words are now.
+   */
   | {
       step: 'added';
       words: number;
       atEnd: boolean;
       before: string;
       cursor: DictationCursor | null;
+      range: DictationCursor;
     }
   | { step: 'nothingHeard' }
   | { step: 'failed'; recording: Recording }
@@ -123,6 +127,10 @@ export const useDictation = ({
           atEnd: inserted.atEnd,
           before,
           cursor: at,
+          range: {
+            start: inserted.cursor - heard.text.length,
+            end: inserted.cursor,
+          },
         });
       } catch (error) {
         logProfileError('dictatePracticeAnswer', error, uid);
@@ -229,6 +237,37 @@ export const useDictation = ({
 };
 
 export type Dictation = ReturnType<typeof useDictation>;
+
+/**
+ * Scrolls the answer's box to the words just added, which the line asks the candidate to check: their
+ * first line at least, and all of them when they fit. A text box can't say where a character is, so
+ * its height up to each end of the words is measured with its text cut there, then put back. The
+ * cursor goes after them, for the next dictation.
+ */
+export const scrollToWords = (
+  box: HTMLTextAreaElement,
+  { start, end }: DictationCursor,
+) => {
+  const text = box.value;
+  const heightTo = (at: number) => {
+    box.value = text.slice(0, at);
+    return box.scrollHeight;
+  };
+  const toStart = heightTo(start);
+  const toEnd = heightTo(end);
+  box.value = text;
+  box.setSelectionRange(end, end);
+  const style = getComputedStyle(box);
+  const padding =
+    (parseFloat(style.paddingTop) || 0) +
+    (parseFloat(style.paddingBottom) || 0);
+  const line = parseFloat(style.lineHeight) || 24;
+  // The words' first line at the top, or their end at the bottom, whichever is higher.
+  box.scrollTop = Math.max(
+    0,
+    Math.min(toEnd - box.clientHeight, toStart - padding - line),
+  );
+};
 
 /** The tinted box of "Listening", "Turning it into text" and "The browser asks". */
 const DictationBox: React.FC<{ children: React.ReactNode }> = ({
