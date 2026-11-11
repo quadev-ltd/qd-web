@@ -7,6 +7,7 @@ import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 
+import { scrollToWords } from './Dictation';
 import { InterviewPracticeScreen } from './PracticeTurnScreen';
 
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
@@ -387,6 +388,11 @@ describe('dictation’s states (Web-X7-Dictation-States)', () => {
     await answerField();
     expect(dictate()).toBeDisabled();
     expect(screen.getByText('practice.dictationUnsupportedNote')).toBeVisible();
+    // Nothing says it can be dictated
+    expect(await answerField()).toHaveAttribute(
+      'placeholder',
+      'practice.answerHint',
+    );
   });
 
   it('a turn removed meanwhile: the page reads it again', async () => {
@@ -405,5 +411,43 @@ describe('dictation’s states (Web-X7-Dictation-States)', () => {
     expect(
       await screen.findByRole('heading', { name: 'practice.notFoundTitle' }),
     ).toBeVisible();
+  });
+});
+
+describe('the words just added, scrolled into view (design check of W1)', () => {
+  /** A box 10 lines high, with 12px of padding above and below, whose lines are 20 characters. */
+  const box = (text: string) => {
+    const area = document.createElement('textarea');
+    area.style.paddingTop = '12px';
+    area.style.paddingBottom = '12px';
+    area.style.lineHeight = '24px';
+    area.value = text;
+    Object.defineProperty(area, 'clientHeight', { value: 264 });
+    Object.defineProperty(area, 'scrollHeight', {
+      get: () => 24 + Math.max(1, Math.ceil(area.value.length / 20)) * 24,
+    });
+    return area;
+  };
+  const lines = (count: number) => 'x'.repeat(20 * count);
+
+  it('shows all the words when they fit: their end at the bottom', () => {
+    const area = box(`${lines(30)} ${lines(2)}`);
+    scrollToWords(area, { start: 601, end: 641 });
+
+    // Up to the end: 33 lines, 24 + 33 × 24 = 816; less the box, 264
+    expect(area.scrollTop).toBe(552);
+    expect(area.value).toBe(`${lines(30)} ${lines(2)}`);
+    expect(area.selectionStart).toBe(641);
+  });
+
+  it('shows their first line when they don’t all fit, and nothing above the top', () => {
+    const area = box(`${lines(5)} ${lines(40)}`);
+    scrollToWords(area, { start: 101, end: 901 });
+    // Up to the start: 6 lines, 168; less the padding and a line, 120
+    expect(area.scrollTop).toBe(120);
+
+    const short = box('Short. Said aloud.');
+    scrollToWords(short, { start: 7, end: 18 });
+    expect(short.scrollTop).toBe(0);
   });
 });
