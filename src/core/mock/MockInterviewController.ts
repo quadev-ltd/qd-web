@@ -3,8 +3,9 @@
 // done", sends it and plays what comes back, pauses with the tab, and ends. It measures what
 // §13.5 asks of the browser and sends it with the next call. The page shows its `view` and calls
 // its actions; the gateway, the microphone and the player are given, so the specs replace them.
-import { type Playback, PlaybackBlockedError, type Recording } from './audio';
+import { type Playback, PlaybackBlockedError } from './audio';
 
+import { microphoneFailureOf, type Recording } from '@/core/audio/recording';
 import { getProfileErrorCode, ProfileErrorCode } from '@/core/profile/errors';
 import { type ProfileGateway } from '@/core/profile/gateway';
 import {
@@ -289,10 +290,7 @@ export class MockInterviewController {
     try {
       this.stream = await this.deps.openMicrophone();
     } catch (error) {
-      const failure =
-        error instanceof Error && 'failure' in error
-          ? (error as { failure: string }).failure
-          : 'missing';
+      const failure = microphoneFailureOf(error);
       this.set({
         phase:
           failure === 'refused'

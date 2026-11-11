@@ -81,7 +81,9 @@ import {
 } from './mockInterviews';
 import {
   countApplicationPractice,
+  dictatePracticeAnswer,
   getBriefPracticeTurns,
+  getDictationsToday,
   getListPracticeTurns,
   getPracticeToday,
   getPracticeTurn,
@@ -153,6 +155,8 @@ export const createFirebaseProfileGateway = (): ProfileGateway => ({
   startPracticeTurn,
   answerPracticeTurn,
   removePracticeTurn,
+  dictatePracticeAnswer,
+  getDictationsToday,
   getMockSessions,
   getMockSession,
   countMockSessions,

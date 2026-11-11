@@ -27,8 +27,9 @@ import Button from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/ButtonLink';
 import Card from '@/components/ui/Card';
 import Dialog from '@/components/ui/Dialog';
+import { useTicking } from '@/core/audio/clock';
+import { canRecord } from '@/core/audio/recording';
 import { useFlag } from '@/core/flags/FlagsProvider';
-import { canRecord } from '@/core/mock/audio';
 import { canStream } from '@/core/mock/liveAudio';
 import { type LivePhase } from '@/core/mock/LiveInterviewController';
 import { type MockView } from '@/core/mock/MockInterviewController';
@@ -77,7 +78,6 @@ import {
   InterviewerCard,
   MockProgress,
   PausedPanel,
-  useTicking,
 } from '@/screens/Mock/MockLive';
 import {
   RealTimeAnswerCard,

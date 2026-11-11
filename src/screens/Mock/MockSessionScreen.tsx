@@ -17,6 +17,7 @@ import ButtonLink from '@/components/ui/ButtonLink';
 import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
 import Dialog from '@/components/ui/Dialog';
+import { clockTime } from '@/core/audio/clock';
 import { useApplications } from '@/core/profile/ApplicationsProvider';
 import {
   getProfileErrorCode,
@@ -50,7 +51,6 @@ import {
   useMockFeedback,
   useMockPractise,
 } from '@/screens/Mock/MockFeedback';
-import { clockTime } from '@/screens/Mock/MockLive';
 import {
   mockMinutes,
   mockTitle,

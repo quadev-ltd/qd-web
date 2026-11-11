@@ -1,10 +1,11 @@
-import { MicrophoneError, PlaybackBlockedError } from './audio';
+import { PlaybackBlockedError } from './audio';
 import {
   type MockDeps,
   MockInterviewController,
   type RecorderLike,
 } from './MockInterviewController';
 
+import { MicrophoneError } from '@/core/audio/recording';
 import { ProfileError, ProfileErrorCode } from '@/core/profile/errors';
 import { type MockLine } from '@/core/profile/mockInterviews';
 import { createMockProfileGateway } from '@/testUtil/mockProfileGateway';

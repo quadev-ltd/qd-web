@@ -3,10 +3,18 @@
 // from the backend's offline `answer-guide` fake ("fake-advice: …" with an empty profile), the
 // marks read by the interview's list and by the brief, the day's count from `usage`,
 // removePracticeTurn, and answerPracticeTurn with the offline `answer-feedback` fake's feedback as
-// stored after the backend's checks.
+// stored after the backend's checks. Dictation (D102): dictatePracticeAnswer with a real recording,
+// heard by the offline `answer-transcript` fake ("fake-transcript: N bytes of audio/webm.", nothing
+// under 1,000 bytes), and the answer sent with its count of dictations.
 import { expect, type Page, test } from '@playwright/test';
 
-import { createAccount, setUsageToday, signIn } from './support';
+import {
+  createAccount,
+  microphone,
+  setMicrophone,
+  setUsageToday,
+  signIn,
+} from './support';
 
 /** A date this many days from today in London, as the date field takes it. */
 const inDays = (days: number) =>
@@ -314,4 +322,79 @@ test('feedback (D94 slice 3): an answer sent by answerPracticeTurn, its feedback
   await expect(questions.getByRole('listitem')).toContainText(
     'Practised · 1 try',
   );
+});
+
+test('dictation (D102): a recording turned into text by dictatePracticeAnswer and added with Undo, sent with its count; silence heard as nothing; the day’s limit', async ({
+  page,
+}) => {
+  await microphone(page);
+  const account = await createAccount({
+    interviewAssistant: true,
+    textPractice: true,
+  });
+  await signIn(page, account);
+  await practiseFirst(page);
+  const field = page.getByRole('textbox', { name: 'Your answer' });
+  const dictate = page.getByRole('button', { name: 'Dictate' });
+  const stop = page.getByRole('button', { name: 'Stop and add' });
+  const heard = /^I did it\. fake-transcript: \d+ bytes of audio\/webm\.$/;
+  await field.fill('I did it.');
+
+  // Recorded long enough to be heard (well over 1,000 bytes): the fake's 5 words at the end
+  await dictate.click();
+  await expect(page.getByText(/^Listening · 0:0\d$/)).toBeVisible();
+  await page.waitForTimeout(1_500);
+  await stop.click();
+  await expect(field).toHaveValue(heard, { timeout: 30_000 });
+  await expect(
+    page.getByText('Added 5 words at the end.', { exact: false }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(field).toHaveValue('I did it.');
+
+  // Dictated again and kept: answerPracticeTurn takes the answer with `dictations: 1`
+  await dictate.click();
+  await page.waitForTimeout(1_500);
+  await stop.click();
+  await expect(field).toHaveValue(heard, { timeout: 30_000 });
+  const answered = page.waitForRequest(request =>
+    request.url().endsWith('/answerPracticeTurn'),
+  );
+  await page.getByRole('button', { name: 'Get feedback' }).click();
+  expect((await answered).postDataJSON()).toMatchObject({
+    data: { dictations: 1 },
+  });
+  const feedback = page.getByRole('region', { name: 'Feedback', exact: true });
+  await expect(feedback).toContainText('Try 1 of 5', { timeout: 30_000 });
+  await expect(page.getByRole('region', { name: 'Your answer' })).toContainText(
+    'fake-transcript:',
+  );
+
+  // Silence, stopped at once: under 1,000 bytes (about 3 a millisecond after the file's start), and
+  // the backend hears nothing
+  await page.getByRole('button', { name: 'Answer again' }).click();
+  await setMicrophone(page, 0);
+  await dictate.click();
+  await expect(stop).toBeVisible();
+  await page.waitForTimeout(100);
+  const refused = page.waitForResponse(response =>
+    response.url().endsWith('/dictatePracticeAnswer'),
+  );
+  await stop.click();
+  expect((await refused).status()).toBe(400);
+  await expect(page.getByRole('alert')).toContainText(
+    'We didn’t hear anything, so nothing was added.',
+  );
+
+  // Used up since the page read the count: only the backend knows, and it refuses
+  await setMicrophone(page, 1);
+  await setUsageToday(account.uid, 'dictation', 30);
+  await dictate.click();
+  await page.waitForTimeout(1_500);
+  await stop.click();
+  await expect(page.getByRole('alert')).toContainText(
+    'You’ve reached today’s limit for dictation.',
+    { timeout: 30_000 },
+  );
+  await expect(dictate).toBeDisabled();
 });

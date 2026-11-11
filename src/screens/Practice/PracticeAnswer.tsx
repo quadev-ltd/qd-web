@@ -1,9 +1,11 @@
 // Answering a question practised and its feedback (X7, D94 slice 3, research doc 13 §30): the
-// typed answer with "Get feedback" (a model call, 5 to 15 seconds), the tries to pick from, the
-// answer of the try chosen with its feedback in six parts, never on tone or confidence (FR-14),
-// and "Answer again" up to 5 tries, then "Start again with new key points".
+// answer, typed or dictated (D102, doc 13 §31), with "Get feedback" (a model call, 5 to 15
+// seconds), the tries to pick from, the answer of the try chosen with its feedback in six parts,
+// never on tone or confidence (FR-14), and "Answer again" up to 5 tries, then "Start again with new
+// key points".
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useBlocker } from 'react-router';
 
 import FormTextArea from '@/components/FormTextArea';
 import Icon from '@/components/Icon';
@@ -11,12 +13,15 @@ import Spinner from '@/components/Spinner';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
+import Dialog from '@/components/ui/Dialog';
+import { type DictationCursor } from '@/core/profile/dictation';
 import { getProfileErrorCode, ProfileErrorCode } from '@/core/profile/errors';
 import {
   PRACTICE_ANSWER_MAX_CHARS,
   PRACTICE_ATTEMPTS_MAX,
   type PracticeAttempt,
 } from '@/core/profile/practice';
+import { DictationArea, useDictation } from '@/screens/Practice/Dictation';
 import FeedbackSections from '@/screens/Practice/FeedbackSections';
 import {
   type PracticeFailure,
@@ -61,41 +66,106 @@ const NotTone: React.FC = () => {
 };
 
 export interface AnswerCardProps {
+  turnId: string;
   /** What the field starts with: the answer being read, or one whose feedback failed. */
   initial: string;
   /** The answer is being read: the field is read-only and the button says so. */
   busy: boolean;
   left: { left: number; max: number } | null;
   failure: PracticeFailure | null;
-  onSubmit: (answer: string) => void;
+  /** The answer, with how many dictations went into it. */
+  onSubmit: (answer: string, dictations: number) => void;
   /** "Answer again" can be closed; the first answer can't. */
   onCancel?: () => void;
+  /** The turn was removed while dictating: the page reads it again. */
+  onGone: () => void;
 }
 
-/** "Your answer" with "Get feedback", the calls left and what the feedback is on. */
+/** "Leave while dictating?": what was said so far isn't added. */
+const LeaveDictatingDialog: React.FC<{
+  onStay: () => void;
+  onLeave: () => void;
+}> = ({ onStay, onLeave }) => {
+  const { t } = useTranslation();
+  return (
+    <Dialog
+      title={t('practice.dictationLeaveTitle')}
+      icon="alert"
+      onClose={onStay}>
+      <p className="text-[16px] leading-normal text-muted">
+        {t('practice.dictationLeaveText')}
+      </p>
+      <div className="flex flex-wrap gap-3">
+        <Button onClick={onStay} className="flex-[1_1_140px]">
+          {t('mock.stayButton')}
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={onLeave}
+          className="flex-[1_1_140px]">
+          {t('mock.leaveButton')}
+        </Button>
+      </div>
+    </Dialog>
+  );
+};
+
+/**
+ * "Your answer", typed or dictated, with "Get feedback", the calls left and what the feedback is
+ * on.
+ */
 export const AnswerCard: React.FC<AnswerCardProps> = ({
+  turnId,
   initial,
   busy,
   left,
   failure,
   onSubmit,
   onCancel,
+  onGone,
 }) => {
   const { t } = useTranslation();
   const [text, setText] = useState(initial);
   const field = useRef<HTMLDivElement>(null);
+  // Where the cursor was last left in the answer: dictated words go there.
+  const cursor = useRef<DictationCursor | null>(null);
+  const dictation = useDictation({
+    turnId,
+    text,
+    onText: setText,
+    cursorRef: cursor,
+    onGone,
+  });
+  const locked = busy || dictation.busy;
   const trimmed = text.trim();
   const tooLong = trimmed.length > PRACTICE_ANSWER_MAX_CHARS;
   const noneLeft = left?.left === 0;
 
-  // "Answer again" opens on the field.
+  // "Answer again" opens on the field, at the end of what it holds.
   useEffect(() => {
     if (onCancel) {
-      field.current?.querySelector('textarea')?.focus();
+      const box = field.current?.querySelector('textarea');
+      box?.focus();
+      box?.setSelectionRange(box.value.length, box.value.length);
     }
     // Only when it opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Leaving while it records asks first, and then adds nothing.
+  const recording = dictation.view === 'recording';
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      recording && currentLocation.pathname !== nextLocation.pathname,
+  );
+  useEffect(() => {
+    if (!recording) {
+      return undefined;
+    }
+    const onLeave = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', onLeave);
+    return () => window.removeEventListener('beforeunload', onLeave);
+  }, [recording]);
 
   return (
     <Card elevation="raised" className="gap-4 p-5">
@@ -105,9 +175,19 @@ export const AnswerCard: React.FC<AnswerCardProps> = ({
           rows={9}
           label={t('practice.answerField')}
           hint={t('practice.answerHint')}
+          placeholder={t('practice.answerPlaceholder')}
           value={text}
-          onChange={event => setText(event.target.value)}
-          readOnly={busy}
+          onChange={event => {
+            setText(event.target.value);
+            dictation.typed();
+          }}
+          onSelect={event => {
+            cursor.current = {
+              start: event.currentTarget.selectionStart,
+              end: event.currentTarget.selectionEnd,
+            };
+          }}
+          readOnly={locked}
           counter={{ length: trimmed.length, max: PRACTICE_ANSWER_MAX_CHARS }}
           error={
             tooLong
@@ -116,6 +196,7 @@ export const AnswerCard: React.FC<AnswerCardProps> = ({
           }
         />
       </div>
+      <DictationArea dictation={dictation} disabled={busy} />
       {failure && (
         <PracticeFailureBanner failure={failure} max={left?.max} of="answer" />
       )}
@@ -125,8 +206,8 @@ export const AnswerCard: React.FC<AnswerCardProps> = ({
       <div className="flex flex-wrap items-center gap-3">
         <Button
           size="small"
-          onClick={() => onSubmit(trimmed)}
-          disabled={busy || !trimmed || tooLong || noneLeft}
+          onClick={() => onSubmit(trimmed, dictation.kept)}
+          disabled={locked || !trimmed || tooLong || noneLeft}
           aria-busy={busy}
           className="gap-2">
           {busy && <Spinner size="small" decorative />}
@@ -134,7 +215,7 @@ export const AnswerCard: React.FC<AnswerCardProps> = ({
             ? t('practice.gettingFeedbackButton')
             : t('practice.feedbackButton')}
         </Button>
-        {onCancel && !busy && (
+        {onCancel && !locked && (
           <Button variant="secondary" size="small" onClick={onCancel}>
             {t('practice.cancelButton')}
           </Button>
@@ -147,6 +228,15 @@ export const AnswerCard: React.FC<AnswerCardProps> = ({
         </p>
       ) : (
         <NotTone />
+      )}
+      {blocker.state === 'blocked' && (
+        <LeaveDictatingDialog
+          onStay={() => blocker.reset()}
+          onLeave={() => {
+            dictation.cancel();
+            blocker.proceed();
+          }}
+        />
       )}
     </Card>
   );

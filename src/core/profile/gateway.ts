@@ -46,6 +46,7 @@ import {
 } from './mockInterviews';
 import {
   type AnswerPracticeTurnRequest,
+  type DictatePracticeAnswerRequest,
   type PracticeTurn,
   type StartPracticeTurnRequest,
 } from './practice';
@@ -333,6 +334,15 @@ export interface ProfileGateway {
   removePracticeTurn(turnId: string): Promise<void>;
   /** How many practice calls were made for this user today (UTC), for the limit. */
   getPracticeToday(uid: string): Promise<number>;
+  /**
+   * Turns a recorded answer into its words (D102, a few seconds), for the page to add to the
+   * answer. Nothing is stored.
+   */
+  dictatePracticeAnswer(
+    request: DictatePracticeAnswerRequest,
+  ): Promise<{ text: string; words: number }>;
+  /** How many dictations were made for this user today (UTC), for their own limit. */
+  getDictationsToday(uid: string): Promise<number>;
 
   // ---------- Mock interviews (D100) ----------
 

@@ -4,7 +4,7 @@
 // keep what was typed.
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes, useLocation } from 'react-router';
+import { useLocation } from 'react-router';
 
 import { InterviewPracticeScreen } from './PracticeTurnScreen';
 
@@ -32,33 +32,34 @@ const setUp = (turn: PracticeTurn, gateway = createMockProfileGateway()) => {
     itemFixture({ id: 'item-1', kind: 'achievement', resourceId: 'r1' }),
   ]);
   gateway.getPracticeTurn.mockResolvedValue(turn);
-  renderProfilePage(
-    <>
-      <Routes>
-        <Route
-          path="/applications/:applicationId/interviews/:interviewId/practice/:turnId"
-          element={<InterviewPracticeScreen />}
-        />
-      </Routes>
-      <Location />
-    </>,
-    {
-      gateway,
-      route: '/applications/a1/interviews/i1/practice/turn-1',
-      interviewProfile: {
-        uid: 'uid-1',
-        status: 'loaded',
-        resources: [resourceFixture()],
+  renderProfilePage(<></>, {
+    gateway,
+    routes: [
+      {
+        path: '/applications/:applicationId/interviews/:interviewId/practice/:turnId',
+        element: (
+          <>
+            <InterviewPracticeScreen />
+            <Location />
+          </>
+        ),
       },
-      applications: {
-        uid: 'uid-1',
-        status: 'loaded',
-        applications: [applicationFixture()],
-        profileRevision: 3,
-      },
-      flags: { textPractice: true },
+      { path: '*', element: <Location /> },
+    ],
+    route: '/applications/a1/interviews/i1/practice/turn-1',
+    interviewProfile: {
+      uid: 'uid-1',
+      status: 'loaded',
+      resources: [resourceFixture()],
     },
-  );
+    applications: {
+      uid: 'uid-1',
+      status: 'loaded',
+      applications: [applicationFixture()],
+      profileRevision: 3,
+    },
+    flags: { textPractice: true },
+  });
   return { gateway };
 };
 
@@ -112,9 +113,11 @@ describe('feedback on a typed answer (X7, D94 slice 3)', () => {
     await user.type(field, `  ${PRACTICE_ANSWER}  `);
     await user.click(send);
 
+    // Typed: no dictation went into it (D102).
     expect(gateway.answerPracticeTurn).toHaveBeenCalledWith({
       turnId: 'turn-1',
       answer: PRACTICE_ANSWER,
+      dictations: 0,
     });
     expect(field).toHaveAttribute('readonly');
     expect(

@@ -24,6 +24,7 @@ import {
 } from './liveProtocol';
 import { type MockQuestion, type MockSetup } from './MockInterviewController';
 
+import { microphoneFailureOf } from '@/core/audio/recording';
 import { getProfileErrorCode, ProfileErrorCode } from '@/core/profile/errors';
 import { type ProfileGateway } from '@/core/profile/gateway';
 import {
@@ -342,10 +343,7 @@ export class LiveInterviewController {
         this.frame(pcm, level),
       );
     } catch (error) {
-      const failure =
-        error instanceof Error && 'failure' in error
-          ? (error as { failure: string }).failure
-          : 'missing';
+      const failure = microphoneFailureOf(error);
       this.set({
         phase:
           failure === 'refused'

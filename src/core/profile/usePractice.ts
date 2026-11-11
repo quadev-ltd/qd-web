@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import {
+  PRACTICE_DICTATIONS_MAX,
   type PracticeMark,
   practiceMarksOf,
   practiceStartKey,
@@ -14,6 +15,7 @@ import {
 } from './practice';
 import { useProfileGateway } from './ProfileGatewayProvider';
 import {
+  DICTATION_DAILY_LIMIT,
   effectiveLimits,
   PRACTICE_DAILY_LIMIT,
   serviceOverride,
@@ -82,8 +84,8 @@ export const usePractice = () => {
 };
 
 /**
- * Feedback on a typed answer to one turn: the answer being read, if it is, and an answer whose
- * feedback failed, kept to be sent again.
+ * Feedback on an answer to one turn, typed or dictated: the answer being read, if it is, and an
+ * answer whose feedback failed, kept to be sent again.
  */
 export const usePracticeAnswer = (turnId: string) => {
   const gateway = useProfileGateway();
@@ -97,14 +99,18 @@ export const usePracticeAnswer = (turnId: string) => {
    * refusal, keeping the answer.
    */
   const answer = useCallback(
-    async (text: string): Promise<{ attempts: number }> => {
+    async (text: string, dictations = 0): Promise<{ attempts: number }> => {
       if (!uid) {
         throw new Error('Not signed in');
       }
       dispatch(practiceAnswerBegan({ uid, turnId, answer: text }));
       let result: { attempts: number };
       try {
-        result = await gateway.answerPracticeTurn({ turnId, answer: text });
+        result = await gateway.answerPracticeTurn({
+          turnId,
+          answer: text,
+          dictations: Math.min(dictations, PRACTICE_DICTATIONS_MAX),
+        });
       } catch (error) {
         dispatch(practiceAnswerEnded({ turnId, kept: text }));
         throw error;
@@ -199,6 +205,47 @@ export const usePracticeLeft = () => {
   const max = effectiveLimits(
     PRACTICE_DAILY_LIMIT,
     serviceOverride(today.limits, USAGE_SERVICES.practice),
+  ).maxCallsPerDay;
+  return { left: { max, left: Math.max(0, max - today.made) }, counted };
+};
+
+/**
+ * Today's dictations and this account's limit (D102), apart from the practice calls: read when the
+ * page opens and after each dictation, so "Dictate" is off once they are used.
+ */
+export const useDictationLeft = () => {
+  const gateway = useProfileGateway();
+  const uid = useSessionUser()?.uid ?? null;
+  const [today, setToday] = useState<{
+    made: number;
+    limits: StoredUsageLimits | null;
+  } | null>(null);
+  const [reads, setReads] = useState(0);
+  useEffect(() => {
+    if (!uid) {
+      return undefined;
+    }
+    let live = true;
+    Promise.all([
+      gateway.getDictationsToday(uid),
+      gateway.getUsageLimits(uid).catch(() => null),
+    ]).then(
+      ([made, limits]) => live && setToday({ made, limits }),
+      () => live && setToday(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [gateway, uid, reads]);
+
+  const counted = useCallback(() => setReads(count => count + 1), []);
+
+  if (!today) {
+    return { left: null, counted };
+  }
+  const max = effectiveLimits(
+    DICTATION_DAILY_LIMIT,
+    serviceOverride(today.limits, USAGE_SERVICES.dictation),
   ).maxCallsPerDay;
   return { left: { max, left: Math.max(0, max - today.made) }, counted };
 };

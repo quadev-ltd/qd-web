@@ -60,6 +60,10 @@ export const createMockProfileGateway = (): Mocked<ProfileGateway> => ({
   answerPracticeTurn: vi.fn(() => Promise.resolve({ attempts: 1 })),
   removePracticeTurn: vi.fn(() => Promise.resolve()),
   getPracticeToday: vi.fn(() => Promise.resolve(0)),
+  dictatePracticeAnswer: vi.fn(() =>
+    Promise.resolve({ text: 'Said aloud.', words: 2 }),
+  ),
+  getDictationsToday: vi.fn(() => Promise.resolve(0)),
   getMockSessions: vi.fn(() => Promise.resolve([])),
   getMockSession: vi.fn(() => Promise.resolve(null)),
   countMockSessions: vi.fn(() => Promise.resolve(0)),

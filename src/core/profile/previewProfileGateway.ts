@@ -122,6 +122,7 @@ import {
 import {
   CV_VERSION_DAILY_LIMIT,
   COVER_LETTER_DAILY_LIMIT,
+  DICTATION_DAILY_LIMIT,
   INTERVIEW_QUESTIONS_DAILY_LIMIT,
   effectiveLimits,
   MOCK_INTERVIEW_DAILY_LIMIT,
@@ -223,6 +224,8 @@ interface PreviewProfile {
   practiceTurns?: PracticeTurn[];
   /** How many practice calls were made today. */
   practiceToday?: number;
+  /** How many answers were dictated today (D102). */
+  dictationsToday?: number;
   /** The mock interviews (D100), the newest last. */
   mockSessions?: MockSession[];
   /** How many mock interviews were started today. */
@@ -299,6 +302,13 @@ export interface PreviewProfileControls {
   /** How many practice calls were already made today. */
   setPracticeToday(count: number): void;
   /**
+   * The next dictation (D102) hears nothing, fails (the model twice, or the network), or meets
+   * today's limit.
+   */
+  failNextDictation(reason: 'nothing-heard' | 'failed' | 'quota'): void;
+  /** How many answers were already dictated today. */
+  setDictationsToday(count: number): void;
+  /**
    * The next mock interview call fails: the model (try again), busy (send the same again),
    * nothing heard in the answer, the model twice (the session ends as failed), or today's limit
    * (a start is refused; mid-session, the session ends).
@@ -333,6 +343,11 @@ export interface PreviewProfileControls {
 
 /** How long the fake takes to prepare a brief; the real one takes 10 to 20 seconds. */
 export const PREVIEW_BRIEF_MS = 1200;
+/** How long the fake takes to turn a dictated answer into text. */
+const PREVIEW_DICTATION_MS = 1200;
+/** What the fake hears in any dictation: the sentence of Web-X7-Dictated, 18 words. */
+export const PREVIEW_DICTATION =
+  'While we worked on it, I updated the support team every 15 minutes, so they could answer customers.';
 /** How long the fake takes to make a CV version; the real one takes about a minute. */
 export const PREVIEW_CV_MS = 2000;
 /** When a mock interview's hints are written: the planned questions' after the start, a follow-up's after it is asked (5 to 15 seconds for real). */
@@ -629,6 +644,13 @@ const practiceDailyLimit = (profile: PreviewProfile) =>
     serviceOverride(profile.usageLimits, USAGE_SERVICES.practice),
   ).maxCallsPerDay;
 
+/** The answers this account can dictate today (D102). */
+const dictationDailyLimit = (profile: PreviewProfile) =>
+  effectiveLimits(
+    DICTATION_DAILY_LIMIT,
+    serviceOverride(profile.usageLimits, USAGE_SERVICES.dictation),
+  ).maxCallsPerDay;
+
 /** The mock interviews this account can start today (D100). */
 const mockDailyLimit = (profile: PreviewProfile) =>
   effectiveLimits(
@@ -763,6 +785,7 @@ export const createPreviewProfileGateway = ({
   let nextBriefFailure: 'model' | 'quota' | null = null;
   let nextQuestionsFailure: 'model' | 'quota' | null = null;
   let nextPracticeFailure: 'model' | 'quota' | null = null;
+  let nextDictationFailure: 'nothing-heard' | 'failed' | 'quota' | null = null;
   let nextLetterFailure: CvVersionFailure | null = null;
   let nextMockFailure:
     'model' | 'busy' | 'nothing-heard' | 'failed' | 'quota' | null = null;
@@ -1981,6 +2004,13 @@ export const createPreviewProfileGateway = ({
     },
     setPracticeToday: count => {
       currentProfile().practiceToday = count;
+      save();
+    },
+    failNextDictation: reason => {
+      nextDictationFailure = reason;
+    },
+    setDictationsToday: count => {
+      currentProfile().dictationsToday = count;
       save();
     },
     failNextMock: reason => {
@@ -3717,6 +3747,34 @@ export const createPreviewProfileGateway = ({
       save();
     },
     getPracticeToday: async uid => read(uid).practiceToday ?? 0,
+    dictatePracticeAnswer: async ({ turnId }) => {
+      const profile = currentProfile();
+      if (!profile.practiceTurns?.some(({ id }) => id === turnId)) {
+        throw new ProfileError(ProfileErrorCode.NotFound);
+      }
+      const failure = nextDictationFailure;
+      nextDictationFailure = null;
+      const today = profile.dictationsToday ?? 0;
+      if (failure === 'quota' || today >= dictationDailyLimit(profile)) {
+        throw new ProfileError(ProfileErrorCode.DailyLimit);
+      }
+      await wait(PREVIEW_DICTATION_MS);
+      if (failure === 'failed') {
+        // A failed dictation counts its cost but no call, as the backend does.
+        throw new ProfileError(ProfileErrorCode.Unknown);
+      }
+      // The model ran, so nothing heard counts.
+      profile.dictationsToday = today + 1;
+      save();
+      if (failure === 'nothing-heard') {
+        throw new ProfileError(ProfileErrorCode.MockNothingHeard);
+      }
+      return {
+        text: PREVIEW_DICTATION,
+        words: PREVIEW_DICTATION.split(' ').length,
+      };
+    },
+    getDictationsToday: async uid => read(uid).dictationsToday ?? 0,
 
     // ---------- Mock interviews (D100): the fake interviewer of previewMockInterviews ----------
 

@@ -15,6 +15,7 @@ export const USAGE_SERVICES = {
   practice: 'practice',
   coverLetter: 'coverLetter',
   mockInterview: 'mockInterview',
+  dictation: 'dictation',
   aiDiagnostics: 'aiDiagnostics',
 } as const;
 export type UsageService = (typeof USAGE_SERVICES)[keyof typeof USAGE_SERVICES];
@@ -56,6 +57,15 @@ export const PRACTICE_DAILY_LIMIT: DailyLimits = {
 export const MOCK_INTERVIEW_DAILY_LIMIT: DailyLimits = {
   maxCallsPerDay: 3,
   maxCostUsdPerDay: 2,
+};
+
+/**
+ * Dictating a practice answer (D102, doc 25 §3): recordings turned into text per user and day, apart
+ * from the practice calls, so dictating never uses up feedback.
+ */
+export const DICTATION_DAILY_LIMIT: DailyLimits = {
+  maxCallsPerDay: 30,
+  maxCostUsdPerDay: 0.2,
 };
 
 /** Cover letters (D98, doc 22): letters written or written again per user and day. */

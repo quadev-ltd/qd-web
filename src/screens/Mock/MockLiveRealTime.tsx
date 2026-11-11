@@ -8,16 +8,17 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Icon from '@/components/Icon';
+import RecordingLevel from '@/components/RecordingLevel';
 import Spinner from '@/components/Spinner';
 import Banner from '@/components/ui/Banner';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Chip from '@/components/ui/Chip';
+import { clockTime, useTicking } from '@/core/audio/clock';
 import {
   type LiveInterviewController,
   type LiveView,
 } from '@/core/mock/LiveInterviewController';
-import { clockTime, Level, useTicking } from '@/screens/Mock/MockLive';
 import { MockPanel } from '@/screens/Mock/mockParts';
 
 const STATUS = {
@@ -109,7 +110,7 @@ export const RealTimeInterviewerCard: React.FC<{
         ) : (
           // The voice model writes its words once it has said them.
           <div className="flex flex-col gap-2">
-            <Level />
+            <RecordingLevel />
             <p className="text-[15px] leading-normal text-muted">
               {t('mock.liveWordsComeText')}
             </p>
