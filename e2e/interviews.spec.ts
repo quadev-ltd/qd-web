@@ -113,6 +113,10 @@ test('an interview added, shown on the tab and the list, edited and removed', as
   await add.getByLabel('Name (optional)').fill('Final interview');
   await add.getByLabel('Date').fill('2027-03-15');
   await add.getByLabel('Start time').fill('10:00');
+  // The lengths (D104)
+  await expect(
+    add.getByRole('group', { name: 'Length (optional)' }).getByRole('button'),
+  ).toHaveText(['15 min', '30 min', '45 min', '60 min', '75 min', '90 min']);
   await add.getByRole('button', { name: '45 min' }).click();
   await add.getByRole('button', { name: 'Mixed' }).click();
   await expect(add.getByRole('button', { name: 'Mixed' })).toHaveAttribute(

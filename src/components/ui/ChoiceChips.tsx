@@ -18,8 +18,8 @@ export interface ChoiceChipsProps<Value extends string | number> {
 }
 
 /**
- * A required choice of one from a few, drawn as chips (D100: a mock interview's length, the
- * feedback card's answers). A group of radio buttons underneath: the arrow keys move between the
+ * A required choice of one from a few, drawn as chips (D100: when a mock interview's hints show,
+ * the feedback card's answers). A group of radio buttons underneath: the arrow keys move between the
  * chips, and one stays chosen. ToggleChips is the optional choice that can be cleared.
  */
 export const ChoiceChips = <Value extends string | number>({

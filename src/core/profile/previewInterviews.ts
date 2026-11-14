@@ -9,7 +9,7 @@ import {
   INTERVIEW_DATE,
   INTERVIEW_DESCRIPTION_MAX_CHARS,
   INTERVIEW_LENGTH_MAX,
-  INTERVIEW_LENGTH_MIN,
+  INTERVIEW_LENGTH_STEP,
   INTERVIEW_NAME_MAX_CHARS,
   INTERVIEW_TIME,
   INTERVIEW_TYPES,
@@ -99,7 +99,8 @@ export const checkedFields = (fields: {
   if (
     typeof length === 'number' &&
     (!Number.isInteger(length) ||
-      length < INTERVIEW_LENGTH_MIN ||
+      length < INTERVIEW_LENGTH_STEP ||
+      length % INTERVIEW_LENGTH_STEP !== 0 ||
       length > INTERVIEW_LENGTH_MAX)
   ) {
     throw invalid();

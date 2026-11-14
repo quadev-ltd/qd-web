@@ -3,6 +3,7 @@
 // one follow-up, after the first answer; and each line voiced as a short tone, so the page plays
 // real audio. Test and preview only.
 import {
+  mockQuestionCount,
   type MockLine,
   type MockLineKind,
   type MockPlanQuestion,
@@ -74,13 +75,13 @@ const OWN_QUESTIONS: Pick<MockPlanQuestion, 'text' | 'kind'>[] = [
   },
 ];
 
-/** 4 questions for 10 minutes, 6 for 20: the interview's likely questions first. */
+/** The fewest questions the length plans (D103), the interview's likely questions first. */
 export const previewMockPlan = (
   likely: Pick<MockPlanQuestion, 'text' | 'kind'>[],
   lengthMinutes: number,
 ): MockPlanQuestion[] =>
   [...likely, ...OWN_QUESTIONS]
-    .slice(0, lengthMinutes >= 20 ? 6 : 4)
+    .slice(0, mockQuestionCount(lengthMinutes).min)
     .map(({ text, kind }, index) => ({
       id: `p${index + 1}`,
       text,

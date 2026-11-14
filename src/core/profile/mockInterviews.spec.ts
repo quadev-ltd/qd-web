@@ -9,8 +9,11 @@ import {
   mockFeedbackChipOf,
   mockHintsKey,
   mockHintsOf,
+  mockLengthMax,
+  mockLengthOf,
   mockOverallOf,
   mockProgress,
+  mockQuestionCount,
   MockSessionSchema,
 } from './mockInterviews';
 
@@ -98,6 +101,56 @@ describe('a mock interview as stored (D100)', () => {
     expect(
       isMockIdle(stored({ status: 'ended', updatedAt: 0 }), MOCK_IDLE_MS + 1),
     ).toBe(false);
+  });
+});
+
+describe('a mock interview’s length (D103)', () => {
+  it('goes up to the interview’s own length rounded down to 5 minutes, at most 60', () => {
+    expect(mockLengthMax(undefined)).toBe(60);
+    expect(mockLengthMax(5)).toBe(5);
+    expect(mockLengthMax(9)).toBe(5);
+    expect(mockLengthMax(15)).toBe(15);
+    expect(mockLengthMax(47)).toBe(45);
+    expect(mockLengthMax(60)).toBe(60);
+    expect(mockLengthMax(90)).toBe(60);
+  });
+
+  it('takes a step from an address, else 10, and no more than the interview allows', () => {
+    expect(mockLengthOf(25)).toBe(25);
+    expect(mockLengthOf(0)).toBe(10);
+    expect(mockLengthOf(Number.NaN)).toBe(10);
+    expect(mockLengthOf(12)).toBe(10);
+    expect(mockLengthOf(65)).toBe(10);
+    expect(mockLengthOf(45, 30)).toBe(30);
+    expect(mockLengthOf(0, 7)).toBe(5);
+  });
+
+  it('plans the backend’s count of questions for each length', () => {
+    expect(
+      [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60].map(minutes => {
+        const { min, max } = mockQuestionCount(minutes);
+        return `${minutes}: ${min}–${max}`;
+      }),
+    ).toEqual([
+      '5: 2–3',
+      '10: 4–5',
+      '15: 5–6',
+      '20: 6–8',
+      '25: 8–10',
+      '30: 10–12',
+      '35: 11–14',
+      '40: 13–16',
+      '45: 15–18',
+      '50: 16–20',
+      '55: 18–22',
+      '60: 20–24',
+    ]);
+  });
+
+  it('reads any length a session holds: 10 or 20 before, a step from 5 to 60 since', () => {
+    expect(stored({ lengthMinutes: 20 }).lengthMinutes).toBe(20);
+    expect(stored({ lengthMinutes: 45 }).lengthMinutes).toBe(45);
+    expect(stored({ lengthMinutes: 'long' }).lengthMinutes).toBe(10);
   });
 });
 

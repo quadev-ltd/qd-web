@@ -13,8 +13,11 @@ export const INTERVIEWS_MAX = 20;
 export const INTERVIEW_NAME_MAX_CHARS = 60;
 /** Longest "What you know about it". */
 export const INTERVIEW_DESCRIPTION_MAX_CHARS = 2_000;
-/** The lengths the form offers; the backend takes any whole number of minutes from 5 to 480. */
-export const INTERVIEW_LENGTHS = [30, 45, 60, 90] as const;
+/** The lengths the form offers (D104). */
+export const INTERVIEW_LENGTHS = [15, 30, 45, 60, 75, 90] as const;
+/** What the backend writes since D104: multiples of 15 minutes, up to 480. */
+export const INTERVIEW_LENGTH_STEP = 15;
+/** What an interview can hold: one written before D104 can be any whole number from 5. */
 export const INTERVIEW_LENGTH_MIN = 5;
 export const INTERVIEW_LENGTH_MAX = 480;
 

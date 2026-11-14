@@ -51,8 +51,56 @@ export const MOCK_WAYS_BUILT: readonly MockWay[] = [
 /** The ways spoken over the `live-assist` connection (§15): their steps are messages, not calls. */
 export const MOCK_LIVE_WAYS: readonly MockWay[] = ['real-time', 'voice-model'];
 
-export const MOCK_LENGTHS = [10, 20] as const;
-export type MockLength = (typeof MOCK_LENGTHS)[number];
+/**
+ * A mock interview's length (D103, doc 24 §20): from 5 minutes up to the interview's own length
+ * in steps of 5, at most 60.
+ */
+export const MOCK_LENGTH_MIN_MINUTES = 5;
+export const MOCK_LENGTH_STEP_MINUTES = 5;
+export const MOCK_LENGTH_MAX_MINUTES = 60;
+export const MOCK_LENGTH_DEFAULT_MINUTES = 10;
+
+/** The longest step an interview allows: its own length rounded down to 5 minutes, 60 with none. */
+export const mockLengthMax = (interviewLengthMinutes?: number): number =>
+  interviewLengthMinutes === undefined
+    ? MOCK_LENGTH_MAX_MINUTES
+    : Math.min(
+        MOCK_LENGTH_MAX_MINUTES,
+        Math.max(
+          MOCK_LENGTH_MIN_MINUTES,
+          Math.floor(interviewLengthMinutes / MOCK_LENGTH_STEP_MINUTES) *
+            MOCK_LENGTH_STEP_MINUTES,
+        ),
+      );
+
+/**
+ * A length an address asks for, within what the interview allows: a step from 5 to 60, else the
+ * default; above the interview's own, its highest step.
+ */
+export const mockLengthOf = (
+  minutes: number,
+  interviewLengthMinutes?: number,
+): number => {
+  const max = mockLengthMax(interviewLengthMinutes);
+  const step =
+    Number.isInteger(minutes) &&
+    minutes >= MOCK_LENGTH_MIN_MINUTES &&
+    minutes <= MOCK_LENGTH_MAX_MINUTES &&
+    minutes % MOCK_LENGTH_STEP_MINUTES === 0;
+  return Math.min(step ? minutes : MOCK_LENGTH_DEFAULT_MINUTES, max);
+};
+
+/** How many questions a session of this length plans (the backend's `mockQuestionCount`). */
+export const mockQuestionCount = (
+  lengthMinutes: number,
+): { min: number; max: number } => {
+  if (lengthMinutes <= 5) return { min: 2, max: 3 };
+  if (lengthMinutes <= 10) return { min: 4, max: 5 };
+  return {
+    min: Math.floor(lengthMinutes / 3),
+    max: Math.floor((2 * lengthMinutes) / 5),
+  };
+};
 
 /** "Voice 1" and "Voice 2" in the setup; the voices' names wait for the backend's check. */
 export const MOCK_VOICES = ['gemini', 'chirp'] as const;
@@ -113,6 +161,8 @@ export const MockRefusal = {
   SessionLimit: 'session-limit',
   /** Only `take-turns` is built. */
   WayNotBuilt: 'way-not-built',
+  /** Longer than the interview's own length allows (D103). */
+  LengthNotAllowed: 'length-not-allowed',
   /** The line no longer waits for an answer, and the request is not the one that answered it. */
   NotCurrent: 'not-current',
   /** Another call is working on the session: retry after a second with the same `requestId`. */
@@ -304,7 +354,8 @@ export const MockSessionSchema = z.object({
     .catch(undefined),
   interviewRemoved: z.literal(true).optional().catch(undefined),
   way: z.enum(MOCK_WAYS).catch('take-turns'),
-  lengthMinutes: z.union([z.literal(10), z.literal(20)]).catch(10),
+  /** 10 or 20 before D103; a step from 5 to 60 since. */
+  lengthMinutes: z.number().int().positive().catch(MOCK_LENGTH_DEFAULT_MINUTES),
   voice: z.enum([...MOCK_VOICES, MOCK_MODEL_VOICE]).catch('gemini'),
   /** A session started before hints (slice H1) shows them on request. */
   hintsShown: z.enum(MOCK_HINTS_SHOWN).catch(DEFAULT_MOCK_HINTS_SHOWN),
@@ -405,7 +456,8 @@ export interface StartMockInterviewRequest {
   applicationId: string;
   interviewId?: string;
   way: MockWay;
-  lengthMinutes: MockLength;
+  /** A step from 5 to 60, up to the interview's own (`length-not-allowed` above it). */
+  lengthMinutes: number;
   /** Needed except for `voice-model`, which speaks in its own voice. */
   voice?: MockVoice;
   /** `on-request` when left out. */

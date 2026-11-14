@@ -35,8 +35,11 @@ const inDays = (days: number) =>
     Date.now() + days * 86_400_000,
   );
 
-/** A new account with text practice and mock interviews on, an application, its interview and its likely question. */
-const openInterview = async (page: Page) => {
+/**
+ * A new account with text practice and mock interviews on, an application, its interview (with
+ * no length unless one is chosen) and its likely question.
+ */
+const openInterview = async (page: Page, length?: string) => {
   const account = await createAccount({
     interviewAssistant: true,
     textPractice: true,
@@ -57,6 +60,9 @@ const openInterview = async (page: Page) => {
   await add.getByLabel('Name (optional)').fill('Technical interview');
   await add.getByLabel('Date').fill(inDays(7));
   await add.getByLabel('Start time').fill('14:00');
+  if (length) {
+    await add.getByRole('button', { name: length }).click();
+  }
   await add.getByRole('button', { name: 'Add the interview' }).click();
   await expect(add).toBeHidden();
   await page.getByRole('link', { name: 'Technical interview' }).click();
@@ -490,6 +496,54 @@ test('the voice model (slices 5, website 5): its words after it speaks, an answe
   ).toBeVisible();
   await expect(
     page.getByText('The model’s own', { exact: true }),
+  ).toBeVisible();
+});
+
+test('the length (D103, D104): a 15-minute interview offers 5 to 15, 5 minutes plans 2 questions, and a longer address is kept to 15', async ({
+  page,
+}) => {
+  await openInterview(page, '15 min');
+  await page
+    .getByRole('button', { name: 'Practise for this interview' })
+    .click();
+  const setup = page.getByRole('dialog', { name: 'Mock interview' });
+  const length = setup.getByRole('slider', { name: 'Length' });
+  await expect(length).toHaveAttribute('max', '15');
+  await expect(length).toHaveValue('10');
+  await expect(setup).toContainText('15 min, this interview’s length');
+  await length.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(length).toHaveValue('5');
+  await expect(setup).toContainText('About 2 or 3 questions.');
+  await setup.getByRole('button', { name: 'Continue' }).click();
+  await expect(page).toHaveURL(/\/mock\?length=5&/);
+  await expect(
+    page.getByRole('region', { name: 'Your interview' }),
+  ).toContainText('About 5 minutes, 2 or 3 questions');
+
+  // startMockInterview takes 5: the offline plan's fewest, 2 questions
+  await page.getByRole('button', { name: 'Start the interview' }).click();
+  await expect(interviewer(page)).toContainText(
+    'fake-warm-up: tell me about your background.',
+  );
+  await expect(
+    page.getByText(/Question 1 of 2 · [1-5] min left/),
+  ).toBeVisible();
+  // Nothing answered: it ends without asking
+  await page.getByRole('button', { name: 'End interview' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Interview ended' }),
+  ).toBeVisible();
+
+  // An address asking for 60: the page asks for 15, which the backend takes
+  const interviewPath = new URL(page.url()).pathname.replace(/\/mock\/.*$/, '');
+  await page.goto(`${interviewPath}/mock?length=60&voice=gemini`);
+  await expect(
+    page.getByRole('region', { name: 'Your interview' }),
+  ).toContainText('About 15 minutes, 5 or 6 questions');
+  await page.getByRole('button', { name: 'Start the interview' }).click();
+  await expect(
+    page.getByText(/Question 1 of 5 · 1[0-5] min left/),
   ).toBeVisible();
 });
 
