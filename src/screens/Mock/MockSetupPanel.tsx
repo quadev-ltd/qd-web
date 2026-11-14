@@ -1,10 +1,10 @@
 // "Mock interview" set up (Web-X6-Setup, D100): how you'll talk, the ways built so far each in one
-// line (take turns, real time, the voice model; doc 24 §16), 10 or 20 minutes, Voice 1 or Voice 2
-// with "Hear it", none for the voice model, which speaks in its own (a
-// sample the backend voiced once, served with the site), when the hints show (slice H2), where the
-// questions come from, and "Continue", which opens the mock interview's page with these choices.
-// The sessions left today are under it.
-import { useEffect, useRef, useState } from 'react';
+// line (take turns, real time, the voice model; doc 24 §16), the length on a slider up to the
+// interview's own (D103, doc 24 §20), Voice 1 or Voice 2 with "Hear it", none for the voice
+// model, which speaks in its own (a sample the backend voiced once, served with the site), when
+// the hints show (slice H2), where the questions come from, and "Continue", which opens the mock
+// interview's page with these choices. The sessions left today are under it.
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
@@ -17,11 +17,14 @@ import { dailyLimitResetTime } from '@/core/profile/limits';
 import {
   DEFAULT_MOCK_HINTS_SHOWN,
   MOCK_HINTS_SHOWN,
-  MOCK_LENGTHS,
+  MOCK_LENGTH_DEFAULT_MINUTES,
+  MOCK_LENGTH_MIN_MINUTES,
+  MOCK_LENGTH_STEP_MINUTES,
   MOCK_VOICES,
   MOCK_WAYS_BUILT,
+  mockLengthMax,
+  mockLengthOf,
   type MockHintsShown,
-  type MockLength,
   type MockVoice,
   type MockWay,
 } from '@/core/profile/mockInterviews';
@@ -29,6 +32,7 @@ import { applicationInterviewMockPath } from '@/core/profile/paths';
 import { useMockLeft } from '@/core/profile/useMockInterviews';
 import {
   HINTS_SHOWN_KEYS,
+  questionRange,
   VOICE_KEYS,
   WAY_KEYS,
   WAY_TEXT_KEYS,
@@ -36,23 +40,26 @@ import {
 
 export interface MockChoices {
   way: MockWay;
-  lengthMinutes: MockLength;
+  lengthMinutes: number;
   voice: MockVoice;
   hints: MockHintsShown;
 }
 
 export const DEFAULT_MOCK_CHOICES: MockChoices = {
   way: 'take-turns',
-  lengthMinutes: 10,
+  lengthMinutes: MOCK_LENGTH_DEFAULT_MINUTES,
   voice: 'gemini',
   hints: DEFAULT_MOCK_HINTS_SHOWN,
 };
 
 /**
  * The choices an address carries (`?length=20&voice=chirp&hints=after-answer&way=real-time`), the
- * defaults otherwise. Only a way built so far.
+ * defaults otherwise. Only a way built so far, and a length the interview allows.
  */
-export const mockChoicesOf = (search: URLSearchParams): MockChoices => {
+export const mockChoicesOf = (
+  search: URLSearchParams,
+  interviewLengthMinutes?: number,
+): MockChoices => {
   const length = Number(search.get('length'));
   const voice = search.get('voice');
   const hints = search.get('hints');
@@ -61,9 +68,7 @@ export const mockChoicesOf = (search: URLSearchParams): MockChoices => {
     way: MOCK_WAYS_BUILT.includes(way as MockWay)
       ? (way as MockWay)
       : DEFAULT_MOCK_CHOICES.way,
-    lengthMinutes: (MOCK_LENGTHS as readonly number[]).includes(length)
-      ? (length as MockLength)
-      : DEFAULT_MOCK_CHOICES.lengthMinutes,
+    lengthMinutes: mockLengthOf(length, interviewLengthMinutes),
     voice: (MOCK_VOICES as readonly string[]).includes(voice ?? '')
       ? (voice as MockVoice)
       : DEFAULT_MOCK_CHOICES.voice,
@@ -81,6 +86,88 @@ export const mockChoicesSearch = ({
 }: MockChoices) =>
   `?length=${lengthMinutes}&voice=${voice}&hints=${hints}&way=${way}`;
 
+/**
+ * "Length" (Web-X6-Setup, D103): a native range from 5 minutes up to the interview's own length in
+ * steps of 5, drawn as the board's track with a dot for each step. The arrow keys move one step,
+ * and it is read as "25 minutes, about 8 to 10 questions". The right end names the interview's
+ * length only when it is the highest step; with one step, only that end shows.
+ */
+const LengthSlider: React.FC<{
+  value: number;
+  interviewLengthMinutes?: number;
+  onChange: (minutes: number) => void;
+}> = ({ value, interviewLengthMinutes, onChange }) => {
+  const { t } = useTranslation();
+  const id = useId();
+  const max = mockLengthMax(interviewLengthMinutes);
+  const span = max - MOCK_LENGTH_MIN_MINUTES;
+  const at = (minutes: number) =>
+    span === 0 ? 0 : ((minutes - MOCK_LENGTH_MIN_MINUTES) / span) * 100;
+  const steps = Array.from(
+    { length: span / MOCK_LENGTH_STEP_MINUTES + 1 },
+    (_, index) => MOCK_LENGTH_MIN_MINUTES + index * MOCK_LENGTH_STEP_MINUTES,
+  );
+  const questions = questionRange(t, value);
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-baseline gap-2">
+        <label
+          htmlFor={id}
+          className="flex-1 text-sm leading-natural font-medium">
+          {t('mock.lengthLabel')}
+        </label>
+        <p className="text-[16px] leading-normal font-bold">
+          {t('mock.lengthOption', { minutes: value })}
+        </p>
+      </div>
+      <div className="relative h-11">
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-3 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-border-faint">
+          <div
+            className="absolute inset-y-0 left-0 rounded-full bg-primary"
+            style={{ width: `${at(value)}%` }}
+          />
+          {steps.map(minutes => (
+            <span
+              key={minutes}
+              className={`absolute top-1/2 size-1 -translate-1/2 rounded-full ${minutes < value ? 'bg-surface' : 'bg-border-strong'}`}
+              style={{ left: `${at(minutes)}%` }}
+            />
+          ))}
+        </div>
+        <input
+          id={id}
+          type="range"
+          min={MOCK_LENGTH_MIN_MINUTES}
+          max={max}
+          step={MOCK_LENGTH_STEP_MINUTES}
+          value={value}
+          onChange={event => onChange(Number(event.target.value))}
+          aria-valuetext={t('mock.lengthValue', { minutes: value, questions })}
+          // The board's thumb, for Chrome and Safari, then Firefox.
+          className="absolute inset-0 size-full cursor-pointer appearance-none rounded-control bg-transparent focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-(--focus-ring) [&::-moz-range-thumb]:box-border [&::-moz-range-thumb]:size-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-primary [&::-moz-range-thumb]:bg-surface [&::-moz-range-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.25)] [&::-webkit-slider-thumb]:box-border [&::-webkit-slider-thumb]:size-6 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-solid [&::-webkit-slider-thumb]:border-primary [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.25)]"
+        />
+      </div>
+      <div className="flex items-center gap-2 text-[13px] leading-normal text-muted">
+        {span > 0 && (
+          <p className="flex-1">
+            {t('mock.lengthEnd', { minutes: MOCK_LENGTH_MIN_MINUTES })}
+          </p>
+        )}
+        <p className="ml-auto">
+          {max === interviewLengthMinutes
+            ? t('mock.lengthEndInterview', { minutes: max })
+            : t('mock.lengthEnd', { minutes: max })}
+        </p>
+      </div>
+      <p className="text-sm leading-normal text-muted">
+        {t('mock.lengthQuestions', { questions })}
+      </p>
+    </div>
+  );
+};
+
 /** Each voice saying the same line (doc 24 §13.8): "Hello, I'm an AI interviewer. …". */
 export const VOICE_SAMPLES = {
   gemini: '/mock/voice-gemini.mp3',
@@ -92,6 +179,8 @@ export interface MockSetupPanelProps {
   interviewId: string;
   /** "Technical interview · Senior Backend Engineer, Northwind Logistics". */
   description: string;
+  /** The interview's own length: the longest a mock interview of it can be (D103). */
+  interviewLengthMinutes?: number;
   initial?: MockChoices;
   onClose: () => void;
 }
@@ -100,6 +189,7 @@ export const MockSetupPanel: React.FC<MockSetupPanelProps> = ({
   applicationId,
   interviewId,
   description,
+  interviewLengthMinutes,
   initial = DEFAULT_MOCK_CHOICES,
   onClose,
 }) => {
@@ -107,7 +197,9 @@ export const MockSetupPanel: React.FC<MockSetupPanelProps> = ({
   const navigate = useNavigate();
   const { left } = useMockLeft();
   const [way, setWay] = useState(initial.way);
-  const [lengthMinutes, setLengthMinutes] = useState(initial.lengthMinutes);
+  const [lengthMinutes, setLengthMinutes] = useState(() =>
+    mockLengthOf(initial.lengthMinutes, interviewLengthMinutes),
+  );
   const [voice, setVoice] = useState(initial.voice);
   const [hints, setHints] = useState(initial.hints);
   const sample = useRef<HTMLAudioElement | null>(null);
@@ -162,13 +254,9 @@ export const MockSetupPanel: React.FC<MockSetupPanelProps> = ({
             {t('mock.waysNote')}
           </p>
         </fieldset>
-        <ChoiceChips
-          label={t('mock.lengthLabel')}
-          options={MOCK_LENGTHS.map(minutes => ({
-            value: minutes,
-            label: t('mock.lengthOption', { minutes }),
-          }))}
+        <LengthSlider
           value={lengthMinutes}
+          interviewLengthMinutes={interviewLengthMinutes}
           onChange={setLengthMinutes}
         />
         {way === 'voice-model' ? (

@@ -102,7 +102,22 @@ test('a mock interview taken in turns: set up, started, answered, a follow-up, s
   const setup = page.getByRole('dialog', { name: 'Mock interview' });
   await expect(setup.getByRole('radio', { name: 'Take turns' })).toBeChecked();
   await expect(setup).toContainText('3 of 3 mock interviews left today');
-  await setup.getByText('20 minutes').click();
+  // The length (D103): 5 minutes up to the interview's 60, 10 first; the arrow keys move a step
+  const length = setup.getByRole('slider', { name: 'Length' });
+  await expect(length).toHaveValue('10');
+  await expect(setup).toContainText('5 min');
+  await expect(setup).toContainText('60 min, this interview’s length');
+  await expect(setup).toContainText('About 4 or 5 questions.');
+  await length.focus();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(length).toHaveValue('20');
+  await expect(length).toHaveAttribute(
+    'aria-valuetext',
+    '20 minutes, about 6 to 8 questions',
+  );
+  await expect(setup).toContainText('20 minutes');
+  await expect(setup).toContainText('About 6 to 8 questions.');
   await setup.getByText('Voice 2').click();
   await setup.getByRole('button', { name: 'Continue' }).click();
 

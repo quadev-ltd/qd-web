@@ -13,7 +13,6 @@ import {
   type MockClient,
   type MockEndReason,
   type MockHintsShown,
-  type MockLength,
   type MockLine,
   type MockLines,
   type MockPlayed,
@@ -89,7 +88,7 @@ export interface MockSetup {
   applicationId: string;
   interviewId?: string;
   way: MockWay;
-  lengthMinutes: MockLength;
+  lengthMinutes: number;
   voice: MockVoice;
   hints: MockHintsShown;
 }

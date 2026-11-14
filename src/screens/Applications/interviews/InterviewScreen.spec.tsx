@@ -321,6 +321,38 @@ describe('editing an interview', () => {
     });
   });
 
+  it('keeps a length the chips don’t offer (written before D104), without sending it again', async () => {
+    const user = userEvent.setup();
+    const { gateway } = setUp({
+      interviews: [interviewFixture({ lengthMinutes: 20 })],
+    });
+    const panel = await openEdit(user);
+
+    // 15, 20, 30, 45, 60, 75 and 90, with 20 chosen.
+    const chips = within(panel).getAllByRole('button', {
+      name: 'interviews.lengthChip',
+    });
+    expect(chips).toHaveLength(7);
+    expect(chips[1]).toHaveAttribute('aria-pressed', 'true');
+
+    await user.clear(within(panel).getByLabelText('interviews.nameField'));
+    await user.type(
+      within(panel).getByLabelText('interviews.nameField'),
+      'Final interview',
+    );
+    await user.click(
+      within(panel).getByRole('button', { name: 'interviews.saveButton' }),
+    );
+
+    await waitFor(() => {
+      expect(gateway.updateInterview).toHaveBeenCalledWith({
+        applicationId: 'a1',
+        interviewId: 'i1',
+        name: 'Final interview',
+      });
+    });
+  });
+
   it('closes without a call when nothing changed', async () => {
     const user = userEvent.setup();
     const { gateway } = setUp();

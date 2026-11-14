@@ -174,6 +174,31 @@ The owner noticed mock interviews could be found only from Sessions in the menu.
 - **The feedback chip:** "Preparing feedback" while any of it is being written or not yet due; otherwise "Feedback
   ready" once one answer's is; otherwise "No feedback yet". Agreed with the design chat.
 
+## The length up to the interview's own (D103, D104, 14 Nov 2026)
+
+The owner asked for the length to go up to the interview's, in steps of 5 minutes (D103). Drawn in canvas version
+82 (doc 24 §20). Built against quadev-backend #75.
+
+- **A native range input** in place of the 10 / 20 chips. It runs from 5 up to the interview's own `lengthMinutes`,
+  rounded down to 5, at most 60, or 60 with no length. The board's track, a dot per step and the thumb are drawn
+  over it, so the arrow keys, the label and `aria-valuetext` ("25 minutes, about 8 to 10 questions") come with the
+  browser. The default is 10, or the highest step when that's less.
+- **The question count** is a copy of the backend's `mockQuestionCount` (2 or 3 for 5 minutes, 4 or 5 for 10, then
+  ⌊L/3⌋ to ⌊2L/5⌋), worded "4 or 5" when the counts are consecutive and "6 to 8" otherwise. The same words are on
+  Ready's summary.
+- **Agreed with the design chat**, not on the boards:
+  - the right end reads "…, this interview's length" only when the highest step is exactly the interview's length
+    (a 47-minute or a 90-minute interview reads plain "45 min" or "60 min");
+  - with one step (an interview of 5 to 9 minutes), only the right end shows, and the input stays enabled.
+- **An address's length** (`?length=`) is kept to a step the interview allows, on the setup and on the mock
+  interview's page: a stale "60" for a 15-minute interview starts 15. The backend refuses anything longer as
+  `length-not-allowed`, which the page shows as any refusal of the start.
+- **Sessions** read any whole number of minutes: older ones are 10 or 20.
+- **The interview form** (D104) offers 15, 30, 45, 60, 75 and 90, and the backend writes only multiples of 15. A
+  length stored before then still shows as its own chip, and an edit sends the length only when it changed, so an
+  old one is never refused. At 390 the chips wrap 4 + 2, as every other chip row does; the board's 3 + 3 came from
+  its generator's wider chips (agreed with the design chat).
+
 ## Consequences
 
 - Real time (slice 4) adds a WebSocket and an AudioWorklet next to the recorder; the controller's view and the

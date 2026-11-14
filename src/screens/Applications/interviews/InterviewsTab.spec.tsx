@@ -273,7 +273,7 @@ describe('adding an interview', () => {
       interviewFixture({ id: 'interview-1', name: 'Final interview' }),
     );
     const panel = await fillIn(user);
-    const [, , sixty] = within(panel).getAllByRole('button', {
+    const [, , , sixty] = within(panel).getAllByRole('button', {
       name: 'interviews.lengthChip',
     });
     await user.click(sixty);

@@ -8,8 +8,8 @@ import Icon, { type IconName } from '@/components/Icon';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import {
+  mockQuestionCount,
   type MockHintsShown,
-  type MockLength,
   type MockSession,
   type MockSessionVoice,
   type MockWay,
@@ -35,10 +35,14 @@ export const VOICE_KEYS = {
   'gemini-live': 'mock.voiceModelOwn',
 } as const satisfies Record<MockSessionVoice, string>;
 
-export const LENGTH_SUMMARY_KEYS = {
-  10: 'mock.lengthSummary10',
-  20: 'mock.lengthSummary20',
-} as const satisfies Record<MockLength, string>;
+/** The questions a length plans, as the backend counts them (D103): "4 or 5", "6 to 8". */
+export const questionRange = (t: TFunction, lengthMinutes: number) => {
+  const { min, max } = mockQuestionCount(lengthMinutes);
+  return t(max === min + 1 ? 'mock.questionsOr' : 'mock.questionsTo', {
+    min,
+    max,
+  });
+};
 
 /** The setup's choice, in the candidate's words. */
 export const HINTS_SHOWN_KEYS = {
@@ -118,7 +122,7 @@ export const MockPanel: React.FC<{
 /** "Your interview": the way, the length and the voice, with "Change" before it starts. */
 export const MockSummaryCard: React.FC<{
   way: MockWay;
-  lengthMinutes: MockLength;
+  lengthMinutes: number;
   voice: MockSessionVoice;
   hints: MockHintsShown;
   onChange?: () => void;
@@ -126,7 +130,13 @@ export const MockSummaryCard: React.FC<{
   const { t } = useTranslation();
   const rows = [
     [t('mock.summaryWay'), t(WAY_KEYS[way])],
-    [t('mock.summaryLength'), t(LENGTH_SUMMARY_KEYS[lengthMinutes])],
+    [
+      t('mock.summaryLength'),
+      t('mock.lengthSummary', {
+        minutes: lengthMinutes,
+        questions: questionRange(t, lengthMinutes),
+      }),
+    ],
     [t('mock.summaryVoice'), t(VOICE_KEYS[voice])],
     [t('mock.summaryHints'), t(HINTS_SUMMARY_KEYS[hints])],
   ];

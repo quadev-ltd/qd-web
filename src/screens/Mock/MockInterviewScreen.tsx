@@ -340,7 +340,9 @@ export const MockInterviewScreen: React.FC = () => {
   const { interviews } = useInterviews(applicationId);
   const { left, reread } = useMockLeft();
   const hasSessions = useHasMockSessions();
-  const choices: MockChoices = mockChoicesOf(search);
+  const interview = interviews.find(({ id }) => id === interviewId);
+  // The address's length, within what the interview allows (D103).
+  const choices: MockChoices = mockChoicesOf(search, interview?.lengthMinutes);
   const now = useNow();
   const [pausedByYou, setPausedByYou] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -463,7 +465,6 @@ export const MockInterviewScreen: React.FC = () => {
   useTicking(running);
 
   const application = applications.find(({ id }) => id === applicationId);
-  const interview = interviews.find(({ id }) => id === interviewId);
   const interviewName = interview
     ? interviewTitle(t, interview)
     : session?.interview

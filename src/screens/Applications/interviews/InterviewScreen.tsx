@@ -338,7 +338,8 @@ const InterviewPage: React.FC<{
           applicationId={application.id}
           interviewId={interview.id}
           description={[title, subtitle].filter(Boolean).join(' · ')}
-          initial={mockChoicesOf(search)}
+          interviewLengthMinutes={interview.lengthMinutes}
+          initial={mockChoicesOf(search, interview.lengthMinutes)}
           onClose={() => {
             setSettingUp(false);
             if (search.has('mock')) {

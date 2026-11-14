@@ -119,6 +119,7 @@ const PRECONDITION_CODES: Record<string, ProfileErrorCode> = {
   [MockRefusal.SessionEnded]: ProfileErrorCode.MockSessionEnded,
   [MockRefusal.SessionFailed]: ProfileErrorCode.MockSessionFailed,
   [MockRefusal.WayNotBuilt]: ProfileErrorCode.Invalid,
+  [MockRefusal.LengthNotAllowed]: ProfileErrorCode.Invalid,
   [MockRefusal.NotEnded]: ProfileErrorCode.Invalid,
   [MockRefusal.NotAnswered]: ProfileErrorCode.Invalid,
   [MockRefusal.NotFailed]: ProfileErrorCode.MockFeedbackNotFailed,

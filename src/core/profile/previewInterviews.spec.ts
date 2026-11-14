@@ -68,6 +68,10 @@ describe('checkedFields', () => {
     );
     expect(() => checkedFields({ lengthMinutes: 4 })).toThrow(invalid);
     expect(() => checkedFields({ lengthMinutes: 30.5 })).toThrow(invalid);
+    // Multiples of 15 only since D104.
+    expect(() => checkedFields({ lengthMinutes: 5 })).toThrow(invalid);
+    expect(() => checkedFields({ lengthMinutes: 20 })).toThrow(invalid);
+    expect(() => checkedFields({ lengthMinutes: 495 })).toThrow(invalid);
     expect(() => checkedFields({ description: 'x'.repeat(2_001) })).toThrow(
       invalid,
     );

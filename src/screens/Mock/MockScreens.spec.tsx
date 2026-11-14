@@ -3,7 +3,7 @@
 // card, what was said in Sessions with the feedback on each answer (D101), and a browser that
 // can't record. The interview's own steps are the controller's spec
 // and the browser journeys'.
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 
@@ -118,8 +118,12 @@ const recordingBrowser = () => {
   });
 };
 
-const renderMock = (route: string, gateway = createMockProfileGateway()) => {
-  gateway.getInterviews.mockResolvedValue([interviewFixture()]);
+const renderMock = (
+  route: string,
+  gateway = createMockProfileGateway(),
+  interview = interviewFixture(),
+) => {
+  gateway.getInterviews.mockResolvedValue([interview]);
   return renderProfilePage(<></>, {
     gateway,
     route,
@@ -186,8 +190,11 @@ describe('setting up a mock interview (Web-X6-Setup)', () => {
       within(ways).getByRole('radio', { name: 'mock.wayRealTimeName' }),
     );
     // 20 minutes, Voice 2
+    fireEvent.change(
+      within(panel).getByRole('slider', { name: 'mock.lengthLabel' }),
+      { target: { value: '20' } },
+    );
     await user.click(within(panel).getAllByRole('radio')[4]!);
-    await user.click(within(panel).getAllByRole('radio')[6]!);
     // Hints: "When I ask" first chosen, then "After I answer"
     expect(
       within(panel).getByRole('radio', { name: 'mock.hintsOnRequest' }),
@@ -204,6 +211,82 @@ describe('setting up a mock interview (Web-X6-Setup)', () => {
         'now at /applications/a1/interviews/i1/mock?length=20&voice=chirp&hints=after-answer&way=real-time',
       ),
     ).toBeInTheDocument();
+  });
+
+  describe('the length (D103): from 5 minutes up to the interview’s own, in steps of 5', () => {
+    const renderSetup = (
+      interviewLengthMinutes?: number,
+      initial?: Parameters<typeof MockSetupPanel>[0]['initial'],
+    ) =>
+      renderProfilePage(
+        <MockSetupPanel
+          applicationId="a1"
+          interviewId="i1"
+          description="Technical interview"
+          interviewLengthMinutes={interviewLengthMinutes}
+          initial={initial}
+          onClose={vi.fn()}
+        />,
+        { route: '/applications/a1/interviews/i1' },
+      );
+    const slider = () =>
+      screen.getByRole('slider', { name: 'mock.lengthLabel' });
+
+    it('a 30-minute interview: 5 to 30, 10 first, read with its questions, its length at the right end', () => {
+      renderSetup(30);
+
+      expect(slider()).toHaveAttribute('min', '5');
+      expect(slider()).toHaveAttribute('max', '30');
+      expect(slider()).toHaveAttribute('step', '5');
+      expect(slider()).toHaveValue('10');
+      expect(slider()).toHaveAttribute('aria-valuetext', 'mock.lengthValue');
+      expect(screen.getByText('mock.lengthEnd')).toBeVisible();
+      expect(screen.getByText('mock.lengthEndInterview')).toBeVisible();
+      expect(screen.getByText('mock.lengthQuestions')).toBeVisible();
+    });
+
+    it('up to 60: with no length set, or a longer interview, the right end is only the minutes', () => {
+      const { unmount } = renderSetup(undefined);
+      expect(slider()).toHaveAttribute('max', '60');
+      expect(screen.getAllByText('mock.lengthEnd')).toHaveLength(2);
+      expect(
+        screen.queryByText('mock.lengthEndInterview'),
+      ).not.toBeInTheDocument();
+      unmount();
+
+      renderSetup(90);
+      expect(slider()).toHaveAttribute('max', '60');
+      expect(
+        screen.queryByText('mock.lengthEndInterview'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('rounds an interview’s length down: 47 minutes offers up to 45, not called its length', () => {
+      renderSetup(47);
+      expect(slider()).toHaveAttribute('max', '45');
+      expect(
+        screen.queryByText('mock.lengthEndInterview'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('an interview of 5 minutes: the one step, chosen, with only the right end', () => {
+      renderSetup(5);
+      expect(slider()).toHaveAttribute('max', '5');
+      expect(slider()).toHaveValue('5');
+      expect(slider()).toBeEnabled();
+      expect(screen.queryByText('mock.lengthEnd')).not.toBeInTheDocument();
+      expect(screen.getByText('mock.lengthEndInterview')).toBeVisible();
+    });
+
+    it('a length from before longer than the interview allows: its highest step', () => {
+      renderSetup(15, {
+        way: 'take-turns',
+        lengthMinutes: 40,
+        voice: 'gemini',
+        hints: 'on-request',
+      });
+      expect(slider()).toHaveValue('15');
+    });
   });
 
   it('can’t continue with none left today', async () => {
@@ -237,7 +320,7 @@ describe('a mock interview’s page (Web-X6-Ready, -End, -CantRecord)', () => {
     const summary = await screen.findByRole('region', {
       name: 'mock.summaryTitle',
     });
-    expect(summary).toHaveTextContent('mock.lengthSummary20');
+    expect(summary).toHaveTextContent('mock.lengthSummary');
     expect(summary).toHaveTextContent('mock.voiceChirp');
     expect(summary).toHaveTextContent('mock.hintsSummaryAfterAnswer');
     expect(
@@ -266,6 +349,24 @@ describe('a mock interview’s page (Web-X6-Ready, -End, -CantRecord)', () => {
       ),
     ).toBeInTheDocument();
     expect(gateway.countMockSessions).toHaveBeenCalled();
+  });
+
+  it('Ready: an address longer than the interview allows takes its highest step (D103)', async () => {
+    const user = userEvent.setup();
+    renderMock(
+      '/applications/a1/interviews/i1/mock?length=45&voice=gemini',
+      createMockProfileGateway(),
+      interviewFixture({ lengthMinutes: 30 }),
+    );
+
+    // Once the interview is read.
+    await screen.findAllByText('Technical interview');
+    await user.click(screen.getByRole('button', { name: 'mock.changeButton' }));
+    expect(
+      screen.getByText(
+        'now at /applications/a1/interviews/i1?length=30&voice=gemini&hints=on-request&way=take-turns&mock=setup',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('Ready in real time: the way in the summary, and headphones suggested (Web-X6-RT-Ready)', async () => {
